@@ -1,6 +1,6 @@
 #[ 
   QXX lattice field theory framework: github.com/ctpeterson/QXX
-  Source file: test/tlattice/tbravais.nim
+  Source file: test/tlattice/tlatticeutils.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,13 +25,32 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-type
-  GeometryType* = int16 
-  CoordinateType* = int32
+#[ backend: implementation of helper procedures for lattice initialization ]#
 
-type
-  Lattice* = concept l
-    type S = auto
-    type F = auto
-    l.sites is S
-    l.newField(F)
+iterator dimensions*[T](arr: openArray[T]): T {.inline.} =
+  # silly helper iterator for iterating through openArray indices
+  for mu in 0..<arr.len: yield T(mu)
+
+proc ones*(nd: int; T: typedesc): seq[T] {.inline.} =
+  # constructs a sequence of ones
+  result = newSeq[T](nd)
+  for mu in 0..<nd: result[mu] = T(1)
+
+# checks if integer "a" divides integer "b"
+proc divides*(a, b: SomeInteger): bool {.inline.} = b mod a == 0
+
+proc dividesSomeElement*(a: SomeInteger; bs: seq[SomeInteger]): bool {.inline.} =
+  # checks if integer "a" divides any integer in "bs"
+  for b in bs: 
+    if divides(a, b): return true
+  return false
+
+proc copyToSeq*[T](arr: openArray[T]): seq[T] {.inline.} =
+  # copies open array to sequence
+  result = newSeq[T](arr.len)
+  for mu in arr.dimensions: result[mu] = arr[mu]
+
+proc product*[T](arr: openArray[T]): T {.inline.} =
+  # calculates product of open array's entries
+  result = T(1)
+  for el in arr: result *= el

@@ -25,27 +25,16 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import std/[system]
-
-import tlatticeconcept
-import tupcxx
+type
+  GeometryType* = int16 
+  CoordinateType* = int32
 
 type
-  SimpleCubicLattice = object
-    latticeGeometry: seq[GeometryType]
-    rankGeometry: seq[GeometryType]
-    globalPtr: upcxx_global_ptr[CoordinateType]
-    sites: seq[CoordinateType]
-
-template toGeomSeq[T](ilg, irg: openArray[T]): untyped =
-  assert(tlg.len == trg.len)
-  let nd = tlg.len
-  var (olg, org) = (newSeq[GeometryType](nd), newSeq[GeometryType](nd))
-  for idx in 0..<nd: 
-    (olg[idx], org[idx]) = (GeometryType(ilg[idx]), GeometryType(irg[idx]))
-  (olg, org)
-
-proc newSimpleCubicLattice*(
-  latticeGeometry, rankGeometry: openArray[SomeInteger]
-): SimpleCubicLattice =
-  let (lg, rg) = toGeomSeq(latticeGeometry, rankGeometry)
+  Lattice* = concept l
+    ## Generic lattice
+    ## Author: Curtis Taylor Peterson
+    ## <in need of documentation>
+    type S = auto
+    type F = auto
+    l.sites is S
+    l.newField(F)
