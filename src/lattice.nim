@@ -1,4 +1,4 @@
-import lattice/[latticeconcept, bravais]
+import lattice/[latticeconcept, bravaislattice]
 
-export bravais
+export bravaislattice
 export latticeconcept

@@ -1,4 +1,4 @@
-import utils/[nimutils, upcxxutils]
+import utils/[nimutils, reliqutils]
 
 export nimutils
-export upcxxutils
+export reliqutils

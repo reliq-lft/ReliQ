@@ -25,16 +25,25 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+#[ backend: constants ]#
+
+const 
+  printBreak* = "\n...............................................................\n"
+
 #[ backend: implementation of helper procedures for lattice initialization ]#
 
-iterator dimensions*[T](arr: openArray[T]): T {.inline.} =
+iterator dimensions*[T](arr: openArray[T]): int {.inline.} =
   # silly helper iterator for iterating through openArray indices
-  for mu in 0..<arr.len: yield T(mu)
+  for mu in 0..<arr.len: yield mu
+
+iterator reversedDimensions*[T](arr: openArray[T], start: int = 0): int {.inline.} =
+  # silly helper iterator for iteration through openArray indices in reverse
+  for mu in countdown(arr.len - (start + 1), 0): yield mu
 
 proc ones*(nd: int; T: typedesc): seq[T] {.inline.} =
   # constructs a sequence of ones
   result = newSeq[T](nd)
-  for mu in 0..<nd: result[mu] = T(1)
+  for mu in result.dimensions: result[mu] = T(1)
 
 # checks if integer "a" divides integer "b"
 proc divides*(a, b: SomeInteger): bool {.inline.} = b mod a == 0

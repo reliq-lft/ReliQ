@@ -57,6 +57,11 @@ proc upcxx_new*(T: typedesc): upcxx_global_ptr[T]
 proc upcxx_delete*[T](global_ptr: upcxx_global_ptr[T])
   {.importcpp: "upcxx::delete_(#)", upcxx.}
 
+proc upcxx_new_array_int*(size: csize_t): upcxx_global_ptr[cint]
+  {.constructor, importcpp: "upcxx::new_array<int>(#)", upcxx.}
+proc upcxx_delete_array*[T](global_ptr: upcxx_global_ptr[T])
+  {.importcpp: "upcxx::delete_array(#)", upcxx.}
+
 proc upcxx_local*[T](global_ptr: upcxx_global_ptr[T]): ptr T
   {.importcpp: "#.local()", upcxx.}
 
