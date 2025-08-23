@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/utils/reliqutils.nim
+  Source file: build/configure.nims
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -24,11 +24,3 @@
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
-
-import upcxx
-
-proc print*(strs: varargs[string]) =
-  if upcxx_rank_me() == 0: 
-    var printout = ""
-    for str in strs: printout &= str
-    echo printout

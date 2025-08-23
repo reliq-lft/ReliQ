@@ -1,6 +1,6 @@
 #[ 
-  QXX lattice field theory framework: github.com/ctpeterson/QXX
-  Source file: test/tlattice/tbravais.nim
+  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  Source file: src/lattice/bravais.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License

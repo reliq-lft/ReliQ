@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""
+  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  Source file: build/install.py
+  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  MIT License
+  
+  Copyright (c) 2025 Curtis Taylor Peterson
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+import sys
+import os
+import subprocess
+import threading
+import pathlib
+import argparse
+import logging
+import time
+import json
+import curses
+import typing
+
+from collections.abc import Callable
+
+### constants ###
+
+DESCRIPTION: str = "Configure and install ReliQ lattice field theory framework"
+
+CWD: pathlib.Path = pathlib.Path.cwd()
+HOME: pathlib.Path = pathlib.Path.home()
+DEFAULT_STANDIN_PATH: pathlib.Path = pathlib.Path('__RELIQ__')
+
+NIM_URL: str = 'Nim: https://nim-lang.org'
+UPCXX_URL: str = 'UPC++: https://bitbucket.org/berkeleylab/upcxx/wiki/Home'
+SPACK_URL: str = 'https://github.com/spack/spack.git'
+KOKKOS_URL: str = 'Kokkos: https://kokkos.org/'
+
+CHOOSENIM: str = 'https://nim-lang.org/choosenim'
+UPCXX_DOWNLOADS: str = 'https://bitbucket.org/berkeleylab/upcxx/downloads'
+
+WAIT_TIME_INCREMENTS: float = 0.1
+
+### global variables ###
+
+stdlog: str = "\nReliQ lattice field theory framework\n"
+
+stdlog += "\nAuthor: Curtis Taylor Peterson"
+stdlog += "\nContact: curtistaylorpetersonwork@gmail.com\n"
+
+stdlog += "\nDependencies:"
+stdlog += "\n- " + NIM_URL
+stdlog += "\n- " + UPCXX_URL
+stdlog += "\n- " + KOKKOS_URL + "\n"
+
+stdlog += "\nHelp: ./install -h\n"
+
+### exceptions ###
+
+class InstallationPathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(str(path) + ' does not exist')
+
+class JSONPathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(str(path) + ' does not exist: are you in ReliQ/build?')
+
+class NimPathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(str(path) + ' does not exist')
+
+class ChoosenimError(Exception):
+    def __init__(self, log: logging.Logger):
+        super().__init__('Logs saved to ' + log.name)
+
+class UPCXXPathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(str(path) + ' does not exist')
+
+class UPCXXIncludePathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(' '.join([str(path / 'include'), 'does not exist']))
+
+class UPCXXDownloadError(Exception):
+    def __init__(self, log: logging.Logger):
+        super().__init__('Logs saved to ' + log.name)
+
+class UPCXXMakeError(Exception):
+    def __init__(self, log: logging.Logger):
+        super().__init__('Logs saved to ' + log.name)
+
+class UPCXXCheckError(Exception):
+    def __init__(self, log: logging.Logger):
+        super().__init__('Logs saved to ' + log.name)
+
+class UPCXXInstallError(Exception):
+    def __init__(self, log: logging.Logger):
+        super().__init__('Logs saved to ' + log.name)
+
+class KokkosPathError(Exception):
+    def __init__(self, path: pathlib.Path): 
+        super().__init__(str(path) + ' does not exist')
+
+### command line parsing ###
+
+def args() -> argparse.Namespace:
+    # argument parser constructor
+    parser = argparse.ArgumentParser(description = DESCRIPTION)
+    
+    # ReliQ installation path
+    parser.add_argument(
+        '-p', 
+        '--prefix', 
+        help = 'ReliQ installation path',
+        type = str,
+        default = CWD
+    )
+
+    # Nim path/installation
+    parser.add_argument(
+        '--nim',
+        help = 'Path to Nim',
+        type = str,
+        default = DEFAULT_STANDIN_PATH
+    )
+    parser.add_argument(
+        '--installNim',
+        help = 'Installs Nim language; uses choosenim',
+        type = str,
+        default = 'True'
+    )
+
+    # UPC++ path/installation
+    parser.add_argument(
+        '--upcxx',
+        help = 'Path to UPC++',
+        type = str,
+        default = DEFAULT_STANDIN_PATH
+    )
+    parser.add_argument(
+        '--installUPCXX',
+        help = 'Installs UPC++ library',
+        type = str,
+        default = 'True'
+    )
+    parser.add_argument(
+        '--checkUPCXX',
+        help = 'Runs \"gmake check\" in UPC++ installation path',
+        type = str,
+        default = 'False'
+    )
+
+    # Kokkos path/installation
+    parser.add_argument(
+        '--kokkos',
+        help = 'Path to Kokkos',
+        type = str,
+        default = DEFAULT_STANDIN_PATH
+    )
+    parser.add_argument(
+        '--installKokkos',
+        help = 'Installs Kokkos library',
+        type = str,
+        default = 'True'
+    )
+
+    # installation threads
+    parser.add_argument(
+        '--threads',
+        help = 'Threads to run parallel make/build/install',
+        type = str,
+        default = '1'
+    )
+
+    # shows installation progress
+    parser.add_argument(
+        '--progress',
+        help = 'Shows installation progress',
+        type = str,
+        default = 'True'
+    )
+
+    # parse arguments and return
+    return parser.parse_args()
+
+### helpers ###
+
+def exec(cmd: str, log: logging.Logger, exception: Exception) -> None:
+    try:
+        proc = subprocess.run(cmd, capture_output = True, shell = True, check = True)
+        log.info(proc.stdout.decode())
+    except subprocess.CalledProcessError as err:
+        log.info(err.stderr.decode())
+        raise exception
+
+def make(cmd: str, log: logging.Logger, exception: Exception) -> None:
+    cmd = 'gmake ' + cmd + (' -j' + threads if threads != '1' else '')
+    exec(cmd, log, exception)
+
+def new_log(path: pathlib.Path, tag: str) -> logging.Logger:
+    logger = logging.getLogger(tag)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(path / (tag + '.log'))
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+def str_to_bool(input: str) -> bool:
+    if (input == 'True') or (input == 'true'): return True
+    elif (input == 'False') or (input == 'false'): return False
+
+def wait_patiently(stop: threading.Event, small_talk: str) -> None:
+    fidget_spinner = '/—\|'
+    lines = stdlog.count('\n') + 1
+    while not stop.is_set():
+        print("\033[2J\033[H", end='')
+        print(stdlog, end = '')
+        for orientation in fidget_spinner:
+            fidget = f'\r\033[K{orientation} {small_talk} {orientation}'
+            print(f'\033[{lines + 1};1H', end='')
+            print(fidget, end = '', flush = True)
+            time.sleep(WAIT_TIME_INCREMENTS)
+        os.system('clear')
+
+### Nim, UPC++, Kokkos installation/specifications ###
+
+def install_nim(nim_path: pathlib.Path) -> None:
+    # set up path to Nim; if already exists, do nothing and returnf'
+    if nim_path != DEFAULT_STANDIN_PATH: 
+        if not nim_path.is_dir(): raise NimPathError(nim_path)
+    else: nim_path = deps_path / 'nim'
+    if not install_nim_lang: return
+    if not nim_path.is_dir(): nim_path.mkdir()
+
+    # prepare log and error
+    choosenim_log = new_log(nim_path, 'choosenim')
+    choosenim_error = ChoosenimError(choosenim_log)
+
+    # download/install Nim through download/install of Choosenim
+    init_path = str(nim_path / 'init.sh')
+    choosenim = 'wget -O ' + init_path + ' https://nim-lang.org/choosenim/init.sh'
+    exec(choosenim, choosenim_log, choosenim_error)
+    exec('chmod u+x ' + init_path, choosenim_log, choosenim_error)
+    exec(init_path + ' -y', choosenim_log, choosenim_error)
+    cmds = ['ln -sf', HOME / '.nimble', nim_path / 'choosenim']
+    link = ' '.join([*map(str, cmds)])
+    os.system(link)
+
+def install_upcxx(upcxx_path: pathlib.Path) -> None:
+    # set up path to UPC++; if already exists, do nothing and return
+    if upcxx_path != DEFAULT_STANDIN_PATH: 
+        if not upcxx_path.isdir(): raise UPCXXPathError(upcxx_path)
+        if not (upcxx_path / 'include').is_dir(): 
+            raise UPCXXIncludePathError(upcxx_path)
+    else: upcxx_path = deps_path / 'upcxx'
+    if not upcxx_path.is_dir(): upcxx_path.mkdir()
+
+    # prepare logs
+    download_log = new_log(upcxx_path, 'upcxx_download')
+    config_log = new_log(upcxx_path, 'upcxx_config')
+    make_log = new_log(upcxx_path, 'upcxx_make')
+    check_log = new_log(upcxx_path, 'upcxx_check')
+    install_log = new_log(upcxx_path, 'upcxx_install')
+
+    # prepare errors
+    download_error = UPCXXDownloadError(download_log)
+    config_error = UPCXXDownloadError(config_log)
+    make_error = UPCXXMakeError(make_log)
+    check_error = UPCXXMakeError(check_log)
+    install_error = UPCXXMakeError(install_log)
+
+    # enter UPC++ installation directory; run installation check if specified
+    os.chdir(upcxx_path)
+    if not install_upcxx_lib: 
+        if check_upcxx: make('check', check_log, check_error)
+        return
+
+    # download UPC++
+    tar = 'upcxx-' + versions['upcxx'] + '.tar.gz'
+    download = 'wget -O ' + tar + ' ' + UPCXX_DOWNLOADS + '/' + tar
+    download += ' && tar -xvf upcxx-' + versions['upcxx'] + '.tar.gz'
+    exec(download, download_log, download_error)
+
+    # compile/install UPC++
+    upcxx_dir = upcxx_path / ('upcxx-' + versions['upcxx'])
+    config = str(upcxx_dir / 'configure') + ' --prefix=' + str(upcxx_path)
+    exec(config, config_log, config_error)
+    make('all', make_log, make_error)
+    if check_upcxx: make('check', check_log, check_error)
+    make('install', install_log, install_error)
+
+def install_kokkos(kokkos_path: pathlib.Path) -> None: 
+    # set up path to Kokkos; if already exists, do nothing and return
+    if kokkos_path != DEFAULT_STANDIN_PATH: 
+        if not kokkos_path.isdir(): raise KokkosPathError(kokkos_path)
+    else: kokkos_path = deps_path / 'kokkos'
+    if not kokkos_path.is_dir(): kokkos_path.mkdir()
+    os.chdir(kokkos_path)
+
+    # prepare logs
+
+    # prepare errors
+
+    # install Spack
+    #exec('git clone -c feature.manyFiles=true ' + SPACK_URL, , )
+    """
+    cd spack
+    . share/spack/setup-env.sh
+    """
+
+    # install Kokkos
+    # spack install kokkos
+
+# multi-threaded installation for displaying installation progress
+def install(waiting_room: Callable, installation: Callable) -> None:
+    stop = threading.Event()
+    wait = threading.Thread(target = waiting_room, args = (stop,))
+    work = threading.Thread(target = installation, args = (stop,))
+    work.start()
+    wait.start()
+    work.join()
+    wait.join()
+
+### execute installation script ###
+
+if __name__ == "__main__":
+    # get arguments and specify installation path
+    args = args()
+    install_path = pathlib.Path(args.prefix)
+    threads = args.threads
+    progress = str_to_bool(args.progress)
+    
+    # display banner if not showing progress
+    if not progress: print(stdlog)
+    
+    # ReliQ dependency versions
+    version_path = install_path / 'version.json'
+    if not version_path.exists(): raise JSONPathError(version_path)
+    with version_path.open() as f: versions = json.load(f)
+
+    # ReliQ installation paths
+    install_path = pathlib.Path(install_path)
+    deps_path = install_path / 'deps'
+    if not install_path.is_dir(): raise InstallationPathError(install_path)
+    if not deps_path.is_dir(): deps_path.mkdir()
+
+    # Nim
+    nim_path = pathlib.Path(args.nim)
+    def nim_waiting_room(stop: threading.Event) -> None: 
+        wait_patiently(stop, 'Installing Nim')
+    def nim_installation(stop: threading.Event) -> None: 
+        global stdlog
+        install_nim(pathlib.Path(args.nim))
+        stop.set()
+        stdlog = stdlog.replace(NIM_URL, NIM_URL + ' ✓')
+        stdlog += '\n✓ Nim installed'
+    install_nim_lang = str_to_bool(args.installNim)
+    if progress: install(nim_waiting_room, nim_installation)
+    else: install_nim(pathlib.Path(args.nim))
+
+    # UPC++
+    def upcxx_waiting_room(stop: threading.Event) -> None: 
+        wait_patiently(stop, 'Installing UPC++')
+    def upcxx_installation(stop: threading.Event) -> None: 
+        global stdlog
+        install_upcxx(pathlib.Path(args.upcxx))
+        stop.set()
+        stdlog = stdlog.replace(UPCXX_URL, UPCXX_URL + ' ✓')
+        stdlog += '\n✓ UPC++ installed'
+    install_upcxx_lib = str_to_bool(args.installUPCXX)
+    check_upcxx = str_to_bool(args.checkUPCXX)
+    if progress: install(upcxx_waiting_room, upcxx_installation)
+    else: install_upcxx(pathlib.Path(args.upcxx))
+
+    # Kokkos
+    def kokkos_waiting_room(stop: threading.Event) -> None: 
+        wait_patiently(stop, 'Installing Kokkos')
+    def kokkos_installation(stop: threading.Event) -> None: 
+        global stdlog
+        install_kokkos(pathlib.Path(args.kokkos))
+        stop.set()
+        stdlog = stdlog.replace(KOKKOS_URL, KOKKOS_URL + ' ✓')
+        stdlog += '\n✓ Kokkos installed'
+    install_kokkos_lib = str_to_bool(args.installKokkos)
+    if progress: install(kokkos_waiting_room, kokkos_installation)
+    else: install_kokkos(pathlib.Path(args.kokkos))
+
+    # final progress display
+    if progress: print(stdlog + '\n')

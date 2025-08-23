@@ -1,7 +1,11 @@
 #[ 
-  QXX lattice field theory framework: github.com/ctpeterson/QXX
-  Source file: test/tlattice/tbravais.nim
+  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  Source file: src/lattice/bravais.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  Notes:
+  * What kind of gain (if any) could be achieved by considering inter-node
+  connectivity in partitioning of lattice?
 
   MIT License
   
@@ -94,12 +98,10 @@ proc partition(lg: openArray[SomeInteger]; bins: SomeInteger): seq[SomeInteger] 
         errorMessage &= "\nunfilled bins (ranks, SIMD lanes, ...): " & $r
     dec mu
 
-proc toGeomSeq[T](ilg, irg: openArray[T]): (seq[GeometryType], seq[GeometryType]) =
-  # converts open arrays specifying lattice and rank geometry into sequences
-  var (olg, org) = (newSeq[GeometryType](ilg.len), newSeq[GeometryType](irg.len))
-  for mu in olg.dimensions: 
-    (olg[mu], org[mu]) = (GeometryType(ilg[mu]), GeometryType(irg[mu]))
-  return (olg, org)
+proc toGeomSeq[T](g: openArray[T]): seq[GeometryType] =
+  # converts openArray of generic type to sequence of GeometryType
+  result = newSeq[GeometryType](g.len)
+  for mu in g.dimensions: result[mu] = GeometryType(g[mu])
 
 proc newRankCoord(rg: seq[GeometryType]): seq[GeometryType] =
   # gets rank coordinate of block-distributed lattice (not to be confused
@@ -126,12 +128,12 @@ proc newLocalStrides(rb: seq[seq[GeometryType]]): seq[GeometryType] =
   for mu in rb.reversedDimensions(start = 1):
     result[mu] = result[mu + 1] * rb[mu + 1][^1]
 
-proc newLocalIndices(rb: seq[seq[GeometryType]]): upcxx_global_ptr[cint] =
+proc newLocalIndices(rb: seq[seq[GeometryType]]): upcxx_global_ptr[CoordinateType] =
   # constructs a upcxx::global_ptr to the flattened lattices indices owned 
   # by current rank
   var numLocalIndices: csize_t = 1
   for mu in rb.dimensions: numLocalIndices *= csize_t(rb[mu][^1])
-  result = upcxx_new_array_int(numLocalIndices)
+  result = upcxx_new_array[CoordinateType](numLocalIndices)
 
 #[ frontend: SimpleCubicLattice constructors ]#
 
@@ -151,6 +153,9 @@ proc newSimpleCubicLattice*(
   ## 
   ## <in need of more documentation>
   
+  #[ distributed memory specifications ]#
+
+  # catch most common errors
   if latticeGeometry.len != rankGeometry.len:
     raise newLatticeInitializationError(IncompatibleRankGeometryError):
       errorMessage &= "\nlattice geometry: " & $latticeGeometry
@@ -160,13 +165,19 @@ proc newSimpleCubicLattice*(
       errorMessage &= "\nrank geometry: " & $rankGeometry
       errorMessage &= "\n# ranks: " & $upcxx_rank_n()
 
-  let nd = latticeGeometry.len
-  let (lg, rg) = toGeomSeq(latticeGeometry, rankGeometry)
+  # set up lattice geometry
+  let
+    nd = latticeGeometry.len
+    lg = toGeomSeq(latticeGeometry)
+  
+  # set up rank geometry
   let 
+    rg = toGeomSeq(rankGeometry)
     rc = newRankCoord(rg)
     rb = newRankBlock(lg, rg, rc)
   let (ls, li) = (newLocalStrides(rb), newLocalIndices(rb))
 
+  # return instantiated SimpleCubicLattice
   return SimpleCubicLattice(
     latticeGeometry: lg, 
     rankGeometry: rg
@@ -188,6 +199,8 @@ proc newSimpleCubicLattice*(
   let rg = latticeGeometry.partition(upcxx_rank_n())
   return newSimpleCubicLattice(latticeGeometry, rg)
 
+#[ tests ]#
+
 when isMainModule: 
   # nim cpp --path:/home/curtyp/Software/ReliQ/src bravaislattice
   # local test: upcxx-run -n 4 -localhost bravaislattice
@@ -196,7 +209,7 @@ when isMainModule:
   let latGeom = [8, 8, 8, 16]
   let latA = newSimpleCubicLattice(latGeom)
   let
-    rankGeomB = latGeom.partition(upcxx_rank_n()) # not exposed to user
+    rankGeomB = latGeom.partition(upcxx_rank_n()) # used here for test: not exposed
     latB = newSimpleCubicLattice(latGeom, rankGeomB)
 
   upcxx_finalize()

@@ -1,6 +1,6 @@
 #[ 
-  QXX lattice field theory framework: github.com/ctpeterson/QXX
-  Source file: test/tlattice/tlatticeutils.nim
+  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  Source file: src/utils/nimutils.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,12 +25,14 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[cmdline]
+
 #[ backend: constants ]#
 
 const 
   printBreak* = "\n...............................................................\n"
 
-#[ backend: implementation of helper procedures for lattice initialization ]#
+#[ backend: implementation of helper procedures ]#
 
 iterator dimensions*[T](arr: openArray[T]): int {.inline.} =
   # silly helper iterator for iterating through openArray indices
@@ -63,3 +65,12 @@ proc product*[T](arr: openArray[T]): T {.inline.} =
   # calculates product of open array's entries
   result = T(1)
   for el in arr: result *= el
+
+# gets C argv
+proc cargc*: cint = cint(paramCount())
+
+proc cargv*(argc: cint): cstringArray =
+  # gets C argv
+  var argv = newSeq[string](argc)
+  for idx in argv.dimensions: argv[idx] = paramStr(idx + 1)
+  return allocCStringArray(argv)
