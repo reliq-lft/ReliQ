@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
   Source file: build/aux/install.py
@@ -28,10 +27,8 @@
 
 ### imports ###
 
-import os
 import pathlib
 import json
-import typing
 
 import constants
 import tools
@@ -47,7 +44,6 @@ if __name__ == '__main__':
     args = tools.args()
 
     install_path = pathlib.Path(args.prefix)
-    if not install_path.is_dir(): install_path.mkdir()
 
     version_path = constants.CWD / 'version.json'
     with version_path.open() as f: versions = json.load(f)
