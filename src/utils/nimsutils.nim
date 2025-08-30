@@ -1,6 +1,6 @@
-"""
+#[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/install.py
+  Source file: src/utils/nimutils.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -23,43 +23,13 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""
+]#
 
-### imports ###
+# concatenate strings with forward slash between
+proc `/`*(sa, sb: string): string = sa & "/" & sb
 
-import pathlib
-import json
+# concatenate strings with space between
+proc `+`*(sa, sb: string): string = sa & " " & sb
 
-import constants
-import tools
-
-import spack
-import nim
-import upcxx
-import kokkos
-
-### execute installation script ###
-
-if __name__ == '__main__':
-    args = tools.args()
-
-    install_path = pathlib.Path(args.prefix)
-
-    version_path = constants.CWD / 'version.json'
-    with version_path.open() as f: versions = json.load(f)
-
-    nimv = versions['nim']
-    upcxxv = versions['upcxx']
-    kokkosv = versions['kokkos']
-
-    spack_path = spack.install(install_path, pathlib.Path(args.spack))
-    spack.create_env(spack_path)
-
-    nim_path = nim.install(spack_path, pathlib.Path(args.nim), nimv)
-    upcxx_path = upcxx.install(spack_path, pathlib.Path(args.upcxx), upcxxv)
-    kokkos_path = kokkos.install(spack_path, pathlib.Path(args.kokkos), kokkosv)
-
-    spack.link(spack_path, install_path)
-    nim.link(nim_path, install_path)
-    upcxx.link(upcxx_path, install_path)
-    kokkos.link(kokkos_path, install_path)
+# append string with space
+proc `+=`*(sa: var string, sb: string) = sa = sa + sb

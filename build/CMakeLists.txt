@@ -1,7 +1,6 @@
-#!/bin/bash
-: '
+#[[
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/install
+  Source file: build/CMakeLists.txt
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -24,14 +23,15 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-'
+]]
 
-PYTHON="/usr/bin/python3"
+cmake_minimum_required(VERSION 3.10)
+project(ReliQ CXX)
 
-AUX="$(pwd)/aux"
-DEPS="$(pwd)/deps"
+find_package(Kokkos REQUIRED CONFIG)
 
-mkdir -p $DEPS
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-export PYTHONPYCACHEPREFIX=$DEPS/__pycache__
-$PYTHON $AUX/install.py "$@"
+add_executable(hello_world hello_world.cpp)
+
+target_link_libraries(hello_world PUBLIC Kokkos::kokkos)

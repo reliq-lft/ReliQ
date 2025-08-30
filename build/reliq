@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
 """
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/tools.py
+  Source file: build/flags.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,41 +26,46 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import subprocess
 import argparse
 import pathlib
-import subprocess
 
-import constants
+CWD: str = pathlib.Path.cwd()
+SWD: pathlib.Path = pathlib.Path(__file__).absolute().parent
+DESCRIPTION: str = "Convenience script for executing ReliQ program"
 
-def exec(
-    *args: pathlib.Path | str, 
-    **kwargs: dict[str, any]
-) -> subprocess.CompletedProcess: 
-    cmd = ' '.join([*map(str, args)])
-    return subprocess.run(cmd, shell = True, check = True, **kwargs)
-
-def args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description = constants.DESCRIPTION)
-    parser.add_argument(
-        '-p', 
-        '--prefix', 
-        help = 'ReliQ installation path',
-        type = str,
-        default = constants.CWD / 'deps'
+if __name__ == '__main__':
+    # parse arguments
+    parser = argparse.ArgumentParser(
+        description = DESCRIPTION,
+        formatter_class = argparse.ArgumentDefaultsHelpFormatter
     )
-    flags = ['--spack', '--nim', '--upcxx', '--kokkos']
-    helpers = [
-        'Path to Spack',
-        'Path to Nim',
-        'Path to UPC++',
-        'Path to Kokkos'
-    ]
-    defaults = [
-        constants.DEFAULT_STANDIN_PATH,
-        constants.DEFAULT_STANDIN_PATH,
-        constants.DEFAULT_STANDIN_PATH,
-        constants.DEFAULT_STANDIN_PATH,
-    ]
-    for (flag, help, default) in zip(flags, helpers, defaults):
-        parser.add_argument(flag, help = help, type = str, default = default)
-    return parser.parse_args()
+    parser.add_argument(
+        '-e',
+        '--executable',
+        help = 'Target executable',
+        type = str,
+        required = True
+    )
+    parser.add_argument(
+        '-l',
+        '--local',
+        help = 'Run locally (equivalent to UPC++ -localhost)',
+        type = str,
+        choices = ["true", "false"],
+        default = "false"
+    )
+    parser.add_argument(
+        '-n',
+        help = 'Number of locales (tasks)',
+        type = str,
+        default = "1"
+    )
+    args = parser.parse_args()
+
+    # execute ReliQ program
+    cmd = str(SWD / 'external' / 'bin' / 'upcxx-run')
+    cmd += ' -n ' + args.n
+    cmd += ' -localhost ' if args.local == 'true' else ' '
+    cmd += str(SWD / 'bin' / args.executable)
+    subprocess.run(cmd, shell = True, check = True)

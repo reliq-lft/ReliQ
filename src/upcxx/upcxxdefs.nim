@@ -33,23 +33,6 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-#[ static compile-time information gathering and processing ]#
-
-const # path to upcxx header and configuration/metadata script
-  UPCXXP = "/home/curtyp/Software/upcxx-2023.9.0/build"
-  UPCXXM = UPCXXP & "/bin/upcxx-meta "
-const # execute configuration/metadata script to get compilation flags
-  UPCXXPP = staticExec(UPCXXM & "PPFLAGS")
-  UPCXXC =  staticExec(UPCXXM & "CFLAGS")
-  UPCXXL =  staticExec(UPCXXM & "LIBFLAGS")
-
-# informs user of upcxx build location
-static: echo "UPCXX: " & UPCXXP
-
-# pass compiler flags from metadata
-{.passC: UPCXXPP & " " & UPCXXC.}
-{.passL: UPCXXL.}
-
 # shorten pragmas referencing upcxx and ReliQ wrapper headers
 {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
 
@@ -96,9 +79,9 @@ proc upcxx_local*[T](global_ptr: upcxx_global_ptr[T]): ptr T
 
 #[ tests ]#
 
-when isMainModule: 
-  # nim cpp upcxxdefs.nim
-  # upcxx-run -n 4 -localhost upcxxdefs
+when isMainModule:  
+  # ../../build/deps/bin/nim cpp --path:/home/curtyp/Software/ReliQ/src upcxx.nim
+  # local test: ../../build/deps/bin/upcxx-run -n 4 -localhost upcxx
 
   upcxx_init()
 

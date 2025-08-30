@@ -1,6 +1,7 @@
-"""
+#!/bin/bash
+: '
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/kokkos.py
+  Source file: build/install
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -23,35 +24,15 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""
+'
 
-import pathlib
-import subprocess
+PYTHON="/usr/bin/python3"
 
-import constants
-import tools
+CWD="$(pwd)"
+SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
+EXT="${CWD}/external"
 
-### install ###
+mkdir -p $EXT
 
-def install(
-    spack: pathlib.Path, 
-    path: pathlib.Path,
-    version: str
-) -> pathlib.Path:
-    if path == constants.DEFAULT_STANDIN_PATH: 
-        spack_bin = spack / 'bin' / 'spack'
-        kokkos = 'kokkos@' + version
-        try: 
-            tools.exec(spack_bin, 'find', kokkos, **{'capture_output': True})
-            print(kokkos, 'already installed')
-        except subprocess.CalledProcessError:
-            tools.exec(spack_bin, ' -e reliq add', kokkos)
-            tools.exec(spack_bin, ' -e reliq install', kokkos)
-    return path
-
-### configure ###
-
-def link(path: pathlib.Path, install_path: pathlib.Path) -> None: 
-    if path != constants.DEFAULT_STANDIN_PATH:
-        tools.exec('ln -sf', path / 'bin' / '/*', install_path / 'bin')
-        tools.exec('ln -sf', path / 'include' / '/*', install_path / 'include')
+export PYTHONPYCACHEPREFIX=$EXT/__pycache__
+$PYTHON $SWD/setup/bootstrap.py "$@"

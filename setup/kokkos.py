@@ -1,6 +1,6 @@
 """
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/spack.py
+  Source file: setup/kokkos.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,46 +25,47 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
+import argparse
 import pathlib
 import subprocess
 
 import constants
 import tools
 
-### constants ###
-
-SPACK_URL: str = 'https://github.com/spack/spack.git'
-
 ### install ###
 
-def install(install_path: pathlib.Path, path: pathlib.Path) -> pathlib.Path:
-    os.chdir(install_path)
-    if path == constants.DEFAULT_STANDIN_PATH:
-        path = install_path / 'spack'
-        if not path.is_dir():
-            tools.exec('git', 'clone -c feature.manyFiles=true', SPACK_URL)
-            os.chdir(path)
-            tools.exec('.', 'share/spack/setup-env.sh')
-    else: # if path specified, check that we can use spack and symlink it
-        local_path = install_path / 'spack'
-        spack_bin = local_path / 'bin' / 'spack'
-        if not spack_bin.exists():
-            raise OSError(str(spack_bin) + ': Does not exist in ' + str(path))
-        if path.is_dir(): exec('ln -sf', path, local_path)
-        else: raise OSError(str(path) + ': No such directory')
-        try: tools.exec(spack_bin, '-h', **{'capture_output': True})
+def install(
+    options: argparse.Namespace,
+    spack: pathlib.Path, 
+    path: pathlib.Path,
+    version: str
+) -> pathlib.Path:
+    if path == constants.DEFAULT_STANDIN_PATH: 
+        spack_bin = spack / 'bin' / 'spack'
+        kokkos = 'kokkos@' + version
+        try: 
+            tools.exec(spack_bin, 'find', kokkos, **{'capture_output': True})
+            print(kokkos, 'already installed')
         except subprocess.CalledProcessError:
-            raise OSError(str(spack_bin) + ': Permission denied')
-        path = local_path
+            specs = [
+                'openmp=' + options.openmp,
+                'serial=' + options.serial,
+            #    'cuda=' + options.cuda, -- not ready yet
+            #    'rocm=' + options.rocm, -- not ready yet
+            ]
+            tools.exec(spack_bin, '-e reliq add', kokkos, *specs)
+            try: tools.exec(spack_bin, '-e reliq install', kokkos, *specs)
+            except subprocess.CalledProcessError as err:
+                tools.exec(spack_bin, '-e reliq remove', kokkos, *specs)
+                raise err
+            except KeyboardInterrupt as err:
+                tools.exec(spack_bin, '-e reliq remove', kokkos, *specs)
+                raise err
     return path
 
 ### configure ###
 
-def create_env(path: pathlib.Path) -> None:
-    env = path / 'var' / 'spack' / 'environments' / 'reliq'
-    if not env.is_dir(): tools.exec(path / 'bin' / 'spack', 'env create reliq')
-
 def link(path: pathlib.Path, install_path: pathlib.Path) -> None: 
-    view = path / 'var' / 'spack' / 'environments' / 'reliq' / '.spack-env' / 'view'
-    tools.exec('ln -sf', str(view) + '/*', install_path)
+    if path != constants.DEFAULT_STANDIN_PATH:
+        tools.exec('ln -sf', path / 'bin' / '/*', install_path / 'bin')
+        tools.exec('ln -sf', path / 'include' / '/*', install_path / 'include')

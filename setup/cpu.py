@@ -1,6 +1,6 @@
-#[ 
+"""
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/configure.nims
+  Source file: setup/cpu.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -23,4 +23,12 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
+"""
+
+class CentralProcessingUnit(object):
+    def __init__(self): pass
+
+class CentralProcessingUnits(object):
+    def __init__(self): 
+        self._psutil = __import__('psutil')
+        self.cpus: list[CentralProcessingUnit] = []

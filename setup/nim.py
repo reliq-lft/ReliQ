@@ -1,6 +1,6 @@
 """
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/upcxx.py
+  Source file: setup/nim.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -40,20 +40,21 @@ def install(
 ) -> pathlib.Path:
     if path == constants.DEFAULT_STANDIN_PATH: 
         spack_bin = spack / 'bin' / 'spack'
-        upcxx = 'upcxx@' + version
+        nim = 'nim@' + version
         try: 
-            tools.exec(spack_bin, 'find', upcxx, **{'capture_output': True})
-            print(upcxx, 'already installed')
+            tools.exec(spack_bin, 'find', nim, **{'capture_output': True})
+            print(nim, 'already installed')
         except subprocess.CalledProcessError:
-            tools.exec(spack_bin, ' -e reliq add', upcxx)
-            tools.exec(spack_bin, ' -e reliq install', upcxx)
-    else: # if path specified, check that we can run a UPC++ program
-        upcxx_run = path / 'bin' / 'upcxx-run'
-        if not upcxx_run.exists():
-            raise OSError(str(upcxx_run) + ': Does not exist in ' + str(path))
-        try: tools.exec(upcxx_run, '-h', **{'capture_output': True})
+            specs = []
+            tools.exec(spack_bin, '-e reliq add', nim, *specs)
+            tools.exec(spack_bin, '-e reliq install', nim, *specs)
+    else: # if path specified, check that we can compile a Nim program
+        nim_bin = path / 'bin' / 'nim'
+        if not nim_bin.exists():
+            raise OSError(str(nim_bin) + ': Does not exist in ' + str(path))
+        try: tools.exec(nim_bin, '-h', **{'capture_output': True})
         except subprocess.CalledProcessError:
-            raise OSError(str(upcxx_run) + ': Permission denied')
+            raise OSError(str(nim_bin) + ': Permission denied')
     return path
 
 ### configure ###

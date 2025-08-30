@@ -1,3 +1,3 @@
-import kokkos/[kokkosdefs.nim]
+import kokkos/[kokkos.nim]
 
 export kokkos

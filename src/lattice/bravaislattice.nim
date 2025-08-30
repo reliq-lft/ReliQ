@@ -202,8 +202,8 @@ proc newSimpleCubicLattice*(
 #[ tests ]#
 
 when isMainModule: 
-  # nim cpp --path:/home/curtyp/Software/ReliQ/src bravaislattice
-  # local test: upcxx-run -n 4 -localhost bravaislattice
+  # ../../build/deps/bin/nim cpp --path:/home/curtyp/Software/ReliQ/src bravaislattice
+  # local test: ../../build/deps/bin/upcxx-run -n 4 -localhostt bravaislattice
   upcxx_init()
 
   let latGeom = [8, 8, 8, 16]

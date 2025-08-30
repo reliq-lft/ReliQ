@@ -1,8 +1,5 @@
 import upcxx/[upcxxdefs]
 import kokkos/[kokkosdefs]
-import lattice/[bravais]
-
-export bravais
 
 proc reliqInit* =
   ## Initializes ReliQ's runtime environment
@@ -14,7 +11,7 @@ proc reliqInit* =
   ## a.) Initialize UPC++ runtime environemnt
   ## b.) Initialize Kokkos runtime environment
   upcxx_init()
-  # kokkos init
+  kokkos_init()
 
 proc reliqFinalize* =
   ## Initializes ReliQ's runtime environment
@@ -23,7 +20,21 @@ proc reliqFinalize* =
   ## Finalizes ReliQ runtime environment. This is currently
   ## composed of two keys steps:
   ## 
-  ## a.) Finalize UPC++ runtime environemnt
-  ## b.) Finalize Kokkos runtime environment
+  ## a.) Finalize Kokkos runtime environment
+  ## b.) Finalize UPC++ runtime environemnt
+  kokkos_finalize()
   upcxx_finalize()
-  # kokkos finalize
+
+when isMainModule:
+  import utils
+
+  reliqInit()
+
+  # UPC++ hello world
+  echo "Hello world from process" + $upcxx_rank_me() +
+    "out of" + $upcxx_rank_n() + "processes"
+  print "I should only print once"
+
+  # Kokkos
+
+  reliqFinalize()

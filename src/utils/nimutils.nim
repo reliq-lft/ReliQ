@@ -26,6 +26,9 @@
 ]#
 
 import std/[cmdline]
+import nimsutils
+
+export nimsutils
 
 #[ backend: constants ]#
 

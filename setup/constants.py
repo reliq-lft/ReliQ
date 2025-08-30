@@ -1,6 +1,6 @@
 """
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: build/aux/constants.py
+  Source file: setup/constants.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -28,6 +28,12 @@
 import pathlib
 
 CWD: pathlib.Path = pathlib.Path.cwd()
-DEFAULT_STANDIN_PATH: pathlib.Path = pathlib.Path('__RELIQ__')
+SWD: pathlib.Path = pathlib.Path(__file__).absolute().parent
+DEFAULT_STANDIN_PATH: pathlib.Path = pathlib.Path('PREFIX')
 
-DESCRIPTION: str = "Configure and install ReliQ lattice field theory framework"
+TRUE: str = 'true'
+FALSE: str = 'false'
+
+AUTO: str = 'auto'
+
+DESCRIPTION: str = "Configure and install ReliQ's external dependencies"

@@ -1,13 +1,7 @@
-#[ 
+"""
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/kokkosdefs.nim
+  Source file: setup/cmake.py
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  Notes:
-  * Kokkos GitHub: https://github.com/kokkos/kokkos
-  * Kokkos wiki: https://kokkos.org/kokkos-core-wiki/
-  * UPC++ + Kokkos: https://tinyurl.com/4cvza7v2
-  * Lectures on Kokkos: https://tinyurl.com/dhbrr7yn
 
   MIT License
   
@@ -29,31 +23,21 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
+"""
 
-import utils/[nimutils]
+import pathlib
+import subprocess
 
-# shorten pragmas pointing to Kokkos headers
-{.pragma: kokkos_core, header: "<Kokkos_Core.hpp>".}
+import constants
+import tools
 
-#[ initialize/finalize Kokkos runtime ]#
-
-# initializes Kokkos runtime
-proc kokkos_init(argc: cint; argv: cstringArray)
-  {.importcpp: "Kokkos::initialize(#, #)", kokkos_core.}
-proc kokkos_init* =
-  let 
-    argc = cargc()
-    argv = cargv(argc)
-  kokkos_init(argc, argv)
-  deallocCStringArray(argv)
-
-# finalizes Kokkos runtime
-proc kokkos_finalize* {.importcpp: "Kokkos::finalize()", kokkos_core.}
-
-#[ tests ]#
-
-when isMainModule: 
-  kokkos_init()
-
-  kokkos_finalize()
+def install(spack: pathlib.Path, version: str) -> pathlib.Path:
+    spack_bin = spack / 'bin' / 'spack'
+    cmake = 'cmake@' + version
+    try: 
+        tools.exec(spack_bin, 'find', cmake, **{'capture_output': True})
+        print(cmake, 'already installed')
+    except subprocess.CalledProcessError:
+        specs = []
+        tools.exec(spack_bin, '-e reliq add', cmake, *specs)
+        tools.exec(spack_bin, '-e reliq install', cmake, *specs)
