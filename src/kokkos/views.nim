@@ -31,6 +31,9 @@ import backend
 # shorten pragmas pointing to Kokkos headers and Kokkos view wrapper
 {.pragma: views,  header: "views.hpp".}
 
+# template returning Kokkos views include through pragma
+template views*: untyped = {.pragma: views, header: "views.hpp".}
+
 type # frontend: Kokkos dynamic rank view
   DynamicView*[T] {.importcpp: "DynamicView", views.} = object
 

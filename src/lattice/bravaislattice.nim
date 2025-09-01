@@ -98,11 +98,6 @@ proc partition(lg: openArray[SomeInteger]; bins: SomeInteger): seq[SomeInteger] 
         errorMessage &= "\nunfilled bins (ranks, SIMD lanes, ...):" + $r
     dec mu
 
-proc toGeomSeq[T](g: openArray[T]): seq[GeometryType] =
-  # converts openArray of generic type to sequence of GeometryType
-  result = newSeq[GeometryType](g.len)
-  for mu in g.dimensions: result[mu] = GeometryType(g[mu])
-
 proc newRankCoord(rg: seq[GeometryType]): seq[GeometryType] =
   # gets rank coordinate of block-distributed lattice (not to be confused
   # with lattice coordinate)
@@ -128,14 +123,12 @@ proc newLocalStrides(rb: seq[seq[GeometryType]]): seq[GeometryType] =
   for mu in rb.reversedDimensions(start = 1):
     result[mu] = result[mu + 1] * rb[mu + 1][^1]
 
-proc newLocalIndices(
-  rb: seq[seq[GeometryType]]
-): GlobalPointerArray[CoordinateType] =
+proc newLocalIndices(rb: seq[seq[GeometryType]]): GlobalPointer[CoordinateType] =
   # constructs a upcxx::global_ptr to the flattened lattices indices owned 
   # by current rank
   var numLocalIndices: csize_t = 1
   for mu in rb.dimensions: numLocalIndices *= csize_t(rb[mu][^1])
-  result = newGlobalPointerArray[CoordinateType](numLocalIndices)
+  result = newGlobalPointerArray(numLocalIndices, CoordinateType)
 
 #[ frontend: SimpleCubicLattice constructors ]#
 
@@ -170,11 +163,11 @@ proc newSimpleCubicLattice*(
   # set up lattice geometry
   let
     nd = latticeGeometry.len
-    lg = toGeomSeq(latticeGeometry)
-  
+    lg = toSeq[GeometryType](latticeGeometry)
+
   # set up rank geometry
-  let 
-    rg = toGeomSeq(rankGeometry)
+  let
+    rg = toSeq[GeometryType](rankGeometry)
     rc = newRankCoord(rg)
     rb = newRankBlock(lg, rg, rc)
   let (ls, li) = (newLocalStrides(rb), newLocalIndices(rb))
@@ -200,8 +193,6 @@ proc newSimpleCubicLattice*(
   ## Please refer to primary constructor method for further details.
   let rg = latticeGeometry.partition(numRanks())
   return newSimpleCubicLattice(latticeGeometry, rg)
-
-#[ tests ]#
 
 when isMainModule:
   upcxxInit()

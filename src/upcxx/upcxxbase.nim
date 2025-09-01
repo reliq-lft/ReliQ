@@ -36,6 +36,9 @@
 # shorten pragmas referencing upcxx and ReliQ wrapper headers
 {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
 
+# template returning UPC++ include through pragma
+template upcxx*: untyped = {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
+
 # initialize/finalize UPC++ runtime
 proc upcxxInit* {.importcpp: "upcxx::init()", inline, upcxx.}
 proc upcxxFinalize* {.importcpp: "upcxx::finalize()", inline, upcxx.}
@@ -45,9 +48,8 @@ proc myRank*: cint {.importcpp: "upcxx::rank_me()", upcxx.}
 proc numRanks*: cint {.importcpp: "upcxx::rank_n()", upcxx.}
 
 # set barrier
-#proc upcxx_barrier* {.importcpp: "upcxx::barrier()", upcxx.}
+proc upcxxBarrier* {.importcpp: "upcxx::barrier()", upcxx.}
 
-# tests
 when isMainModule:
   upcxxInit()
 

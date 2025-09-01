@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/upcxx/upcxxGlobalPointer.nim
+  Source file: src/upcxx/globalptr.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,45 +25,48 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-# shorten pragmas referencing upcxx and ReliQ wrapper headers
-{.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
+import upcxxbase
+
+# include upcxx headers
+upcxx()
 
 type # UPC++ global pointer: accessible to all ranks; downcasts to ordinary pointer
-  GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx, inheritable.} = object
-  GlobalPointerArray*[T] = object of GlobalPointer[T]
+  GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx.} = object
 
 # upcxx::global_ptr constructor: single data type
-proc newGlobalPointer*[T]: GlobalPointer[T] 
+proc newGlobalPointer[T]: GlobalPointer[T] 
   {.constructor, importcpp: "upcxx::new_<'*0>(upcxx::rank_me())", upcxx.}
+proc newGlobalPointer*(T: typedesc): GlobalPointer[T] = newGlobalPointer[T]()
 
 # upcxx::global_ptr destructor: single data type
-proc delete*[T](global_ptr: GlobalPointer[T])
+proc deleteGlobalPointer*[T](global_ptr: GlobalPointer[T])
   {.importcpp: "upcxx::delete_(#)", upcxx.}
 
 # return upcxx::global_ptr to new array
-proc newGlobalPointerArray*[T](size: csize_t): GlobalPointerArray[T]
+proc newGlobalPointerArray[T](size: csize_t): GlobalPointer[T]
   {.importcpp: "upcxx::new_array<'*0>(#)", upcxx.}
+proc newGlobalPointerArray*(size: csize_t, T: typedesc): GlobalPointer[T] = 
+  return newGlobalPointerArray[T](size)  
 
 # upcxx::global_ptr destructor: array of data type
-proc delete*[T](global_ptr: GlobalPointerArray[T])
+proc deleteGlobalPointerArray*[T](global_ptr: GlobalPointer[T])
   {.importcpp: "upcxx::delete_array(#)", upcxx.}
 
 # downcasts upcxx::global_ptr to ordinary pointer
 proc local*[T](global_ptr: GlobalPointer[T]): ptr T {.importcpp: "#.local()", upcxx.}
 
-# tests
 when isMainModule:
-  upcxx_init()
+  upcxxInit()
   
-  var gptr = newGlobalPointer[int]()
+  var gptr = newGlobalPointer(int)
 
   var lptr = gptr.local()
 
-  delete(gptr)
+  gptr.deleteGlobalPointer()
 
   let sz: csize_t = 10
-  var gptrArr = newGlobalPointerArray[int](sz)
+  var gptrArr = newGlobalPointerArray(sz, int)
 
-  delete(gptrArr)
+  gptrArr.deleteGlobalPointerArray()
   
-  upcxx_finalize()
+  upcxxFinalize()

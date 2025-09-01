@@ -1,13 +1,7 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/kokkosdefs.nim
+  Source file: src/kokkos/functors.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  Notes:
-  * Kokkos GitHub: https://github.com/kokkos/kokkos
-  * Kokkos wiki: https://kokkos.org/kokkos-core-wiki/
-  * UPC++ + Kokkos: https://tinyurl.com/4cvza7v2
-  * Lectures on Kokkos: https://tinyurl.com/dhbrr7yn
 
   MIT License
   
@@ -31,27 +25,3 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[nimutils]
-
-# shorten pragmas pointing to Kokkos headers
-{.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-
-# template returning Kokkos_Core include through pragma
-template kokkosCore*: untyped = {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-
-# initializes Kokkos runtime
-proc kokkosInit(argc: cint; argv: cstringArray)
-  {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
-proc kokkosInit* {.inline.} =
-  let 
-    argc = cargc()
-    argv = cargv(argc)
-  kokkosInit(argc, argv)
-  deallocCStringArray(argv)
-
-# finalizes Kokkos runtime
-proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
-
-when isMainModule: 
-  kokkosInit()
-  kokkosFinalize()
