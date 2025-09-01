@@ -78,10 +78,12 @@ proc newDynamicView[T](
   {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
 
 # frontend: more flexible dynamic view constructor
-proc newDynamicView*[T](dims: openArray[SomeInteger]): DynamicView[T] {.inline.} =
-  var d = newSeq[csize_t](dims.len)
-  for mu in dims.dimensions: d[mu] = csize_t(dims[mu])
-  case dims.len:
+proc newDynamicView*(
+  dims: openArray[SomeInteger];
+  T: typedesc
+): DynamicView[T] {.inline.} =
+  var d = dims.toSeq(csize_t)
+  return case dims.len:
     of 1: newDynamicView[T]("DynamicView", d[0])
     of 2: newDynamicView[T]("DynamicView", d[0], d[1])
     of 3: newDynamicView[T]("DynamicView", d[0], d[1], d[2])
@@ -97,13 +99,14 @@ proc newDynamicView*[T](dims: openArray[SomeInteger]): DynamicView[T] {.inline.}
           errorMessage &= "\ndimensions:" + $dims
       newDynamicView[T]("DynamicView", d[0])
 
+# lessons learned:
+# * problems with C++ "=" operator overload seem to stem from improper spec of 
+#   importcpp pragma string; i.e., it is wrong or unsupported by compiler
+# * private constructor procedure confuses Nim compiler w/ Kokkos
+#   - repr: var "testa = newDynamicView[float]("DynamicView", 10, 10)" does not 
+#     compile when combined with var "testb = newDynamicView[float]([10, 10])"
 when isMainModule:
-  # lessons learned: 
-  # * problems with C++ "=" operator overload seem to stem from improper spec of 
-  #   importcpp pragma string; i.e., it is wrong or unsupported by compiler
-  # * private constructor procedure confuses Nim compiler w/ Kokkos
-  #   - repr: var "testa = newDynamicView[float]("DynamicView", 10, 10)" does not 
-  #     compile when combined with var "testb = newDynamicView[float]([10, 10])"
   import runtime
-  reliq: 
-    var viewb = newDynamicView[float]([10, 10]) 
+  reliq:
+    let arr = [10, 10] 
+    var viewa = arr.newDynamicView(float)

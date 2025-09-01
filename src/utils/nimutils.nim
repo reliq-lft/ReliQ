@@ -65,10 +65,13 @@ proc dividesSomeElement*(a: SomeInteger; bs: seq[SomeInteger]): bool {.inline.} 
     if divides(a, b): return true
   return false
 
-proc copyToSeq*[T](arr: openArray[T]): seq[T] {.inline.} =
-  # copies open array to sequence
+proc toSeq*[I](arr: openArray[I]; T: typedesc): seq[T] {.inline.} =
+  # converts open array to sequence
   result = newSeq[T](arr.len)
-  for mu in arr.dimensions: result[mu] = arr[mu]
+  for mu in arr.dimensions: result[mu] = T(arr[mu])
+proc toSeq*[I](arr: openArray[I]): auto {.inline.} =
+  assert(arr.len > 0, "toSeq: openArray must have at least one element")
+  return arr.toSeq[typeof(arr[0])]()
 
 proc product*[T](arr: openArray[T]): T {.inline.} =
   # calculates product of open array's entries

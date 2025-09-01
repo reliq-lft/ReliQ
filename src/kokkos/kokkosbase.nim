@@ -49,7 +49,6 @@ proc kokkosInit* {.inline.} =
 # finalizes Kokkos runtime
 proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
-# tests
 when isMainModule: 
   kokkosInit()
   kokkosFinalize()

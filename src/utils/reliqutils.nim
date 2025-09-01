@@ -25,10 +25,22 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[macros]
 import upcxx/[upcxxbase]
 
-proc print*(strs: varargs[string]) =
-  if myRank() == 0: 
-    var printout = ""
-    for str in strs: printout &= str
-    echo printout
+# macro that implements Nim "echo"; written for the fun of it, tbh
+macro reliqPrint(args: varargs[untyped]): untyped =
+  var statements: seq[NimNode]
+  for iarg, varg in args:
+    if iarg < args.len - 1:
+      statements.add newCall("write", ident"stdout", newCall(ident"$", varg))
+    else: statements.add newCall("writeLine", ident"stdout", newCall(ident"$", varg))
+  return newStmtList(statements)
+
+# print statement that only prints from rank 0
+template print*(args: varargs[untyped]): untyped =
+  if myRank() == 0: reliqPrint(args)
+
+when isMainModule:
+  import runtime
+  reliq: print "I should only print once: ", 1, $2, [3]

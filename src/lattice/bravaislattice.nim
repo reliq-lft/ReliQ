@@ -82,7 +82,7 @@ template newLatticeInitializationError*(
 proc partition(lg: openArray[SomeInteger]; bins: SomeInteger): seq[SomeInteger] =
   # partitions grid of size "nd" into integral number of bins
   let nd = lg.len
-  var rlg = lg.copyToSeq
+  var rlg = lg.toSeq()
   var (r, mu) = (bins, (bins div nd + bins mod nd)*nd - 1)
   result = ones(nd, type(bins))
   while r > 1:
