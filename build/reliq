@@ -26,6 +26,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import os
 import subprocess
 import argparse
 import pathlib
@@ -33,6 +34,8 @@ import pathlib
 CWD: str = pathlib.Path.cwd()
 SWD: pathlib.Path = pathlib.Path(__file__).absolute().parent
 DESCRIPTION: str = "Convenience script for executing ReliQ program"
+
+OMP_URL: str = "https://www.openmp.org/specifications"
 
 if __name__ == '__main__':
     # parse arguments
@@ -48,7 +51,13 @@ if __name__ == '__main__':
         required = True
     )
     parser.add_argument(
-        '-l',
+        '-n',
+        '--ntasks',
+        help = 'Number of tasks (bound to address spaces)',
+        type = str,
+        default = "1"
+    )
+    parser.add_argument(
         '--local',
         help = 'Run locally (equivalent to UPC++ -localhost)',
         type = str,
@@ -56,16 +65,29 @@ if __name__ == '__main__':
         default = "false"
     )
     parser.add_argument(
-        '-n',
-        help = 'Number of locales (tasks)',
+        '--OMP_PROC_BIND',
+        help = 'OMP_PROC_BIND environment variable; see ' + OMP_URL,
         type = str,
-        default = "1"
+        default = "spread"
+    )
+    parser.add_argument(
+        '--OMP_PLACES',
+        help = 'OMP_PLACES environment variable; see ' + OMP_URL,
+        type = str,
+        default = "threads"
     )
     args = parser.parse_args()
 
+    # set environment variables
+    env_vars = {
+        "OMP_PROC_BIND": args.OMP_PROC_BIND,
+        "OMP_PLACES": args.OMP_PLACES
+    }
+    for var, value in env_vars.items(): os.environ[var] = value
+
     # execute ReliQ program
     cmd = str(SWD / 'external' / 'bin' / 'upcxx-run')
-    cmd += ' -n ' + args.n
+    cmd += ' -n ' + args.ntasks
     cmd += ' -localhost ' if args.local == 'true' else ' '
     cmd += str(SWD / 'bin' / args.executable)
     subprocess.run(cmd, shell = True, check = True)

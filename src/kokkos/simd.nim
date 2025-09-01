@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/utils/nimutils.nim
+  Source file: src/kokkos/views.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,11 +25,5 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-# concatenate strings with forward slash between
-proc `/`*(sa, sb: string): string = sa & "/" & sb
-
-# concatenate strings with space between
-proc `+`*(sa, sb: string): string = sa & " " & sb
-
-# append string with space
-proc `+=`*(sa: var string, sb: string) = sa = sa + sb
+# shorten pragmas pointing to Kokkos headers
+{.pragma: kokkos, header: "<Kokkos_Core.hpp>".}

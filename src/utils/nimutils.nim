@@ -26,9 +26,6 @@
 ]#
 
 import std/[cmdline]
-import nimsutils
-
-export nimsutils
 
 #[ backend: constants ]#
 
@@ -36,6 +33,15 @@ const
   printBreak* = "\n...............................................................\n"
 
 #[ backend: implementation of helper procedures ]#
+
+# concatenate strings with forward slash between
+proc `/`*(sa, sb: string): string = sa & "/" & sb
+
+# concatenate strings with space between
+proc `+`*(sa, sb: string): string = sa & " " & sb
+
+# append string with space
+proc `+=`*(sa: var string, sb: string) = sa = sa + sb
 
 iterator dimensions*[T](arr: openArray[T]): int {.inline.} =
   # silly helper iterator for iterating through openArray indices

@@ -1,7 +1,15 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/utils/reliqutils.nim
+  Source file: src/upcxx/upcxxdefs.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  Notes:
+  * This source is intended to be encapsulated entirely within ReliQ's backend
+
+  Resources:
+  * UPC++ Programmer's Guide: https://upcxx.lbl.gov/docs/html/guide.html
+  * Graph algorithms in UPC++: https://tinyurl.com/nv8mr7h9
+    - Has useful information on interleaved communication/computation
 
   MIT License
   
@@ -25,10 +33,25 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import upcxx/[upcxxbase]
+# shorten pragmas referencing upcxx and ReliQ wrapper headers
+{.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
 
-proc print*(strs: varargs[string]) =
-  if myRank() == 0: 
-    var printout = ""
-    for str in strs: printout &= str
-    echo printout
+# initialize/finalize UPC++ runtime
+proc upcxxInit* {.importcpp: "upcxx::init()", inline, upcxx.}
+proc upcxxFinalize* {.importcpp: "upcxx::finalize()", inline, upcxx.}
+
+# get process rank and total number of ranks
+proc myRank*: cint {.importcpp: "upcxx::rank_me()", upcxx.}
+proc numRanks*: cint {.importcpp: "upcxx::rank_n()", upcxx.}
+
+# set barrier
+#proc upcxx_barrier* {.importcpp: "upcxx::barrier()", upcxx.}
+
+# tests
+when isMainModule:
+  upcxxInit()
+
+  echo "Hello world from process " & $myRank() &
+    " out of " & $numRanks() & " processes"
+  
+  upcxxFinalize()

@@ -29,9 +29,9 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import backend
 import latticeconcept
 import utils
-import upcxx
 
 #[ frontend: Bravais lattice types ]#
 
@@ -43,7 +43,7 @@ type
     ## <in need of documentation>
     latticeGeometry: seq[GeometryType]
     rankGeometry: seq[GeometryType]
-    #globalPtr: upcxx_global_ptr[CoordinateType]
+    #GlobalPointer: GlobalPointer[CoordinateType]
     #sites: seq[CoordinateType]
 
 #[ backend: types for exception handling ]#
@@ -64,7 +64,7 @@ template newLatticeInitializationError*(
   appendToMessage: untyped
 ): untyped =
   # constructs error to be raised according to LatticeInitializationErrors spec
-  if upcxx_rank_me() == 0:
+  if myRank() == 0:
     var errorMessage {.inject.} = case err:
       of LatticeSubdivisionError:
         "Not enough factors of 2 for subdivision of lattice."
@@ -93,9 +93,9 @@ proc partition(lg: openArray[SomeInteger]; bins: SomeInteger): seq[SomeInteger] 
       r = r div 2
     elif not dividesSomeElement(2, rlg) and (r > 1): 
       raise newLatticeInitializationError(LatticeSubdivisionError):
-        errorMessage &= "\nlattice geometry: " & $lg
-        errorMessage &= "\nleftover lattice geometry: " & $rlg
-        errorMessage &= "\nunfilled bins (ranks, SIMD lanes, ...): " & $r
+        errorMessage &= "\nlattice geometry:" + $lg
+        errorMessage &= "\nleftover lattice geometry:" + $rlg
+        errorMessage &= "\nunfilled bins (ranks, SIMD lanes, ...):" + $r
     dec mu
 
 proc toGeomSeq[T](g: openArray[T]): seq[GeometryType] =
@@ -106,7 +106,7 @@ proc toGeomSeq[T](g: openArray[T]): seq[GeometryType] =
 proc newRankCoord(rg: seq[GeometryType]): seq[GeometryType] =
   # gets rank coordinate of block-distributed lattice (not to be confused
   # with lattice coordinate)
-  var rank = GeometryType(upcxx_rank_me())
+  var rank = GeometryType(myRank())
   result = newSeq[GeometryType](rg.len)
   for mu in rg.reversedDimensions:
     result[mu] = rank mod rg[mu]
@@ -128,12 +128,14 @@ proc newLocalStrides(rb: seq[seq[GeometryType]]): seq[GeometryType] =
   for mu in rb.reversedDimensions(start = 1):
     result[mu] = result[mu + 1] * rb[mu + 1][^1]
 
-proc newLocalIndices(rb: seq[seq[GeometryType]]): upcxx_global_ptr[CoordinateType] =
+proc newLocalIndices(
+  rb: seq[seq[GeometryType]]
+): GlobalPointerArray[CoordinateType] =
   # constructs a upcxx::global_ptr to the flattened lattices indices owned 
   # by current rank
   var numLocalIndices: csize_t = 1
   for mu in rb.dimensions: numLocalIndices *= csize_t(rb[mu][^1])
-  result = upcxx_new_array[CoordinateType](numLocalIndices)
+  result = newGlobalPointerArray[CoordinateType](numLocalIndices)
 
 #[ frontend: SimpleCubicLattice constructors ]#
 
@@ -158,12 +160,12 @@ proc newSimpleCubicLattice*(
   # catch most common errors
   if latticeGeometry.len != rankGeometry.len:
     raise newLatticeInitializationError(IncompatibleRankGeometryError):
-      errorMessage &= "\nlattice geometry: " & $latticeGeometry
-      errorMessage &= "\nrank geometry: " & $rankGeometry
-  if rankGeometry.product != upcxx_rank_n():
+      errorMessage &= "\nlattice geometry:" + $latticeGeometry
+      errorMessage &= "\nrank geometry:" + $rankGeometry
+  if rankGeometry.product != numRanks():
     raise newLatticeInitializationError(BadRankGeometrySpecificationError):
-      errorMessage &= "\nrank geometry: " & $rankGeometry
-      errorMessage &= "\n# ranks: " & $upcxx_rank_n()
+      errorMessage &= "\nrank geometry:" + $rankGeometry
+      errorMessage &= "\n# ranks:" + $numRanks()
 
   # set up lattice geometry
   let
@@ -196,20 +198,18 @@ proc newSimpleCubicLattice*(
   ##   Euclidean time direction).
   ## 
   ## Please refer to primary constructor method for further details.
-  let rg = latticeGeometry.partition(upcxx_rank_n())
+  let rg = latticeGeometry.partition(numRanks())
   return newSimpleCubicLattice(latticeGeometry, rg)
 
 #[ tests ]#
 
-when isMainModule: 
-  # ../../build/deps/bin/nim cpp --path:/home/curtyp/Software/ReliQ/src bravaislattice
-  # local test: ../../build/deps/bin/upcxx-run -n 4 -localhostt bravaislattice
-  upcxx_init()
+when isMainModule:
+  upcxxInit()
 
   let latGeom = [8, 8, 8, 16]
   let latA = newSimpleCubicLattice(latGeom)
   let
-    rankGeomB = latGeom.partition(upcxx_rank_n()) # used here for test: not exposed
+    rankGeomB = latGeom.partition(numRanks()) # used here for test: not exposed
     latB = newSimpleCubicLattice(latGeom, rankGeomB)
 
-  upcxx_finalize()
+  upcxxFinalize()

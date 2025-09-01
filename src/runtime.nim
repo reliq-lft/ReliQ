@@ -1,7 +1,6 @@
-import upcxx/[upcxxdefs]
-import kokkos/[kokkosdefs]
+import backend
 
-proc reliqInit* =
+proc reliqInit* {.inline.} =
   ## Initializes ReliQ's runtime environment
   ## Author: Curtis Taylor Peterson
   ## 
@@ -10,10 +9,10 @@ proc reliqInit* =
   ## 
   ## a.) Initialize UPC++ runtime environemnt
   ## b.) Initialize Kokkos runtime environment
-  upcxx_init()
-  kokkos_init()
+  upcxxInit()
+  kokkosInit()
 
-proc reliqFinalize* =
+proc reliqFinalize* {.inline.} =
   ## Initializes ReliQ's runtime environment
   ## Author: Curtis Taylor Peterson
   ## 
@@ -22,19 +21,30 @@ proc reliqFinalize* =
   ## 
   ## a.) Finalize Kokkos runtime environment
   ## b.) Finalize UPC++ runtime environemnt
-  kokkos_finalize()
-  upcxx_finalize()
+  kokkosFinalize()
+  upcxxFinalize()
+
+template reliq*(work: untyped): untyped =
+  ## Encapsulates ReliQ's runtime environment in workload block
+  ## Author: Curtis Taylor Peterson
+  reliqInit()
+  work
+  reliqFinalize()
 
 when isMainModule:
   import utils
 
-  reliqInit()
+  const encapsulated = true
 
-  # UPC++ hello world
-  echo "Hello world from process" + $upcxx_rank_me() +
-    "out of" + $upcxx_rank_n() + "processes"
-  print "I should only print once"
+  proc hello_world() =
+    echo "Hello world from process" + $myRank() +
+      "out of" + $numRanks() + "processes"
+    print "I should only print once"
 
-  # Kokkos
-
-  reliqFinalize()
+  if not encapsulated:
+    reliqInit()
+    hello_world()
+    reliqFinalize()
+  else: 
+    reliq: 
+      hello_world()
