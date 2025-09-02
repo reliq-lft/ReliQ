@@ -11,10 +11,10 @@
   
   Copyright (c) 2025 Curtis Taylor Peterson
   
-  Permission is hereby granted, free of charge, to any person obtaining a copy
+  Permission is hereby granted, free of chadge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -42,7 +42,7 @@ type
     ## 
     ## <in need of documentation>
     latticeGeometry: seq[GeometryType]
-    rankGeometry: seq[GeometryType]
+    distMemoryGeometry: seq[GeometryType]
     #GlobalPointer: GlobalPointer[CoordinateType]
     #sites: seq[CoordinateType]
 
@@ -51,8 +51,8 @@ type
 # enumerate possible errors that a user may run into
 type LatticeInitializationErrors = enum 
   LatticeSubdivisionError,
-  IncompatibleRankGeometryError,
-  BadRankGeometrySpecificationError
+  IncompatibledistMemoryGeometryError,
+  BaddistMemoryGeometrySpecificationError
 
 # special error type for handling exception during lattice initialization
 type LatticeInitializationError = object of CatchableError
@@ -68,9 +68,9 @@ template newLatticeInitializationError*(
     var errorMessage {.inject.} = case err:
       of LatticeSubdivisionError:
         "Not enough factors of 2 for subdivision of lattice."
-      of IncompatibleRankGeometryError:
+      of IncompatibledistMemoryGeometryError:
         "Dimension of lattice and rank geometry are incompatible."
-      of BadRankGeometrySpecificationError:
+      of BaddistMemoryGeometrySpecificationError:
         "Product of entries in rank geometry must equal rank number."
     errorMessage = printBreak & errorMessage
     appendToMessage
@@ -98,20 +98,20 @@ proc partition(lg: openArray[SomeInteger]; bins: SomeInteger): seq[SomeInteger] 
         errorMessage &= "\nunfilled bins (ranks, SIMD lanes, ...):" + $r
     dec mu
 
-proc newRankCoord(rg: seq[GeometryType]): seq[GeometryType] =
+proc newRankCoord(dg: seq[GeometryType]): seq[GeometryType] =
   # gets rank coordinate of block-distributed lattice (not to be confused
   # with lattice coordinate)
   var rank = GeometryType(myRank())
-  result = newSeq[GeometryType](rg.len)
-  for mu in rg.reversedDimensions:
-    result[mu] = rank mod rg[mu]
-    rank = rank div rg[mu]
+  result = newSeq[GeometryType](dg.len)
+  for mu in dg.reversedDimensions:
+    result[mu] = rank mod dg[mu]
+    rank = rank div dg[mu]
 
-proc newRankBlock(lg, rg, rc: seq[GeometryType]): seq[seq[GeometryType]] =
+proc newRankBlock(lg, dg, rc: seq[GeometryType]): seq[seq[GeometryType]] =
   # gets range of each dimension for sublattice that this rank is responsible for
-  result = newSeq[seq[GeometryType]](rg.len)
-  for mu in rg.dimensions:
-    let (b, r) = (lg[mu] div rg[mu], lg[mu] mod rg[mu])
+  result = newSeq[seq[GeometryType]](dg.len)
+  for mu in dg.dimensions:
+    let (b, r) = (lg[mu] div dg[mu], lg[mu] mod dg[mu])
     let start = rc[mu] * b + min(rc[mu], r)
     let size = b + GeometryType(if rc[mu] < r: 1 else: 0)
     result[mu] = @[start, size]
@@ -134,7 +134,8 @@ proc newLocalIndices(rb: seq[seq[GeometryType]]): GlobalPointer[CoordinateType] 
 
 proc newSimpleCubicLattice*(
   latticeGeometry: openArray[SomeInteger],
-  rankGeometry: openArray[SomeInteger]
+  distMemoryGeometry: openArray[SomeInteger],
+  sharedMemoryGeometry: openArray[SomeInteger]
 ): SimpleCubicLattice =
   ## SimpleCubicLattice constructor
   ## Author: Curtis Taylor Peterson
@@ -151,32 +152,50 @@ proc newSimpleCubicLattice*(
   #[ distributed memory specifications ]#
 
   # catch most common errors
-  if latticeGeometry.len != rankGeometry.len:
-    raise newLatticeInitializationError(IncompatibleRankGeometryError):
+  if latticeGeometry.len != distMemoryGeometry.len:
+    raise newLatticeInitializationError(IncompatibledistMemoryGeometryError):
       errorMessage &= "\nlattice geometry:" + $latticeGeometry
-      errorMessage &= "\nrank geometry:" + $rankGeometry
-  if rankGeometry.product != numRanks():
-    raise newLatticeInitializationError(BadRankGeometrySpecificationError):
-      errorMessage &= "\nrank geometry:" + $rankGeometry
+      errorMessage &= "\nrank geometry:" + $distMemoryGeometry
+  if distMemoryGeometry.product != numRanks():
+    raise newLatticeInitializationError(BaddistMemoryGeometrySpecificationError):
+      errorMessage &= "\nrank geometry:" + $distMemoryGeometry
       errorMessage &= "\n# ranks:" + $numRanks()
 
   # set up lattice geometry
   let
     nd = latticeGeometry.len
-    lg = toSeq[GeometryType](latticeGeometry)
+    lg = latticeGeometry.toSeq(GeometryType)
 
   # set up rank geometry
   let
-    rg = toSeq[GeometryType](rankGeometry)
-    rc = newRankCoord(rg)
-    rb = newRankBlock(lg, rg, rc)
+    dg = distMemoryGeometry.toSeq(GeometryType)
+    rc = newRankCoord(dg)
+    rb = newRankBlock(lg, dg, rc)
   let (ls, li) = (newLocalStrides(rb), newLocalIndices(rb))
 
   # return instantiated SimpleCubicLattice
   return SimpleCubicLattice(
     latticeGeometry: lg, 
-    rankGeometry: rg
+    distMemoryGeometry: dg
   )
+
+proc newSimpleCubicLattice*(
+  latticeGeometry: openArray[SomeInteger],
+  distMemoryGeometry: openArray[SomeInteger]
+): SimpleCubicLattice = 
+  ## SimpleCubicLattice constructor
+  ## 
+  ## TL;DR: Simplest SimpleCubicLattice constructor
+  ## 
+  ## The following attributes of SimpleCubicLattice are inferred.
+  ## * Distributed memory geometry inferred from rank number. Splitting of lattice
+  ##   dimensions into ranks starts with last dimension (conventional
+  ##   Euclidean time direction).
+  ## * Shared memory geometry inferred from shared memory rank number
+  ## 
+  ## Please refer to primary constructor method for further details.
+  let sg = latticeGeometry.partition(numThreads())
+  return newSimpleCubicLattice(latticeGeometry, distMemoryGeometry, sg)
 
 proc newSimpleCubicLattice*(
   latticeGeometry: openArray[SomeInteger]
@@ -186,21 +205,22 @@ proc newSimpleCubicLattice*(
   ## TL;DR: Simplest SimpleCubicLattice constructor
   ## 
   ## The following attributes of SimpleCubicLattice are inferred.
-  ## * Rank geometry inferred from rank number. Splitting of lattice 
-  ##   dimensions into ranks starts with last dimension (conventional 
+  ## * Distributed memory geometry inferred from rank number. Splitting of lattice
+  ##   dimensions into ranks starts with last dimension (conventional
   ##   Euclidean time direction).
+  ## * Shared memory geometry inferred from shared memory rank number
   ## 
   ## Please refer to primary constructor method for further details.
-  let rg = latticeGeometry.partition(numRanks())
-  return newSimpleCubicLattice(latticeGeometry, rg)
+  let 
+    dg = latticeGeometry.partition(numRanks())
+    sg = latticeGeometry.partition(numLanes()) # TO-DO: also works for GPU threads?
+  return newSimpleCubicLattice(latticeGeometry, dg, sg)
 
 when isMainModule:
-  upcxxInit()
-
-  let latGeom = [8, 8, 8, 16]
-  let latA = newSimpleCubicLattice(latGeom)
-  let
-    rankGeomB = latGeom.partition(numRanks()) # used here for test: not exposed
-    latB = newSimpleCubicLattice(latGeom, rankGeomB)
-
-  upcxxFinalize()
+  import runtime
+  reliq:
+    let latGeom = [8, 8, 8, 16]
+    let latA = newSimpleCubicLattice(latGeom)
+    let
+      rankGeomB = latGeom.partition(numRanks()) # used here for test: not exposed
+      latB = newSimpleCubicLattice(latGeom, rankGeomB)

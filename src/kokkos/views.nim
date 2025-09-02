@@ -26,7 +26,6 @@
 ]#
 
 import utils
-import backend
 
 # shorten pragmas pointing to Kokkos headers and Kokkos view wrapper
 {.pragma: views,  header: "views.hpp".}

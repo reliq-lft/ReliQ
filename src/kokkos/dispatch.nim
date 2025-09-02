@@ -25,3 +25,16 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import kokkosbase
+
+# include kokkos headers
+kokkos: {.pragma: iostream, header: "<iostream>".}
+
+# test implementation of a parallel for
+proc parallelFor(tag: cstring; start, stop: cint) 
+  {.importcpp: "Kokkos::parallel_for(#, Kokkos::RangePolicy<>(#, #), KOKKOS_LAMBDA (const int i) { std::cout << i << \": hello, fellow traveler!\" << std::endl; })", inline, kokkos, iostream.}
+
+when isMainModule:
+  import runtime
+  reliq:
+    parallelFor("test", 0, 1024)

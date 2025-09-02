@@ -33,11 +33,11 @@
 
 import utils/[nimutils]
 
-# shorten pragmas pointing to Kokkos headers
-{.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-
 # template returning Kokkos_Core include through pragma
-template kokkosCore*: untyped = {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
+template kokkos*(pragmas: untyped): untyped = 
+  {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
+  pragmas
+kokkos: discard
 
 # initializes Kokkos runtime
 proc kokkosInit(argc: cint; argv: cstringArray)
@@ -52,6 +52,8 @@ proc kokkosInit* {.inline.} =
 # finalizes Kokkos runtime
 proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
-when isMainModule: 
-  kokkosInit()
-  kokkosFinalize()
+# get number of threads
+proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
+
+# get number of single-instruction lanes; placeholder for now
+proc numLanes*: cint = 1

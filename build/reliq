@@ -51,18 +51,23 @@ if __name__ == '__main__':
         required = True
     )
     parser.add_argument(
-        '-n',
+        '-d',
         '--ntasks',
         help = 'Number of tasks (bound to address spaces)',
         type = str,
         default = "1"
     )
     parser.add_argument(
+        '-s',
+        '--nthreads',
+        help = 'Number of threads per task',
+        type = str,
+        default = "1"
+    )
+    parser.add_argument(
         '--local',
         help = 'Run locally (equivalent to UPC++ -localhost)',
-        type = str,
-        choices = ["true", "false"],
-        default = "false"
+        action = 'store_true'
     )
     parser.add_argument(
         '--OMP_PROC_BIND',
@@ -88,6 +93,6 @@ if __name__ == '__main__':
     # execute ReliQ program
     cmd = str(SWD / 'external' / 'bin' / 'upcxx-run')
     cmd += ' -n ' + args.ntasks
-    cmd += ' -localhost ' if args.local == 'true' else ' '
+    cmd += ' -localhost ' if args.local else ' '
     cmd += str(SWD / 'bin' / args.executable)
     subprocess.run(cmd, shell = True, check = True)

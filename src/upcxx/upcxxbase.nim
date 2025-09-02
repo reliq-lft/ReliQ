@@ -37,7 +37,9 @@
 {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
 
 # template returning UPC++ include through pragma
-template upcxx*: untyped = {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
+template upcxx*(pragmas: untyped): untyped = 
+  {.pragma: upcxx, header: "<upcxx/upcxx.hpp>".}
+  pragmas
 
 # initialize/finalize UPC++ runtime
 proc upcxxInit* {.importcpp: "upcxx::init()", inline, upcxx.}

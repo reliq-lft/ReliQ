@@ -28,7 +28,7 @@
 import upcxxbase
 
 # include upcxx headers
-upcxx()
+upcxx: discard
 
 type # UPC++ global pointer: accessible to all ranks; downcasts to ordinary pointer
   GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx.} = object

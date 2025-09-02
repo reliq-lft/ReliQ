@@ -71,7 +71,7 @@ proc toSeq*[I](arr: openArray[I]; T: typedesc): seq[T] {.inline.} =
   for mu in arr.dimensions: result[mu] = T(arr[mu])
 proc toSeq*[I](arr: openArray[I]): auto {.inline.} =
   assert(arr.len > 0, "toSeq: openArray must have at least one element")
-  return arr.toSeq[typeof(arr[0])]()
+  return arr.toSeq(typeof(arr[0]))
 
 proc product*[T](arr: openArray[T]): T {.inline.} =
   # calculates product of open array's entries

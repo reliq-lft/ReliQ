@@ -1,9 +1,10 @@
 import upcxx/[upcxxbase, globalptr]
-import kokkos/[kokkosbase, simd, views]
+import kokkos/[kokkosbase, views]
+import kokkos/[simd]
 
 export upcxxbase
 export globalptr
 
 export kokkosbase
-export simd
 export views
+export simd

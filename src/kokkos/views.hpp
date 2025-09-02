@@ -28,5 +28,10 @@
 #pragma once
 #include <Kokkos_DynRankView.hpp>
 
+#ifndef RELIQ_VIEWS_HPP
+#define RELIQ_VIEWS_HPP
+
 template <class T>
 using DynamicView = Kokkos::DynRankView<T>;
+
+#endif // RELIQ_VIEWS_HPP
