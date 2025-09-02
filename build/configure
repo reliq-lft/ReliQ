@@ -77,10 +77,22 @@ mkdir -p $CWD/data
 
 ### poem, because why not
 
+center() {
+    local string="$1"
+    local cols=${COLUMNS:-$(tput cols)}
+    local indent=$(( (cols - ${#string}) / 2 ))
+
+    if (( indent > 0 )); then
+        printf "%*s%s\\n" "${indent}" " " "${string}"
+    else
+        printf "%s\\n" "${string}" # If string is too long, just print it
+    fi
+}
+
 echo ""
-echo "---------------------------------------------------------------------------------------------"
-echo ""
-echo "Enjoy your time with ReliQ, follow traveler!"
+center "O------------------------------------------------------O"
+center "O---O Enjoy your time with ReliQ, fellow traveler! O---O"
+center "O------------------------------------------------------O"
 echo ""
 echo "\"The Zen of Python\" by Tim Peters"
 echo ""
@@ -105,5 +117,7 @@ echo "If the implementation is easy to explain, it may be a good idea."
 echo "Namespaces are one honking great idea -- let's do more of those!"
 echo ""
 echo "Source: https://peps.python.org/pep-0020/"
+echo "See, also, \"The Zen of Nim\": https://nim-lang.org/blog/2021/11/15/zen-of-nim.html"
 echo ""
-echo "---------------------------------------------------------------------------------------------"
+echo "Contact: reliq-lft@protonmail.me"
+echo ""
