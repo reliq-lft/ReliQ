@@ -8,3 +8,9 @@ export globalptr
 export kokkosbase
 export views
 export simd
+
+proc numLanes*: int =
+  # fetch number of SIMD (SIMT) lanes; needs to work for GPU threads too
+  # TO-DO: implement properly; placeholder for now
+  let t = newSIMD(float64)
+  return t.width

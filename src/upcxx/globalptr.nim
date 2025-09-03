@@ -34,9 +34,8 @@ type # UPC++ global pointer: accessible to all ranks; downcasts to ordinary poin
   GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx.} = object
 
 # upcxx::global_ptr constructor: single data type
-proc newGlobalPointer[T]: GlobalPointer[T] 
-  {.constructor, importcpp: "upcxx::new_<'*0>(upcxx::rank_me())", upcxx.}
-proc newGlobalPointer*(T: typedesc): GlobalPointer[T] = newGlobalPointer[T]()
+proc newGlobalPointer*[T](t: T): GlobalPointer[T] 
+  {.constructor, importcpp: "upcxx::new_<'*0>(#)", upcxx.}
 
 # upcxx::global_ptr destructor: single data type
 proc deleteGlobalPointer*[T](global_ptr: GlobalPointer[T])
@@ -58,7 +57,8 @@ proc local*[T](global_ptr: GlobalPointer[T]): ptr T {.importcpp: "#.local()", up
 when isMainModule:
   upcxxInit()
   
-  var gptr = newGlobalPointer(int)
+  let sq = newSeq[int](10)
+  var gptr = newGlobalPointer(sq)
 
   var lptr = gptr.local()
 

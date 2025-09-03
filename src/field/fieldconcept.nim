@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/lattice/latticeconcept.nim
+  Source file: src/field/fieldconcept.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -25,14 +25,12 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-type
-  GeometryType* = int16 
-  CoordinateType* = int32
+import lattice/[latticeconcept]
 
 type
-  Lattice* = concept l, type LatticeCoordinate, type FieldType
-    ## Generic lattice concept
+  Field* = concept f, l, type FieldType
+    ## Generic field concept
     ## <in need of documentation>
-    for site in l.sites(): discard
-    l.latticeCoordinate(n: int): LatticeCoordinate
-    l.newField(FieldType): auto
+    l is Lattice
+    f[0] is FieldType
+    l.newField(FieldType): type(f)

@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/lattice/bravais.nim
+  Source file: src/lattice/simplecubiclattice.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   Notes:
@@ -30,29 +30,31 @@
 ]#
 
 import backend
-import latticeconcept
 import utils
+import latticeconcept
 
-#[ frontend: Bravais lattice types ]#
+#[ frontend: simple cubic lattice type definition ]#
 
 type
+  SimpleCubicRankDim = tuple[start, stop, size: GeometryType]
   SimpleCubicLattice* = object
     ## Simple cubic Bravais lattice
-    ## Author: Curtis Taylor Peterson
     ## 
     ## <in need of documentation>
-    latticeGeometry: seq[GeometryType]
-    distMemoryGeometry: seq[GeometryType]
-    #GlobalPointer: GlobalPointer[CoordinateType]
-    #sites: seq[CoordinateType]
-
+    globalGeometry: seq[GeometryType]
+    localPartition: seq[GeometryType]
+    localBlockCoordinate: seq[GeometryType]
+    localGeometry: seq[SimpleCubicRankDim]
+    localStrides: seq[GeometryType]
+    numLocalSites*: GeometryType
+    
 #[ backend: types for exception handling ]#
 
 # enumerate possible errors that a user may run into
 type LatticeInitializationErrors = enum 
   LatticeSubdivisionError,
   IncompatibledistMemoryGeometryError,
-  BaddistMemoryGeometrySpecificationError
+  BadDistMemoryGeometrySpecificationError
 
 # special error type for handling exception during lattice initialization
 type LatticeInitializationError = object of CatchableError
@@ -70,7 +72,7 @@ template newLatticeInitializationError*(
         "Not enough factors of 2 for subdivision of lattice."
       of IncompatibledistMemoryGeometryError:
         "Dimension of lattice and rank geometry are incompatible."
-      of BaddistMemoryGeometrySpecificationError:
+      of BadDistMemoryGeometrySpecificationError:
         "Product of entries in rank geometry must equal rank number."
     errorMessage = printBreak & errorMessage
     appendToMessage
@@ -107,30 +109,37 @@ proc newRankCoord(dg: seq[GeometryType]): seq[GeometryType] =
     result[mu] = rank mod dg[mu]
     rank = rank div dg[mu]
 
-proc newRankBlock(lg, dg, rc: seq[GeometryType]): seq[seq[GeometryType]] =
+proc newRankBlock(lg, dg, rc: seq[GeometryType]): seq[SimpleCubicRankDim] =
   # gets range of each dimension for sublattice that this rank is responsible for
-  result = newSeq[seq[GeometryType]](dg.len)
+  result = newSeq[SimpleCubicRankDim](dg.len)
   for mu in dg.dimensions:
     let (b, r) = (lg[mu] div dg[mu], lg[mu] mod dg[mu])
     let start = rc[mu] * b + min(rc[mu], r)
     let size = b + GeometryType(if rc[mu] < r: 1 else: 0)
-    result[mu] = @[start, size]
+    result[mu] = (start: start, stop: start + size - 1, size: size)
 
-proc newLocalStrides(rb: seq[seq[GeometryType]]): seq[GeometryType] =
+proc newLocalStrides(rb: seq[SimpleCubicRankDim]): seq[GeometryType] =
   # gets local strides for this block: needed for index flattening
   result = newSeq[GeometryType](rb.len)
   result[^1] = 1
   for mu in rb.reversedDimensions(start = 1):
-    result[mu] = result[mu + 1] * rb[mu + 1][^1]
-
-proc newLocalIndices(rb: seq[seq[GeometryType]]): GlobalPointer[CoordinateType] =
-  # constructs a upcxx::global_ptr to the flattened lattices indices owned 
-  # by current rank
-  var numLocalIndices: csize_t = 1
-  for mu in rb.dimensions: numLocalIndices *= csize_t(rb[mu][^1])
-  result = newGlobalPointerArray(numLocalIndices, CoordinateType)
+    result[mu] = result[mu + 1] * rb[mu + 1].size
 
 #[ frontend: SimpleCubicLattice constructors ]#
+
+proc newSimpleCubicLattice*(other: SimpleCubicLattice): SimpleCubicLattice = 
+  ## SimpleCubicLattice copy constructor
+  ## 
+  ## Copy constructor for SimpleCubicLattice.
+  ## <in need of more documentation>
+  result = SimpleCubicLattice(
+    globalGeometry: other.globalGeometry,
+    localPartition: other.localPartition,
+    localBlockCoordinate: other.localBlockCoordinate,
+    localGeometry: other.localGeometry,
+    localStrides: other.localStrides,
+    numLocalSites: other.numLocalSites
+  )
 
 proc newSimpleCubicLattice*(
   latticeGeometry: openArray[SomeInteger],
@@ -138,7 +147,6 @@ proc newSimpleCubicLattice*(
   sharedMemoryGeometry: openArray[SomeInteger]
 ): SimpleCubicLattice =
   ## SimpleCubicLattice constructor
-  ## Author: Curtis Taylor Peterson
   ## 
   ## TL;DR: Base SimpleCubicLattice constructor
   ## 
@@ -157,7 +165,7 @@ proc newSimpleCubicLattice*(
       errorMessage &= "\nlattice geometry:" + $latticeGeometry
       errorMessage &= "\nrank geometry:" + $distMemoryGeometry
   if distMemoryGeometry.product != numRanks():
-    raise newLatticeInitializationError(BaddistMemoryGeometrySpecificationError):
+    raise newLatticeInitializationError(BadDistMemoryGeometrySpecificationError):
       errorMessage &= "\nrank geometry:" + $distMemoryGeometry
       errorMessage &= "\n# ranks:" + $numRanks()
 
@@ -166,17 +174,23 @@ proc newSimpleCubicLattice*(
     nd = latticeGeometry.len
     lg = latticeGeometry.toSeq(GeometryType)
 
-  # set up rank geometry
+  # set up distributed memory geometry
   let
     dg = distMemoryGeometry.toSeq(GeometryType)
     rc = newRankCoord(dg)
     rb = newRankBlock(lg, dg, rc)
-  let (ls, li) = (newLocalStrides(rb), newLocalIndices(rb))
+    ls = newLocalStrides(rb)
+  var numLocalSites: GeometryType = 1
+  for mu in rb.dimensions: numLocalSites *= rb[mu].size
 
   # return instantiated SimpleCubicLattice
   return SimpleCubicLattice(
-    latticeGeometry: lg, 
-    distMemoryGeometry: dg
+    globalGeometry: lg,
+    localPartition: dg,
+    localBlockCoordinate: rc,
+    localGeometry: rb,
+    localStrides: ls,
+    numLocalSites: numLocalSites
   )
 
 proc newSimpleCubicLattice*(
@@ -185,12 +199,9 @@ proc newSimpleCubicLattice*(
 ): SimpleCubicLattice = 
   ## SimpleCubicLattice constructor
   ## 
-  ## TL;DR: Simplest SimpleCubicLattice constructor
+  ## TL;DR: Next-to-simplest SimpleCubicLattice constructor
   ## 
   ## The following attributes of SimpleCubicLattice are inferred.
-  ## * Distributed memory geometry inferred from rank number. Splitting of lattice
-  ##   dimensions into ranks starts with last dimension (conventional
-  ##   Euclidean time direction).
   ## * Shared memory geometry inferred from shared memory rank number
   ## 
   ## Please refer to primary constructor method for further details.
@@ -213,14 +224,40 @@ proc newSimpleCubicLattice*(
   ## Please refer to primary constructor method for further details.
   let 
     dg = latticeGeometry.partition(numRanks())
-    sg = latticeGeometry.partition(numLanes()) # TO-DO: also works for GPU threads?
+    sg = latticeGeometry.partition(numLanes())
   return newSimpleCubicLattice(latticeGeometry, dg, sg)
+
+#[ frontend: Lattice concept conformance ]#
+
+# implement sites method for Lattice concept
+iterator sites*(l: SimpleCubicLattice): int =
+  for n in 0..<l.numLocalSites: yield n
+
+# implement latticeCoordinate method for Lattice concept
+proc latticeCoordinate*(l: SimpleCubicLattice; n: int): seq[int] =
+  ## Gets lattice coordinate from flattened index
+  ## 
+  ## <in need of documentation>
+  result = newSeq[int](l.localGeometry.len)
+  var nIdx = n
+  for mu in l.localGeometry.dimensions:
+    result[mu] = l.localGeometry[mu].start + nIdx div l.localStrides[mu]
+    nIdx = nIdx mod l.localStrides[mu]
 
 when isMainModule:
   import runtime
+  const verbosity = 1
   reliq:
     let latGeom = [8, 8, 8, 16]
     let latA = newSimpleCubicLattice(latGeom)
     let
       rankGeomB = latGeom.partition(numRanks()) # used here for test: not exposed
       latB = newSimpleCubicLattice(latGeom, rankGeomB)
+    
+    for site in latA.sites:
+      let coord = latA.latticeCoordinate(site)
+      for mu in coord.dimensions:
+        assert(coord[mu] >= latA.localGeometry[mu].start)
+        assert(coord[mu] <= latA.localGeometry[mu].stop)
+      if verbosity > 1: 
+        echo "[" & $myRank() & "] " & "latA site: ", site, " coord: ", coord

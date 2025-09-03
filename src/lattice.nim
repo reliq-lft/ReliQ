@@ -1,4 +1,5 @@
-import lattice/[latticeconcept, bravaislattice]
+import lattice/[latticeconcept]
+import lattice/[simplecubiclattice]
 
-export bravaislattice
 export latticeconcept
+export simplecubiclattice

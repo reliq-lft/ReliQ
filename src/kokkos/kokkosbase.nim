@@ -54,6 +54,3 @@ proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
 # get number of threads
 proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
-
-# get number of single-instruction lanes; placeholder for now
-proc numLanes*: cint = 1
