@@ -39,6 +39,8 @@ template kokkos*(pragmas: untyped): untyped =
   pragmas
 kokkos: discard
 
+#[ frontend: runtime initializers/finalizers ]#
+
 # initializes Kokkos runtime
 proc kokkosInit(argc: cint; argv: cstringArray)
   {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
@@ -51,6 +53,8 @@ proc kokkosInit* {.inline.} =
 
 # finalizes Kokkos runtime
 proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
+
+#[ misc. procedures ]#
 
 # get number of threads
 proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}

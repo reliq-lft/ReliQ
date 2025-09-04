@@ -33,6 +33,11 @@ import backend
 import utils
 import lattice/[simplecubiclattice]
 
+# shorten pragmas pointing to UPC++ & Kokkos headers and include local 
+# field view wrapper
+backend: 
+  {.pragma: simplecubicfieldview, header: "simplecubicfieldview.hpp".}
+
 #[ frontend: simple cubic field type definition ]#
 
 type
@@ -43,7 +48,13 @@ type
     lattice: ref SimpleCubicLattice
     field: GlobalPointer[T]
 
-#[ frontend: SimpleCubicField constructors ]#
+type
+  SimpleCubicFieldView*[T] {.
+    importcpp: "SimpleCubicFieldView", 
+    simplecubicfieldview
+  .} = object
+
+#[ frontend: SimpleCubicField constructor ]#
 
 proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
   ## Create new field on simple cubic Bravais lattice
@@ -53,6 +64,22 @@ proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
   result = SimpleCubicField[T](field: newGlobalPointerArray(numLocalSites, T))
   new(result.lattice)
   result.lattice[] = lattice  
+
+#[ frontend: SimpleCubicFieldView constructor ]#
+
+proc newSimpleCubicFieldView[T](field: GlobalPointer[T]): SimpleCubicFieldView[T] {.
+  importcpp: "SimpleCubicFieldView(#)", 
+  header: "simplecubicfieldview.hpp",
+  constructor,
+  inline
+.}
+proc newFieldView*[T](f: SimpleCubicField[T]): SimpleCubicFieldView[T] =
+  ## Create new view of field on simple cubic Bravais lattice
+  ##
+  ## <in need of documentation>
+  # Developer note: worth inlining, but do this after you've checked that current
+  # state ensures that SimpleCubicField actually implements Field concept
+  return newSimpleCubicFieldView(f.field)
 
 #[ frontend: basic SimpleCubicField methods ]#
 
@@ -65,6 +92,31 @@ proc `[]`*[T](f: SimpleCubicField[T]; n: int): T =
   let nIdx = cint(n)
   var value: T
   {.emit: """value_1 = lPtr_1[nIdx_1];""".}
+  return value
+
+proc `[]`*[T](f: var SimpleCubicField[T]; n: int): T =
+  ## Access field value at given local site and allow it to be modified
+  ##
+  ## This is for testing; it is most certainly not optimal or efficient
+  ## <in need of documentation>
+  let lPtr = f.field.local()
+  let nIdx = cint(n)
+  var value: ptr T
+  {.emit: """value_1 = &lPtr_1[nIdx_1];""".}
+  return value[]
+
+#[ frontend: basic SimpleCubicFieldView methods ]#
+
+# access field value at given local site
+proc `[]`*[T](f: SimpleCubicFieldView[T]; n: int): T =
+  ## Access field view value at given local site and allow it to be modified
+  ##
+  ## This is for testing; it is most certainly not optimal or efficient
+  ## <in need of documentation>
+  let nIdx = cint(n)
+  var field = f
+  var value: T
+  {.emit: """value_1 = field_1[nIdx_1];""".}
   return value
 
 when isMainModule:
@@ -82,3 +134,27 @@ when isMainModule:
     for n in l.sites(): 
       if verbosity > 1: 
         echo "[" & $myRank() & "] " & "site: ", n, " coord: ", field[n]
+    
+    var execPolicyA = newRangePolicy(0, l.numLocalSites)
+
+    var fieldView = field.newFieldView()
+    let fv1 = fieldView[0]
+    var fv2 = fieldView[0]
+    print fv1
+
+
+# ---
+
+#[
+proc `()`*[T](
+  f: SimpleCubicFieldView[T]; 
+  n: int
+): int {.exportcpp: "operator()".} = n
+]#
+
+#[ i want something like this ----v
+kokkos:
+  parallel_for(execPolicyA, proc(i: int) {.kokkos.} =
+    field[i] = float(i)
+  )
+]#
