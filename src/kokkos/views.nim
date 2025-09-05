@@ -27,11 +27,15 @@
 
 import utils
 import kokkosbase
+import upcxx/[upcxxbase, globalptr]
 
 # shorten pragmas pointing to Kokkos headers and include local views wrapper
-kokkos: {.pragma: views, header: "views.hpp".}
+template views*: untyped =
+  {.pragma: views, header: "../kokkos/views.hpp".}
+kokkos: views()
 
 type # frontend: Kokkos dynamic rank view
+  StaticView*[T] {.importcpp: "StaticView", views.} = object
   DynamicView*[T] {.importcpp: "DynamicView", views.} = object
 
 # enumerate possible errors that a user may run into
@@ -58,6 +62,42 @@ template newKokkosViewError(
     appendToMessage
     print errorMessage & printBreak
   newException(KokkosViewError, "")
+
+#[ frontend/backend: static view constructors ]#
+
+# backend: Kokkos static view constructor
+proc newStaticView[T](tag: cstring; n1: csize_t): StaticView[T]
+  {.importcpp: "StaticView" & "<'*0>(#, @)", constructor, inline, views.}
+
+# backend: Kokkos static view constructor from pointer
+proc newStaticView[T](localPtr: ptr T; n: csize_t): StaticView[T] 
+  {.importcpp: "StaticView" & "<'*0>(#, #)", constructor, inline, views.}
+
+# frontend: base Kokkos static view constructor
+proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] {.inline.} = 
+  return newStaticView[T]("StaticView", csize_t(n))
+
+# frontend: Kokkos static view constructor from pointer
+proc newStaticView*[T](
+  n: SomeInteger;
+  localPointer: ptr T
+): StaticView[T] {.inline.} = newStaticView(localPointer, csize_t(n))
+proc newStaticView*[T](
+  localPointer: ptr T;
+  n: SomeInteger
+): StaticView[T] {.inline.} = newStaticView(localPointer, csize_t(n))
+
+# frontend: Kokkos static view constructor from global pointer
+proc newStaticView*[T](
+  n: SomeInteger;
+  globalPointer: GlobalPointer[T]
+): StaticView[T] {.inline.} = newStaticView(globalPointer.local(), csize_t(n))
+proc newStaticView*[T](
+  globalPointer: GlobalPointer[T];
+  n: SomeInteger
+): StaticView[T] {.inline.} = newStaticView(globalPointer.local(), csize_t(n))
+
+#[ frontend/backend: dynamic view constructors ]#
 
 # backend: Kokkos dynamic rank view constructors (Kokkos supports up to 7 dimensions)
 proc newDynamicView[T](tag: cstring; n1: csize_t): DynamicView[T]
@@ -98,6 +138,23 @@ proc newDynamicView*(
         raise newKokkosViewError(TooManyDynamicViewDimensionsError):
           errorMessage &= "\ndimensions:" + $dims
       newDynamicView[T]("DynamicView", d[0])
+proc newDynamicView*(
+  T: typedesc;
+  dims: openArray[SomeInteger]
+): DynamicView[T] {.inline.} = dims.newDynamicView(T)
+
+#[ frontend: static view methods ]#
+
+# backend: static view accessor method
+proc getViewElement[T](view: StaticView[T]; n: cint): T 
+  {.importcpp: "#.operator[](#)", inline, views.}
+
+# public static view accessor method
+proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T {.inline.} =
+  ## Access element of Kokkos static view
+  ##
+  ## <in need of documentation>
+  return view.getViewElement(cint(n))
 
 # lessons learned:
 # * problems with C++ "=" operator overload seem to stem from improper spec of 
@@ -108,5 +165,26 @@ proc newDynamicView*(
 when isMainModule:
   import runtime
   reliq:
-    let arr = [10, 10] 
-    var viewa = arr.newDynamicView(float)
+    let 
+      sca = 10.0
+      arr = [10.0, 10.0]
+    let 
+      lPtrS = addr sca
+      lPtrA = addr arr[0]
+      gPtr = newGlobalPointerArray(10, float)
+    var 
+      viewa = newStaticView(10, float)
+      viewb = newStaticView(10, addr sca)
+      viewc = lPtrS.newStaticView(10)
+      viewd = newStaticView(10, addr arr[0])
+      viewe = newStaticView(10, lPtrA)
+      viewf = lPtrA.newStaticView(10)
+      viewg = newStaticView(10, gPtr)
+      viewh = gPtr.newStaticView(10)
+    for i in 1..7: 
+      let sq = newSeq[int](i)
+      var 
+        viewx = sq.newDynamicView(float)
+        viewy = newDynamicView(float, sq)
+    echo "echo viewf[0]:" + $viewf[0]
+    print "print viewf[0]:" + $viewf[0]

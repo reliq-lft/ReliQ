@@ -35,4 +35,4 @@ type
     ## <in need of documentation>
     for site in l.sites(): discard
     l.latticeCoordinate(n: int): LatticeCoordinate
-    l.newField(FieldType): auto
+    l.newField(FieldType): FieldType

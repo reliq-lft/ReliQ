@@ -1,6 +1,6 @@
 /**
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/views.hpp
+  Source file: src/kokkos/dispatch.hpp
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -26,36 +26,18 @@
  */
 
 #pragma once
-#include <upcxx/upcxx.hpp>
+#include <Kokkos_Core.hpp>
 
-#ifndef RELIQ_SIMPLECUBICFIELDVIEW_HPP
-#define RELIQ_SIMPLECUBICFIELDVIEW_HPP
+#ifndef RELIQ_DISPATCH_HPP
+#define RELIQ_DISPATCH_HPP
 
-template <typename T>
-struct SimpleCubicFieldView {
-/**
- * A simple view class for a field defined on a SimpleCubicLattice.
- * This class is a simple wrapper around a pointer to local memory.
- * It provides operator overloads for "[]" to acces the field elements.
- * It also provides a "()" operator overload, which makes it a valid Kokkos functor.
- */
+// typedef for C function pointer to be passed to Kokkos parallel_for
+typedef void (*NimProc)(int);
 
-// pointer to local memory
-T* field;
+// wrapper for Kokkos parallel_for
+inline void parallel_for_range(int start, int stop, NimProc proc) {
+  auto execPolicy = Kokkos::RangePolicy<>(start, stop);
+  Kokkos::parallel_for(execPolicy, KOKKOS_LAMBDA (const int n) { proc(n); });
+}
 
-// constructors
-SimpleCubicFieldView() : field(nullptr) {}
-SimpleCubicFieldView(upcxx::global_ptr<T> gptr) : field(gptr.local()) {}
-
-// set field pointer to point to gptr's local memory
-void setFieldView(upcxx::global_ptr<T> gptr) { field = gptr.local(); }
-
-// "[]" operator overloads
-inline T& operator[] (int n) { return field[n]; }
-inline const T& operator[] (int n) const { return field[n]; }
-
-// "()" operator overload: needed for view to be valid Kokkos functor
-T operator() (int n) {}
-};
-
-#endif // RELIQ_SIMPLECUBICFIELDVIEW_HPP
+#endif // RELIQ_DISPATCH_HPP

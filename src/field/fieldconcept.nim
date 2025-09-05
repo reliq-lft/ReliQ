@@ -28,10 +28,10 @@
 import lattice/[latticeconcept]
 
 type
-  Field* = concept f, l, type FieldType, type FieldViewType
+  Field* = concept f, l, type FieldType
     ## Generic field concept
     ## <in need of documentation>
     l is Lattice
     f[0] is FieldType
     l.newField(FieldType): type(f)
-    f.newFieldView(): FieldViewType
+    f.lattice(): Lattice

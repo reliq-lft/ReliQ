@@ -3,10 +3,6 @@
   Source file: src/field/simplecubicfield.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
-  Notes:
-  * What kind of gain (if any) could be achieved by considering inter-node
-  connectivity in partitioning of lattice?
-
   MIT License
   
   Copyright (c) 2025 Curtis Taylor Peterson
@@ -33,10 +29,8 @@ import backend
 import utils
 import lattice/[simplecubiclattice]
 
-# shorten pragmas pointing to UPC++ & Kokkos headers and include local 
-# field view wrapper
-backend: 
-  {.pragma: simplecubicfieldview, header: "simplecubicfieldview.hpp".}
+# shorten pragmas pointing to UPC++ & Kokkos headers and include field view wrapper
+backend: views()
 
 #[ frontend: simple cubic field type definition ]#
 
@@ -45,14 +39,9 @@ type
     ## Field on simple cubic Bravais lattice
     ##
     ## <in need of documentation>
-    lattice: ref SimpleCubicLattice
+    lattice: ptr SimpleCubicLattice
     field: GlobalPointer[T]
-
-type
-  SimpleCubicFieldView*[T] {.
-    importcpp: "SimpleCubicFieldView", 
-    simplecubicfieldview
-  .} = object
+    fieldView: StaticView[T]
 
 #[ frontend: SimpleCubicField constructor ]#
 
@@ -61,63 +50,36 @@ proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
   ##
   ## <in need of documentation>
   let numLocalSites = csize_t(lattice.numLocalSites)
-  result = SimpleCubicField[T](field: newGlobalPointerArray(numLocalSites, T))
-  new(result.lattice)
-  result.lattice[] = lattice  
+  let field = newGlobalPointerArray(numLocalSites, T)
+  result = SimpleCubicField[T](
+    lattice: addr lattice,
+    field: field, 
+    fieldView: field.newStaticView(numLocalSites)
+  )
 
-#[ frontend: SimpleCubicFieldView constructor ]#
+#[ frontend: implement field concept ]#
 
-proc newSimpleCubicFieldView[T](field: GlobalPointer[T]): SimpleCubicFieldView[T] {.
-  importcpp: "SimpleCubicFieldView(#)", 
-  header: "simplecubicfieldview.hpp",
-  constructor,
-  inline
-.}
-proc newFieldView*[T](f: SimpleCubicField[T]): SimpleCubicFieldView[T] =
-  ## Create new view of field on simple cubic Bravais lattice
+proc lattice*[T](f: SimpleCubicField[T]): SimpleCubicLattice =
+  ## Return lattice associated with field
   ##
   ## <in need of documentation>
-  # Developer note: worth inlining, but do this after you've checked that current
-  # state ensures that SimpleCubicField actually implements Field concept
-  return newSimpleCubicFieldView(f.field)
+  return f.lattice[]
 
 #[ frontend: basic SimpleCubicField methods ]#
 
-proc `[]`*[T](f: SimpleCubicField[T]; n: int): T =
+proc `[]`*[T](f: SimpleCubicField[T]; n: int): T {.inline.} =
   ## Access field value at given local site
   ##
   ## This is for testing; it is most certainly not optimal or efficient
   ## <in need of documentation>
-  let lPtr = f.field.local()
-  let nIdx = cint(n)
-  var value: T
-  {.emit: """value_1 = lPtr_1[nIdx_1];""".}
-  return value
+  return f.fieldView[n]
 
-proc `[]`*[T](f: var SimpleCubicField[T]; n: int): T =
+proc `[]`*[T](f: var SimpleCubicField[T]; n: int): T {.inline.} =
   ## Access field value at given local site and allow it to be modified
   ##
   ## This is for testing; it is most certainly not optimal or efficient
   ## <in need of documentation>
-  let lPtr = f.field.local()
-  let nIdx = cint(n)
-  var value: ptr T
-  {.emit: """value_1 = &lPtr_1[nIdx_1];""".}
-  return value[]
-
-#[ frontend: basic SimpleCubicFieldView methods ]#
-
-# access field value at given local site
-proc `[]`*[T](f: SimpleCubicFieldView[T]; n: int): T =
-  ## Access field view value at given local site and allow it to be modified
-  ##
-  ## This is for testing; it is most certainly not optimal or efficient
-  ## <in need of documentation>
-  let nIdx = cint(n)
-  var field = f
-  var value: T
-  {.emit: """value_1 = field_1[nIdx_1];""".}
-  return value
+  return f.fieldView[n]
 
 when isMainModule:
   import runtime
@@ -131,17 +93,13 @@ when isMainModule:
       print "SimpleCubicLattice conforms to Lattice concept"
     else: print "SimpleCubicLattice does not conform to Lattice concept"
 
+    discard field.lattice()
+
     for n in l.sites(): 
       if verbosity > 1: 
         echo "[" & $myRank() & "] " & "site: ", n, " coord: ", field[n]
     
     var execPolicyA = newRangePolicy(0, l.numLocalSites)
-
-    var fieldView = field.newFieldView()
-    let fv1 = fieldView[0]
-    var fv2 = fieldView[0]
-    print fv1
-
 
 # ---
 

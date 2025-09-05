@@ -31,6 +31,11 @@
 #ifndef RELIQ_VIEWS_HPP
 #define RELIQ_VIEWS_HPP
 
+// wrap Kokkos View; called "static" bc the rank is fixed at compile time
+template <class T>
+using StaticView = Kokkos::View<T*>;
+
+// wrap Kokkos DynRankView; called "dynamic" bc the rank is determined at runtime
 template <class T>
 using DynamicView = Kokkos::DynRankView<T>;
 

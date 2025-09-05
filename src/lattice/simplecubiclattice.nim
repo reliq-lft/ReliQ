@@ -170,9 +170,7 @@ proc newSimpleCubicLattice*(
       errorMessage &= "\n# ranks:" + $numRanks()
 
   # set up lattice geometry
-  let
-    nd = latticeGeometry.len
-    lg = latticeGeometry.toSeq(GeometryType)
+  let lg = latticeGeometry.toSeq(GeometryType)
 
   # set up distributed memory geometry
   let
