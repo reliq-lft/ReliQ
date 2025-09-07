@@ -7,9 +7,13 @@
 
 > Please note that `ReliQ` is in the early development stage; it is not ready for production. However, if you like what you're seeing, we could use help; please contact us at [reliq-lft@protonmail.me](reliq-lft@protonmail.me). Otherwise, you can follow us by clicking the `Follow` button in the top right corner of this page or our [organization page](https://github.com/reliq-lft).
 >
-> Sections of this document that are labelled "unstable" are under active development/testing.
+> Sections of this document that are labelled "__unstable__" are under active development/testing.
 
-## Installation (unstable)
+## Documentation (__unstable__)
+
+Very basic documentation for `ReliQ` can be found here: [https://reliq-lft.github.io/ReliQ/](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
+
+## Installation (__unstable__)
 
 The evolving design of `ReliQ`'s build system centers on ease of use and flexibility. Users can opt to have `ReliQ` figure out what needs to be built/installed or they can build/install the portions of `ReliQ` that they wish, and `ReliQ`'s build system will simply figure out the wiring. 
 
@@ -77,7 +81,7 @@ The configuration script also creates following symbolic links under `<reliq_bui
 * `<reliq_src>/src`: Symbolic link to `ReliQ` primary source files.
 * `<reliq_src>/build`: Symbolic link to `ReliQ` source files used for building/installing `ReliQ`.
 
-## Compiling and running `ReliQ` programs (unstable)
+## Compiling and running `ReliQ` programs (__unstable__)
 
 ### Compiling `ReliQ` programs under `src`
 
