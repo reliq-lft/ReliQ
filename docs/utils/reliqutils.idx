@@ -1,0 +1,2 @@
+nimTitle	reliqutils	utils/reliqutils.html	module utils/reliqutils		0
+nim	print	utils/reliqutils.html#print.t,varargs[untyped]	template print(args: varargs[untyped]): untyped		42

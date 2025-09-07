@@ -1,0 +1,11 @@
+nimTitle	simplecubiclattice	lattice/simplecubiclattice.html	module lattice/simplecubiclattice		0
+nim	SimpleCubicLattice	lattice/simplecubiclattice.html#SimpleCubicLattice	object SimpleCubicLattice		51
+nim	newLatticeInitializationError	lattice/simplecubiclattice.html#newLatticeInitializationError.t,LatticeInitializationErrors,untyped	template newLatticeInitializationError(err: LatticeInitializationErrors;\n                              appendToMessage: untyped): untyped		75
+nim	`$`	lattice/simplecubiclattice.html#$,SimpleCubicLattice	proc `$`(l: SimpleCubicLattice): string		169
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,SimpleCubicLattice	proc newSimpleCubicLattice(other: SimpleCubicLattice): SimpleCubicLattice		185
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[L],openArray[D],openArray[S],bool	proc newSimpleCubicLattice[L: SomeInteger; D: SomeInteger; S: SomeInteger](\n    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];\n    sharedMemoryGeometry: openArray[S];\n    printLatticeGeometrySummary: bool = false): SimpleCubicLattice		242
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[L],openArray[D],bool,bool	proc newSimpleCubicLattice[L: SomeInteger; D: SomeInteger](\n    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];\n    startWithLastDimensionInVectorPartition: bool = false;\n    printLatticeGeometrySummary: bool = true): SimpleCubicLattice		312
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[SomeInteger],bool,bool,bool	proc newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];\n                      startWithLastDimensionInLocalPartition: bool = true;\n                      startWithLastDimensionInVectorPartition: bool = false;\n                      printLatticeGeometrySummary: bool = true): SimpleCubicLattice		334
+nim	sites	lattice/simplecubiclattice.html#sites.i,SimpleCubicLattice	iterator sites(l: SimpleCubicLattice): int		362
+nim	latticeCoordinate	lattice/simplecubiclattice.html#latticeCoordinate,SimpleCubicLattice,int	proc latticeCoordinate(l: SimpleCubicLattice; n: int): seq[int]		366
+nimgrp	newsimplecubiclattice	lattice/simplecubiclattice.html#newSimpleCubicLattice-procs-all	proc		185

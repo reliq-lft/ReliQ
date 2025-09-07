@@ -1,0 +1,6 @@
+nimTitle	simplecubicfield	field/simplecubicfield.html	module field/simplecubicfield		0
+nim	SimpleCubicField	field/simplecubicfield.html#SimpleCubicField	object SimpleCubicField		38
+nim	newField	field/simplecubicfield.html#newField,SimpleCubicLattice,typedesc	proc newField(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T]		49
+nim	lattice	field/simplecubicfield.html#lattice,SimpleCubicField[T]	proc lattice[T](f: SimpleCubicField[T]): SimpleCubicLattice		61
+nim	`[]`	field/simplecubicfield.html#[],SimpleCubicField[T],SomeInteger	proc `[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]		69
+nim	`[]=`	field/simplecubicfield.html#[]=,SimpleCubicField[T],SomeInteger,SIMXVec[T]	proc `[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])		76

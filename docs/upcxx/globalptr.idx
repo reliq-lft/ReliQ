@@ -1,0 +1,7 @@
+nimTitle	globalptr	upcxx/globalptr.html	module upcxx/globalptr		0
+nim	GlobalPointer	upcxx/globalptr.html#GlobalPointer	object GlobalPointer		34
+nim	newGlobalPointer	upcxx/globalptr.html#newGlobalPointer,T	proc newGlobalPointer[T](t: T): GlobalPointer[T]		37
+nim	deleteGlobalPointer	upcxx/globalptr.html#deleteGlobalPointer,GlobalPointer[T]	proc deleteGlobalPointer[T](global_ptr: GlobalPointer[T])		41
+nim	newGlobalPointerArray	upcxx/globalptr.html#newGlobalPointerArray,csize_t,typedesc	proc newGlobalPointerArray(size: csize_t; T: typedesc): GlobalPointer[T]		47
+nim	deleteGlobalPointerArray	upcxx/globalptr.html#deleteGlobalPointerArray,GlobalPointer[T]	proc deleteGlobalPointerArray[T](global_ptr: GlobalPointer[T])		51
+nim	local	upcxx/globalptr.html#local,GlobalPointer[T]	proc local[T](global_ptr: GlobalPointer[T]): ptr T		55

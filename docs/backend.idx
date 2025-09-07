@@ -1,0 +1,3 @@
+nimTitle	backend	backend.html	module backend		0
+nim	backend	backend.html#backend.t,untyped	template backend(pragmas: untyped): untyped		42
+nim	numLanes	backend.html#numLanes	proc numLanes(): int		47

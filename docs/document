@@ -6,7 +6,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,14 @@
 '
 
 CWD="$(pwd)"
-NIM="$@"
+SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
+DOCS="${SWD}/docs"
+SRC="${SWD}/src"
+MAIN="${SRC}/reliq.nim"
 
-$NIM doc --project --index:on --git.url:git@github.com:ctpeterson/ReliQ.git --git.commit:HEAD --outdir:html docs.nim 
+echo "Docs from source path: ${MAIN}"
+echo "Generating docs in: ${DOCS}"
+
+CMD="${CWD}/external/bin/nim doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
+echo "Running command: ${CMD}"
+eval $CMD
