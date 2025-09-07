@@ -13,7 +13,7 @@
 
 ## Documentation (__unstable__)
 
-Very basic documentation for `ReliQ` can be found here: [https://reliq-lft.github.io/ReliQ](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
+Very basic documentation for `ReliQ` can be found [here](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
 
 ## Installation (__unstable__)
 
