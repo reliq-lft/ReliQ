@@ -26,17 +26,20 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '
 
+NIM=$(which nim)
 CWD="$(pwd)"
 SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
 DOCS="${SWD}/docs"
 SRC="${SWD}/src"
 MAIN="${SRC}/reliq.nim"
 
+rm -rf ${DOCS}/*
+
 echo "Docs from source path: ${MAIN}"
 echo "Generating docs in: ${DOCS}"
 
-CMD="${CWD}/external/bin/nim doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
+CMD="$NIM doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
 echo "Running command: ${CMD}"
 eval $CMD
 
-ln -sf ${SWD}/docs/reliq.html ${SWD}/index.html
+cp ${SWD}/build/index.html ${SWD}/docs/index.html
