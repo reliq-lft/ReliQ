@@ -31,65 +31,65 @@ import utils
 # shorten pragmas pointing to Kokkos headers
 kokkos: {.pragma: simd, header: "<Kokkos_SIMD.hpp>".}
 
-# SIMD type
+# SIMXVec type
 type 
-  SIMD*[T] {.importcpp: "Kokkos::Experimental::simd", simd.} = object
-  ## ReliQ wrapper for Kokkos SIMD type
+  SIMXVec*[T] {.importcpp: "Kokkos::Experimental::simd", simd.} = object
+  ## ReliQ wrapper for Kokkos SIMXVec type
   ## 
   ## <in need of documentation>
 
-# SIMD constructor
-proc newSIMD[T](): SIMD[T] {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
-proc newSIMD*(T: typedesc): SIMD[T] = newSIMD[T]()
-proc newSIMD*[T](value: T): SIMD[T] 
+# SIMXVec constructor
+proc newSIMXVec[T](): SIMXVec[T] {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
+proc newSIMXVec*(T: typedesc): SIMXVec[T] = newSIMXVec[T]()
+proc newSIMXVec*[T](value: T): SIMXVec[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
-proc newSIMD*[T](other: SIMD[T]): SIMD[T] 
+proc newSIMXVec*[T](other: SIMXVec[T]): SIMXVec[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
 # TODO: ... placeholder for generator constructor...
 
-# SIMD width
-proc width*[T](a: SIMD[T]): int {.importcpp: "#.size()", simd.}
+# SIMXVec width
+proc width*[T](a: SIMXVec[T]): int {.importcpp: "#.size()", simd.}
 
-# Kokkos SIMD accessors
-proc `[]`*[T](a: SIMD[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
+# Kokkos SIMXVec accessors
+proc `[]`*[T](a: SIMXVec[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
 # TODO: ... placeholder for generator-based accessor; may need to do
 # intermediate conversion to sequence or something...
 
-# Kokkos SIMD assignment overloads
-proc `=copy`*[T](a: var SIMD[T], b: SIMD[T]) {.importcpp: "operator=(#, #)", simd.}
+# Kokkos SIMXVec assignment overloads
+proc `=copy`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator=(#, #)", simd.}
 
-# Kokkos SIMD arithematic overloads
-proc `+`*[T](a, b: SIMD[T]): SIMD[T] {.importcpp: "operator+(#, #)", simd.}
-proc `-`*[T](a, b: SIMD[T]): SIMD[T] {.importcpp: "operator-(#, #)", simd.}
-proc `*`*[T](a, b: SIMD[T]): SIMD[T] {.importcpp: "operator*(#, #)", simd.}
-proc `/`*[T](a, b: SIMD[T]): SIMD[T] {.importcpp: "operator/(#, #)", simd.}
+# Kokkos SIMXVec arithematic overloads
+proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
+proc `-`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator-(#, #)", simd.}
+proc `*`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator*(#, #)", simd.}
+proc `/`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator/(#, #)", simd.}
 
-# Kokkos SIMD compound arithematic assignment overloads
-proc `+=`*[T](a: var SIMD[T], b: SIMD[T]) {.importcpp: "operator+=(#, #)", simd.}
-proc `-=`*[T](a: var SIMD[T], b: SIMD[T]) {.importcpp: "operator-=(#, #)", simd.}
-proc `*=`*[T](a: var SIMD[T], b: SIMD[T]) {.importcpp: "operator*=(#, #)", simd.}
-proc `/=`*[T](a: var SIMD[T], b: SIMD[T]) {.importcpp: "operator/=(#, #)", simd.}
+# Kokkos SIMXVec compound arithematic assignment overloads
+proc `+=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator+=(#, #)", simd.}
+proc `-=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator-=(#, #)", simd.}
+proc `*=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator*=(#, #)", simd.}
+proc `/=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator/=(#, #)", simd.}
 
-# SIMD vector iterator
-iterator values*[T](a: SIMD[T]): T =
+# SIMXVec vector iterator
+iterator values*[T](a: SIMXVec[T]): T =
   for l in 0..<a.width: yield a[l]
 
 # converion to sequence
-proc toSeq*[T](a: SIMD[T]): seq[T] =
+proc toSeq*[T](a: SIMXVec[T]): seq[T] =
   result = newSeq[T](a.width)
   for l in 0..<a.width: result[l] = a[l]
 
 # conversion to string
-proc `$`*[T](a: SIMD[T]): string = "SIMD:" + $(a.toSeq())
+proc `$`*[T](a: SIMXVec[T]): string = "SIMXVec:" + $(a.toSeq())
 
 when isMainModule:
   import runtime
   reliq:
     var 
-      l = newSIMD(float)
-      x = newSIMD(1.0)
-      y = newSIMD(2.0)
-      z = newSIMD(l)
+      l = newSIMXVec(float)
+      x = newSIMXVec(1.0)
+      y = newSIMXVec(2.0)
+      z = newSIMXVec(l)
       t = x + y
     t = x + y
     t = x - y

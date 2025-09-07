@@ -30,9 +30,9 @@ type
   CoordinateType* = int32
 
 type
-  Lattice* = concept l, type LatticeCoordinate, type FieldType
+  Lattice* = concept l, type LatticeCoordinate, type FieldType, type Field
     ## Generic lattice concept
     ## <in need of documentation>
     for site in l.sites(): discard
     l.latticeCoordinate(n: int): LatticeCoordinate
-    l.newField(FieldType): FieldType
+    l.newField(FieldType): Field

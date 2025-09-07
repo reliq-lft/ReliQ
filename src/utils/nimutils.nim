@@ -25,7 +25,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import std/[cmdline]
+import std/[cmdline, strutils]
 
 #[ backend: constants ]#
 
@@ -33,6 +33,10 @@ const
   printBreak* = "\n...............................................................\n"
 
 #[ backend: implementation of helper procedures ]#
+
+iterator dimensions*[T](arr: openArray[T]): int {.inline.} =
+  # silly helper iterator for iterating through openArray indices
+  for mu in 0..<arr.len: yield mu
 
 # concatenate strings with forward slash between
 proc `/`*(sa, sb: string): string = sa & "/" & sb
@@ -43,9 +47,11 @@ proc `+`*(sa, sb: string): string = sa & " " & sb
 # append string with space
 proc `+=`*(sa: var string, sb: string) = sa = sa + sb
 
-iterator dimensions*[T](arr: openArray[T]): int {.inline.} =
-  # silly helper iterator for iterating through openArray indices
-  for mu in 0..<arr.len: yield mu
+# division of a integer arrays
+proc `/`*[A: SomeInteger, B: SomeInteger](a: openArray[A], b: openArray[B]): auto =
+  assert(a.len == b.len, "array division: arrays must have same length")
+  result = newSeq[type(a[0])](a.len)
+  for mu in a.dimensions: result[mu] = a[mu] div b[mu]
 
 iterator reversedDimensions*[T](arr: openArray[T], start: int = 0): int {.inline.} =
   # silly helper iterator for iteration through openArray indices in reverse
@@ -59,7 +65,10 @@ proc ones*(nd: int; T: typedesc): seq[T] {.inline.} =
 # checks if integer "a" divides integer "b"
 proc divides*(a, b: SomeInteger): bool {.inline.} = b mod a == 0
 
-proc dividesSomeElement*(a: SomeInteger; bs: seq[SomeInteger]): bool {.inline.} =
+proc dividesSomeElement*[A: SomeInteger, B: SomeInteger](
+  a: A, 
+  bs: seq[B]
+): bool {.inline.} =
   # checks if integer "a" divides any integer in "bs"
   for b in bs: 
     if divides(a, b): return true
@@ -77,6 +86,9 @@ proc product*[T](arr: openArray[T]): T {.inline.} =
   # calculates product of open array's entries
   result = T(1)
   for el in arr: result *= el
+
+# remove "@" in sequence printout for cleaner output
+proc `$`*(sq: seq[SomeInteger]): string = "[" & sq.join(", ") & "]"
 
 # gets C argv
 proc cargc*: cint = cint(paramCount())

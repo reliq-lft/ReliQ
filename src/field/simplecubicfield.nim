@@ -40,8 +40,8 @@ type
     ##
     ## <in need of documentation>
     lattice: ptr SimpleCubicLattice
-    field: GlobalPointer[T]
-    fieldView: StaticView[T]
+    field: GlobalPointer[SIMXVec[T]]
+    fieldView: StaticView[SIMXVec[T]]
 
 #[ frontend: SimpleCubicField constructor ]#
 
@@ -49,13 +49,11 @@ proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
   ## Create new field on simple cubic Bravais lattice
   ##
   ## <in need of documentation>
-  let numLocalSites = csize_t(lattice.numLocalSites)
-  let field = newGlobalPointerArray(numLocalSites, T)
-  result = SimpleCubicField[T](
-    lattice: addr lattice,
-    field: field, 
-    fieldView: field.newStaticView(numLocalSites)
-  )
+  let numVecSites = csize_t(lattice.numVecSites)
+  let 
+    field = newGlobalPointerArray(numVecSites, SIMXVec[T])
+    fieldView = field.newStaticView(numVecSites)
+  result = SimpleCubicField[T](lattice: addr lattice, field: field, fieldView: fieldView)
 
 #[ frontend: implement field concept ]#
 
@@ -67,14 +65,14 @@ proc lattice*[T](f: SimpleCubicField[T]): SimpleCubicLattice =
 
 #[ frontend: basic SimpleCubicField methods ]#
 
-proc `[]`*[T](f: SimpleCubicField[T]; n: int): T {.inline.} =
+proc `[]`*[T](f: SimpleCubicField[T]; n: int): SIMXVec[T] {.inline.} =
   ## Access field value at given local site
   ##
   ## This is for testing; it is most certainly not optimal or efficient
   ## <in need of documentation>
   return f.fieldView[n]
 
-proc `[]`*[T](f: var SimpleCubicField[T]; n: int): T {.inline.} =
+proc `[]`*[T](f: var SimpleCubicField[T]; n: int): SIMXVec[T] {.inline.} =
   ## Access field value at given local site and allow it to be modified
   ##
   ## This is for testing; it is most certainly not optimal or efficient
@@ -98,10 +96,10 @@ when isMainModule:
     for n in l.sites(): 
       if verbosity > 1: 
         echo "[" & $myRank() & "] " & "site: ", n, " coord: ", field[n]
-    
-    var execPolicyA = newRangePolicy(0, l.numLocalSites)
 
 # ---
+
+#var execPolicyA = newRangePolicy(0, l.numLocalSites)
 
 #[
 proc `()`*[T](

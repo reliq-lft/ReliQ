@@ -45,7 +45,8 @@ template backend*(pragmas: untyped): untyped =
   pragmas
 
 proc numLanes*: int =
-  # fetch number of SIMD (SIMT) lanes; needs to work for GPU threads too
-  # TO-DO: implement properly for GPU case; placeholder for now
-  let t = newSIMD(float64)
+  # Fetch number of SIMD (SIMT) lanes
+  # * on CPU: number of SIMD lanes
+  # * on GPU: warp size
+  let t = newSIMXVec(float64)
   return t.width
