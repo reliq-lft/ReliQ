@@ -1,7 +1,9 @@
 # ReliQ
 > "We all make choices. But in the end our choices make us." - Andrew Ryan (BioShock)
 
-[![License: GPL v2](https://img.shields.io/badge/license-MIT-blue)](https://github.com/reliq-lft/ReliQ/blob/main/LICENSE) [![Python](https://img.shields.io/badge/Python-3.10+-brightgreen.svg)](https://www.python.org)
+[![License: GPL v2](https://img.shields.io/badge/license-MIT-blue)](https://github.com/reliq-lft/ReliQ/blob/main/LICENSE) 
+[![Docs](https://readthedocs.org/projects/swissfit/badge/?version=latest)](https://github.com/reliq-lft/ReliQ/actions/workflows/docs.yml)
+[![Python](https://img.shields.io/badge/Python-3.10+-brightgreen.svg)](https://www.python.org) 
 
 `ReliQ` is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind. As such, `ReliQ` is written in the elegant [Nim](https://nim-lang.org/) programming language, and we are experimenting with the use of a [partitioned global address space](https://en.wikipedia.org/wiki/Partitioned_global_address_space) for `ReliQ`'s distributed memory model using the [Unified Parallel C++ (UPC++)](https://upcxx.lbl.gov/docs/html/guide.html) framework. Currently, each address space operates on the shared memory model implemented by [Kokkos](https://kokkos.org/). 
 
@@ -11,7 +13,7 @@
 
 ## Documentation (__unstable__)
 
-Very basic documentation for `ReliQ` can be found here: [https://reliq-lft.github.io/ReliQ/](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
+Very basic documentation for `ReliQ` can be found here: [https://reliq-lft.github.io/ReliQ](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
 
 ## Installation (__unstable__)
 
