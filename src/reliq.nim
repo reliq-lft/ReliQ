@@ -1,16 +1,16 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/field/fieldconcept.nim
+  Source file: src/reliq.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
   
   Copyright (c) 2025 reliq-lft
   
-  Permission is hereby granted, free of charge, to any person obtaining a copy
+  Permission is hereby granted, free of chadge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -25,13 +25,25 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice/[latticeconcept]
+#[ ReliQ utilities and runtime environment ]#
 
-type
-  Field* = concept f, l, type FieldType, type Field
-    ## Generic field concept
-    ## <in need of documentation>
-    l is Lattice
-    f[0] is FieldType
-    l.newField(FieldType): Field
-    f.lattice(): Lattice
+import utils
+import runtime
+
+export utils
+export runtime
+
+#[ ReliQ lattice types ]#
+
+import lattice/[latticeconcept]
+import lattice/[simplecubiclattice]
+
+export latticeconcept
+export simplecubiclattice
+
+#[ ReliQ field types ]#
+import field/[fieldconcept]
+import field/[simplecubicfield]
+
+export fieldconcept
+export simplecubicfield

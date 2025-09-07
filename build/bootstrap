@@ -1,11 +1,12 @@
-#[ 
+#!/bin/bash
+: '
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/field/fieldconcept.nim
+  Source file: build/install
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
   
-  Copyright (c) 2025 reliq-lft
+  Copyright (c) 2025 Curtis Taylor Peterson
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -23,15 +24,15 @@
   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
+'
 
-import lattice/[latticeconcept]
+PYTHON="/usr/bin/python3"
 
-type
-  Field* = concept f, l, type FieldType, type Field
-    ## Generic field concept
-    ## <in need of documentation>
-    l is Lattice
-    f[0] is FieldType
-    l.newField(FieldType): Field
-    f.lattice(): Lattice
+CWD="$(pwd)"
+SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
+EXT="${CWD}/external"
+
+mkdir -p $EXT
+
+export PYTHONPYCACHEPREFIX=$EXT/__pycache__
+$PYTHON $SWD/setup/bootstrap.py "$@"
