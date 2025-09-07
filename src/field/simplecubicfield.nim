@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of chadge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -42,6 +42,7 @@ type
     lattice: ptr SimpleCubicLattice
     field: GlobalPointer[SIMXVec[T]]
     fieldView: StaticView[SIMXVec[T]]
+    # ^--- shall we upgrade these to tensor types?
 
 #[ frontend: SimpleCubicField constructor ]#
 
@@ -65,19 +66,19 @@ proc lattice*[T](f: SimpleCubicField[T]): SimpleCubicLattice =
 
 #[ frontend: basic SimpleCubicField methods ]#
 
-proc `[]`*[T](f: SimpleCubicField[T]; n: int): SIMXVec[T] {.inline.} =
+proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T] {.inline.} =
   ## Access field value at given local site
   ##
   ## This is for testing; it is most certainly not optimal or efficient
   ## <in need of documentation>
   return f.fieldView[n]
 
-proc `[]`*[T](f: var SimpleCubicField[T]; n: int): SIMXVec[T] {.inline.} =
-  ## Access field value at given local site and allow it to be modified
+proc `[]=`*[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T]) {.inline.} =
+  ## Set field value at given local site
   ##
   ## This is for testing; it is most certainly not optimal or efficient
   ## <in need of documentation>
-  return f.fieldView[n]
+  f.fieldView[n] = value
 
 when isMainModule:
   import runtime
@@ -96,6 +97,10 @@ when isMainModule:
     for n in l.sites(): 
       if verbosity > 1: 
         echo "[" & $myRank() & "] " & "site: ", n, " coord: ", field[n]
+    
+    print field[0], "before"
+    field[0] = newSIMXVec(1.0)
+    print field[0], "after"
 
 # ---
 

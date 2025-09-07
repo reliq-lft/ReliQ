@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,8 @@ type
   ## <in need of documentation>
 
 # SIMXVec constructor
-proc newSIMXVec[T](): SIMXVec[T] {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
+proc newSIMXVec[T](): SIMXVec[T] 
+  {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
 proc newSIMXVec*(T: typedesc): SIMXVec[T] = newSIMXVec[T]()
 proc newSIMXVec*[T](value: T): SIMXVec[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
@@ -52,11 +53,14 @@ proc width*[T](a: SIMXVec[T]): int {.importcpp: "#.size()", simd.}
 
 # Kokkos SIMXVec accessors
 proc `[]`*[T](a: SIMXVec[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
-# TODO: ... placeholder for generator-based accessor; may need to do
-# intermediate conversion to sequence or something...
+
+# Kokkos SIMXVec lane accessors
+proc `[]`*[T](a: var SIMXVec[T], lane: int): var T 
+  {.importcpp: "#.operator[](#)", simd.}
 
 # Kokkos SIMXVec assignment overloads
-proc `=copy`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator=(#, #)", simd.}
+#proc `=copy`*[T](a: var SIMXVec[T], b: T) 
+#  {.importcpp: "operator=(#, #)", simd.}
 
 # Kokkos SIMXVec arithematic overloads
 proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
@@ -103,4 +107,6 @@ when isMainModule:
     print t.width
     print $t
     for v in t.values: print $v
+    #t[0] = 3.0
+    #print $t
     

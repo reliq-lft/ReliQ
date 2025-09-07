@@ -9,7 +9,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of chadge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -108,6 +108,11 @@ proc partition[L: SomeInteger, B: SomeInteger](
   var (r, mu) = (bins, if startWithLast: (bins div nd + bins mod nd)*nd - 1 else: 0)
   result = ones(nd, T)
   while r > 1:
+    if not startWithLast: # try to reduce nodal surface area w/ vector lanes
+      let 
+        lastIsLarger = rlg[mu] < rlg[mu + 1]
+        lastIsNotOdd = rlg[mu + 1] mod 2 == 0
+      if all(lastIsLarger, lastIsNotOdd): inc mu
     let dim = abs(mu) mod nd
     if divides(2, rlg[dim]):
       result[dim] *= 2
@@ -168,13 +173,12 @@ proc `$`*(l: SimpleCubicLattice): string =
   let
     localGeometry = l.globalGeometry / l.localPartition
     vectorGeometry = localGeometry / l.vecLatticePartition
-  var s = "SimpleCubicLattice:\n"
-  s &= "  geometry:" + $(l.globalGeometry) + "\n"
-  s &= "  rank partition:" + $(l.localPartition) + "\n"
-  s &= "  rank geometry:" + $localGeometry + "\n"
-  s &= "  local SIMX vector partition:" + $(l.vecLatticePartition) + "\n"
-  s &= "  vectorized local geometry:" + $vectorGeometry + "\n"
-  return s
+  result = "SimpleCubicLattice:\n"
+  result &= "  geometry:" + $(l.globalGeometry) + "\n"
+  result &= "  rank partition:" + $(l.localPartition) + "\n"
+  result &= "  rank geometry:" + $localGeometry + "\n"
+  result &= "  local SIMX vector partition:" + $(l.vecLatticePartition) + "\n"
+  result &= "  vectorized local geometry:" + $vectorGeometry
 
 #[ frontend: SimpleCubicLattice constructors ]#
 
@@ -347,7 +351,7 @@ proc newSimpleCubicLattice*(
   let 
     g = latticeGeometry.toSeq(GeometryType)
     dg = g.partition(numRanks(), startWithLast = startWithLastDimensionInLocalPartition)
-    lg = latticeGeometry / dg
+    lg = g / dg
     sg = lg.partition(numLanes(), startWithLast = startWithLastDimensionInVectorPartition)
   let quiet = printLatticeGeometrySummary
   return newSimpleCubicLattice(g, dg, sg, printLatticeGeometrySummary = quiet)

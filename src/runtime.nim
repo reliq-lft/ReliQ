@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of chadge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal

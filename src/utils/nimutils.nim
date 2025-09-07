@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -57,6 +57,18 @@ iterator reversedDimensions*[T](arr: openArray[T], start: int = 0): int {.inline
   # silly helper iterator for iteration through openArray indices in reverse
   for mu in countdown(arr.len - (start + 1), 0): yield mu
 
+proc any*(args: varargs[bool]): bool = 
+  # returns true if any arg is true
+  for arg in args: 
+    if arg: return true
+  return false
+
+proc all*(args: varargs[bool]): bool = 
+  # returns true if all args are true
+  for arg in args: 
+    if not arg: return false
+  return true
+
 proc ones*(nd: int; T: typedesc): seq[T] {.inline.} =
   # constructs a sequence of ones
   result = newSeq[T](nd)
@@ -89,6 +101,9 @@ proc product*[T](arr: openArray[T]): T {.inline.} =
 
 # remove "@" in sequence printout for cleaner output
 proc `$`*(sq: seq[SomeInteger]): string = "[" & sq.join(", ") & "]"
+
+# remove "@" in sequence printout for cleaner output
+proc `$`*(sq: seq[SomeNumber]): string = "[" & sq.join(", ") & "]"
 
 # gets C argv
 proc cargc*: cint = cint(paramCount())

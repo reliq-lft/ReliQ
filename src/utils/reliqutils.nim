@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ macro reliqPrint(args: varargs[untyped]): untyped =
   for iarg, varg in args:
     if iarg < args.len - 1:
       statements.add newCall("write", ident"stdout", newCall(ident"$", varg))
+      statements.add newCall("write", ident"stdout", newLit(" "))
     else: statements.add newCall("writeLine", ident"stdout", newCall(ident"$", varg))
   return newStmtList(statements)
 

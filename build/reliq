@@ -6,7 +6,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -51,14 +51,14 @@ if __name__ == '__main__':
         required = True
     )
     parser.add_argument(
-        '-d',
+        '-n',
         '--ntasks',
         help = 'Number of tasks (bound to address spaces)',
         type = str,
         default = "1"
     )
     parser.add_argument(
-        '-s',
+        '-t',
         '--nthreads',
         help = 'Number of threads per task',
         type = str,

@@ -5,7 +5,7 @@
 
   MIT License
   
-  Copyright (c) 2025 Curtis Taylor Peterson
+  Copyright (c) 2025 reliq-lft
   
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -149,12 +149,23 @@ proc newDynamicView*(
 proc getViewElement[T](view: StaticView[T]; n: cint): T 
   {.importcpp: "#.operator[](#)", inline, views.}
 
+# backend: set view element
+proc setViewElement[T](view: var StaticView[T]; n: cint; value: T) 
+  {.importcpp: "#.operator[](#) = #", inline, views.}
+
 # public static view accessor method
 proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T {.inline.} =
   ## Access element of Kokkos static view
   ##
   ## <in need of documentation>
   return view.getViewElement(cint(n))
+
+# set field value
+proc `[]=`*[T](view: var StaticView[T]; n: SomeInteger; value: T) {.inline.} =
+  ## Set element of Kokkos static view
+  ##
+  ## <in need of documentation>
+  view.setViewElement(cint(n), value)
 
 # lessons learned:
 # * problems with C++ "=" operator overload seem to stem from improper spec of 
