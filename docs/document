@@ -38,3 +38,5 @@ echo "Generating docs in: ${DOCS}"
 CMD="${CWD}/external/bin/nim doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
 echo "Running command: ${CMD}"
 eval $CMD
+
+ln -sf ${SWD}/docs/reliq.html ${SWD}/index.html
