@@ -28,9 +28,7 @@
 import kokkosbase
 
 # shorten pragmas pointing to Kokkos headers and include local dispatch wrapper
-template dispatch*: untyped =
-  {.pragma: dispatch, header: "../kokkos/dispatch.hpp".}
-kokkos: dispatch()
+kokkos: discard
 
 #[ frontend: execution policy types ]#
 
@@ -73,7 +71,7 @@ proc newThreadVectorRange*(
 
 # parallel for wrapper
 proc forall(start, stop: cint; body: proc(i: int) {.cdecl.}) 
-  {.importcpp: "parallel_for_range(@)", dispatch.}
+  {.importcpp: "parallel_for_range(@)", kokkos_wrapper.}
 proc forall*(start, stop: SomeInteger; body: proc(i: int) {.cdecl.}) {.inline.} =
   forall(cint(start), cint(stop), body)
 

@@ -1,6 +1,6 @@
 /**
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/dispatch.hpp
+  Source file: src/kokkos/kokkos.hpp
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -27,9 +27,23 @@
 
 #pragma once
 #include <Kokkos_Core.hpp>
+#include <Kokkos_DynRankView.hpp>
+#include <Kokkos_SIMD.hpp>
 
-#ifndef RELIQ_DISPATCH_HPP
-#define RELIQ_DISPATCH_HPP
+#ifndef RELIQ_KOKKOS_HPP
+#define RELIQ_KOKKOS_HPP
+
+/* view wrappers */
+
+// wrap Kokkos View; called "static" bc the rank is fixed at compile time
+template <class T>
+using StaticView = Kokkos::View<T*>;
+
+// wrap Kokkos DynRankView; called "dynamic" bc the rank is determined at runtime
+template <class T>
+using DynamicView = Kokkos::DynRankView<T>;
+
+/* dispatch wrappers */
 
 // typedef for C function pointer to be passed to Kokkos parallel_for
 typedef void (*NimProc)(int);
@@ -40,4 +54,6 @@ inline void parallel_for_range(int start, int stop, NimProc proc) {
   Kokkos::parallel_for(execPolicy, KOKKOS_LAMBDA (const int n) { proc(n); });
 }
 
-#endif // RELIQ_DISPATCH_HPP
+/* simd wrappers */
+
+#endif // RELIQ_KOKKOS_HPP

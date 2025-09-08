@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/views.nim
+  Source file: src/kokkos/kokkos_wrapper.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -30,13 +30,11 @@ import kokkosbase
 import upcxx/[upcxxbase, globalptr]
 
 # shorten pragmas pointing to Kokkos headers and include local views wrapper
-template views*: untyped =
-  {.pragma: views, header: "../kokkos/views.hpp".}
-kokkos: views()
+kokkos: discard
 
 type # frontend: Kokkos dynamic rank view
-  StaticView*[T] {.importcpp: "StaticView", views.} = object
-  DynamicView*[T] {.importcpp: "DynamicView", views.} = object
+  StaticView*[T] {.importcpp: "StaticView", kokkos_wrapper.} = object
+  DynamicView*[T] {.importcpp: "DynamicView", kokkos_wrapper.} = object
 
 # enumerate possible errors that a user may run into
 type KokkosViewErrors = enum 
@@ -67,11 +65,11 @@ template newKokkosViewError(
 
 # backend: Kokkos static view constructor
 proc newStaticView[T](tag: cstring; n1: csize_t): StaticView[T]
-  {.importcpp: "StaticView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "StaticView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 
 # backend: Kokkos static view constructor from pointer
 proc newStaticView[T](localPtr: ptr T; n: csize_t): StaticView[T] 
-  {.importcpp: "StaticView" & "<'*0>(#, #)", constructor, inline, views.}
+  {.importcpp: "StaticView" & "<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
 
 # frontend: base Kokkos static view constructor
 proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] {.inline.} = 
@@ -101,21 +99,21 @@ proc newStaticView*[T](
 
 # backend: Kokkos dynamic rank view constructors (Kokkos supports up to 7 dimensions)
 proc newDynamicView[T](tag: cstring; n1: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](tag: cstring; n1, n2: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](tag: cstring; n1, n2, n3: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](tag: cstring; n1, n2, n3, n4: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](tag: cstring; n1, n2, n3, n4, n5: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](tag: cstring; n1, n2, n3, n4, n5, n6: csize_t): DynamicView[T]
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 proc newDynamicView[T](
   tag: cstring; n1, n2, n3, n4, n5, n6, n7: csize_t
 ): DynamicView[T] 
-  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, views.}
+  {.importcpp: "DynamicView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
 
 # frontend: more flexible dynamic view constructor
 proc newDynamicView*(
@@ -147,11 +145,11 @@ proc newDynamicView*(
 
 # backend: static view accessor method
 proc getViewElement[T](view: StaticView[T]; n: cint): T 
-  {.importcpp: "#.operator[](#)", inline, views.}
+  {.importcpp: "#.operator[](#)", inline, kokkos_wrapper.}
 
 # backend: set view element
 proc setViewElement[T](view: var StaticView[T]; n: cint; value: T) 
-  {.importcpp: "#.operator[](#) = #", inline, views.}
+  {.importcpp: "#.operator[](#) = #", inline, kokkos_wrapper.}
 
 # public static view accessor method
 proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T {.inline.} =

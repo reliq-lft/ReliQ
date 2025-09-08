@@ -31,14 +31,13 @@ import utils
 # shorten pragmas pointing to Kokkos headers
 kokkos: {.pragma: simd, header: "<Kokkos_SIMD.hpp>".}
 
-# SIMXVec type
 type 
   SIMXVec*[T] {.importcpp: "Kokkos::Experimental::simd", simd.} = object
   ## ReliQ wrapper for Kokkos SIMXVec type
   ## 
   ## <in need of documentation>
 
-# SIMXVec constructor
+# SIMXVec constructors
 proc newSIMXVec[T](): SIMXVec[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
 proc newSIMXVec*(T: typedesc): SIMXVec[T] = newSIMXVec[T]()
@@ -46,21 +45,28 @@ proc newSIMXVec*[T](value: T): SIMXVec[T]
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
 proc newSIMXVec*[T](other: SIMXVec[T]): SIMXVec[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
-# TODO: ... placeholder for generator constructor...
+proc newSIMXVec*[T](values: seq[T]): SIMXVec[T] =
+  result = newSIMXVec(T)
+  for l in 0..<min(result.width, values.len): 
+    let value = values[l]
+    {.emit: """
+    Kokkos::Experimental::simd_mask<`T`> m([&] (std::size_t i) { return i == `l`; });
+    Kokkos::Experimental::simd<`T`> c(`value`);
+    where(m, result) = c;
+    """.}
+proc newSIMXVec*[T](values: openArray[T]): SIMXVec[T] = newSIMXVec(values.toSeq())
 
 # SIMXVec width
-proc width*[T](a: SIMXVec[T]): int {.importcpp: "#.size()", simd.}
+proc width*[T](simd: SIMXVec[T]): int {.importcpp: "#.size()", simd.}
 
-# Kokkos SIMXVec accessors
-proc `[]`*[T](a: SIMXVec[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
-
-# Kokkos SIMXVec lane accessors
-proc `[]`*[T](a: var SIMXVec[T], lane: int): var T 
-  {.importcpp: "#.operator[](#)", simd.}
-
-# Kokkos SIMXVec assignment overloads
-#proc `=copy`*[T](a: var SIMXVec[T], b: T) 
-#  {.importcpp: "operator=(#, #)", simd.}
+# array access operator overloads
+proc `[]`*[T](simd: SIMXVec[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
+proc `[]=`*[T](simd: var SIMXVec[T], lane: int, value: T) =
+  {.emit: """
+  Kokkos::Experimental::simd_mask<`T`> m([&] (std::size_t i) { return i == `lane`; });
+  Kokkos::Experimental::simd<`T`> c(`value`);
+  where(m, `simd`) = c;
+  """.}
 
 # Kokkos SIMXVec arithematic overloads
 proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
@@ -78,7 +84,11 @@ proc `/=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator/=(#, #)",
 iterator values*[T](a: SIMXVec[T]): T =
   for l in 0..<a.width: yield a[l]
 
-# converion to sequence
+# conversion from sequence to SIMXVec
+proc toSIMXVec*[T](values: seq[T]): SIMXVec[T] = newSIMXVec(values)
+proc toSIMXVec*[T](values: openArray[T]): SIMXVec[T] = newSIMXVec(values.toSeq())
+
+# conversion to sequence
 proc toSeq*[T](a: SIMXVec[T]): seq[T] =
   result = newSeq[T](a.width)
   for l in 0..<a.width: result[l] = a[l]
@@ -89,6 +99,7 @@ proc `$`*[T](a: SIMXVec[T]): string = "SIMXVec:" + $(a.toSeq())
 when isMainModule:
   import runtime
   reliq:
+    let sq = @[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     var 
       l = newSIMXVec(float)
       x = newSIMXVec(1.0)
@@ -107,6 +118,10 @@ when isMainModule:
     print t.width
     print $t
     for v in t.values: print $v
-    #t[0] = 3.0
-    #print $t
-    
+    t[3] = 3.0
+    print $t
+    let 
+      sqva = newSIMXVec(sq)
+      sqvb = sq.toSIMXVec()
+    print sqva
+    print sqvb

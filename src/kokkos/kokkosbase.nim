@@ -36,6 +36,7 @@ import utils/[nimutils]
 # template returning Kokkos_Core include through pragma
 template kokkos*(pragmas: untyped): untyped = 
   {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
+  {.pragma: kokkos_wrapper, header: "../kokkos/kokkos.hpp".}
   pragmas
 kokkos: discard
 

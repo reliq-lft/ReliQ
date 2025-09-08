@@ -30,7 +30,7 @@ import utils
 import lattice/[simplecubiclattice]
 
 # shorten pragmas pointing to UPC++ & Kokkos headers and include field view wrapper
-backend: views()
+backend: discard
 
 #[ frontend: simple cubic field type definition ]#
 
