@@ -21,7 +21,7 @@
   <div class="document" id="documentId">
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="backend.html">backend</a>, <a href="field/fieldconcept.html">field/fieldconcept</a>, <a href="field/simplecubicfield.html">field/simplecubicfield</a>, <a href="kokkos/dispatch.html">kokkos/dispatch</a>, <a href="kokkos/kokkosbase.html">kokkos/kokkosbase</a>, <a href="kokkos/simd.html">kokkos/simd</a>, <a href="kokkos/views.html">kokkos/views</a>, <a href="lattice/latticeconcept.html">lattice/latticeconcept</a>, <a href="lattice/simplecubiclattice.html">lattice/simplecubiclattice</a>, <a href="reliq.html">reliq</a>, <a href="runtime.html">runtime</a>, <a href="upcxx/globalptr.html">upcxx/globalptr</a>, <a href="upcxx/upcxxbase.html">upcxx/upcxxbase</a>, <a href="utils.html">utils</a>, <a href="utils/nimutils.html">utils/nimutils</a>, <a href="utils/reliqutils.html">utils/reliqutils</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="backend.html">backend</a>, <a href="field/fieldconcept.html">field/fieldconcept</a>, <a href="field/simplecubicfield.html">field/simplecubicfield</a>, <a href="kokkos/kokkosbase.html">kokkos/kokkosbase</a>, <a href="kokkos/simd.html">kokkos/simd</a>, <a href="kokkos/views.html">kokkos/views</a>, <a href="lattice/latticeconcept.html">lattice/latticeconcept</a>, <a href="lattice/simplecubiclattice.html">lattice/simplecubiclattice</a>, <a href="reliq.html">reliq</a>, <a href="runtime.html">runtime</a>, <a href="upcxx/globalptr.html">upcxx/globalptr</a>, <a href="upcxx/upcxxbase.html">upcxx/upcxxbase</a>, <a href="utils.html">utils</a>, <a href="utils/nimutils.html">utils/nimutils</a>, <a href="utils/reliqutils.html">utils/reliqutils</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="simd: proc `$`[T](a: SIMXVec[T]): string" href="kokkos/simd.html#%24%2CSIMXVec%5BT%5D">simd: proc `$`[T](a: SIMXVec[T]): string</a></li>
@@ -32,49 +32,119 @@
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc `$`(sq: seq[SomeNumber]): string" href="utils/nimutils.html#%24%2Cseq%5BSomeNumber%5D">nimutils: proc `$`(sq: seq[SomeNumber]): string</a></li>
           </ul></dd>
+<dt><a name="%60%26amp%3B%26amp%3B%3D%60" href="#%60%26amp%3B%26amp%3B%3D%60"><span>`&amp;&amp;=`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="nimutils: proc `&amp;&amp;=`(sa: var string; sb: string)" href="utils/nimutils.html#%26%26%3D%2Cstring%2Cstring">nimutils: proc `&amp;&amp;=`(sa: var string; sb: string)</a></li>
+          </ul></dd>
+<dt><a name="%60%26amp%3B%26amp%3B%60" href="#%60%26amp%3B%26amp%3B%60"><span>`&amp;&amp;`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="nimutils: proc `&amp;&amp;`(sa, sb: string): string" href="utils/nimutils.html#%26%26%2Cstring%2Cstring">nimutils: proc `&amp;&amp;`(sa, sb: string): string</a></li>
+          </ul></dd>
 <dt><a name="%60%2A%3D%60" href="#%60%2A%3D%60"><span>`*=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simd: proc `*=`[T](a: var SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `*=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+          data-doc-search-tag="simplecubicfield: proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; fy`gensym6: SimpleCubicField[T])" href="field/simplecubicfield.html#%2A%3D%2C%2C">simplecubicfield: proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; fy`gensym6: SimpleCubicField[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; y`gensym6: T)" href="field/simplecubicfield.html#%2A%3D%2C%2CT">simplecubicfield: proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; y`gensym6: T)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `*=`[T](a: SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `*=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `*=`[T](a: SIMXVec[T]; b: T)" href="kokkos/simd.html#%2A%3D%2CSIMXVec%5BT%5D%2CT">simd: proc `*=`[T](a: SIMXVec[T]; b: T)</a></li>
           </ul></dd>
 <dt><a name="%60%2A%60" href="#%60%2A%60"><span>`*`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `*`[T](fx`gensym6, fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#%2A%2C%2C">simplecubicfield: proc `*`[T](fx`gensym6, fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `*`[T](fx`gensym6: SimpleCubicField[T]; y`gensym6: T): SimpleCubicField[T]" href="field/simplecubicfield.html#%2A%2C%2CT">simplecubicfield: proc `*`[T](fx`gensym6: SimpleCubicField[T]; y`gensym6: T): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `*`[T](x`gensym6: T; fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#%2A%2CT%2C">simplecubicfield: proc `*`[T](x`gensym6: T; fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="simd: proc `*`[T](a, b: SIMXVec[T]): SIMXVec[T]" href="kokkos/simd.html#%2A%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `*`[T](a, b: SIMXVec[T]): SIMXVec[T]</a></li>
           </ul></dd>
 <dt><a name="%60%2B%3D%60" href="#%60%2B%3D%60"><span>`+=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simd: proc `+=`[T](a: var SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `+=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+          data-doc-search-tag="simplecubicfield: proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; fy`gensym4: SimpleCubicField[T])" href="field/simplecubicfield.html#%2B%3D%2C%2C">simplecubicfield: proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; fy`gensym4: SimpleCubicField[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; y`gensym4: T)" href="field/simplecubicfield.html#%2B%3D%2C%2CT">simplecubicfield: proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; y`gensym4: T)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `+=`[T](a: SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `+=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `+=`[T](a: SIMXVec[T]; b: T)" href="kokkos/simd.html#%2B%3D%2CSIMXVec%5BT%5D%2CT">simd: proc `+=`[T](a: SIMXVec[T]; b: T)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc `+=`(sa: var string; sb: string)" href="utils/nimutils.html#%2B%3D%2Cstring%2Cstring">nimutils: proc `+=`(sa: var string; sb: string)</a></li>
           </ul></dd>
 <dt><a name="%60%2B%60" href="#%60%2B%60"><span>`+`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `+`[T](fx`gensym4, fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#%2B%2C%2C">simplecubicfield: proc `+`[T](fx`gensym4, fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `+`[T](fx`gensym4: SimpleCubicField[T]; y`gensym4: T): SimpleCubicField[T]" href="field/simplecubicfield.html#%2B%2C%2CT">simplecubicfield: proc `+`[T](fx`gensym4: SimpleCubicField[T]; y`gensym4: T): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `+`[T](x`gensym4: T; fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#%2B%2CT%2C">simplecubicfield: proc `+`[T](x`gensym4: T; fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="simd: proc `+`[T](a, b: SIMXVec[T]): SIMXVec[T]" href="kokkos/simd.html#%2B%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `+`[T](a, b: SIMXVec[T]): SIMXVec[T]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc `+`(sa, sb: string): string" href="utils/nimutils.html#%2B%2Cstring%2Cstring">nimutils: proc `+`(sa, sb: string): string</a></li>
           </ul></dd>
 <dt><a name="%60-%3D%60" href="#%60-%3D%60"><span>`-=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simd: proc `-=`[T](a: var SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `-=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+          data-doc-search-tag="simplecubicfield: proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; fy`gensym5: SimpleCubicField[T])" href="field/simplecubicfield.html#-%3D%2C%2C">simplecubicfield: proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; fy`gensym5: SimpleCubicField[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; y`gensym5: T)" href="field/simplecubicfield.html#-%3D%2C%2CT">simplecubicfield: proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; y`gensym5: T)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `-=`[T](a: SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `-=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `-=`[T](a: SIMXVec[T]; b: T)" href="kokkos/simd.html#-%3D%2CSIMXVec%5BT%5D%2CT">simd: proc `-=`[T](a: SIMXVec[T]; b: T)</a></li>
           </ul></dd>
 <dt><a name="%60-%60" href="#%60-%60"><span>`-`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `-`[T](fx`gensym5, fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#-%2C%2C">simplecubicfield: proc `-`[T](fx`gensym5, fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `-`[T](fx`gensym5: SimpleCubicField[T]; y`gensym5: T): SimpleCubicField[T]" href="field/simplecubicfield.html#-%2C%2CT">simplecubicfield: proc `-`[T](fx`gensym5: SimpleCubicField[T]; y`gensym5: T): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `-`[T](x`gensym5: T; fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#-%2CT%2C">simplecubicfield: proc `-`[T](x`gensym5: T; fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="simd: proc `-`[T](a, b: SIMXVec[T]): SIMXVec[T]" href="kokkos/simd.html#-%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `-`[T](a, b: SIMXVec[T]): SIMXVec[T]</a></li>
           </ul></dd>
 <dt><a name="%60/%3D%60" href="#%60/%3D%60"><span>`/=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simd: proc `/=`[T](a: var SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#/%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `/=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+          data-doc-search-tag="simplecubicfield: proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; fy`gensym7: SimpleCubicField[T])" href="field/simplecubicfield.html#/%3D%2C%2C">simplecubicfield: proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; fy`gensym7: SimpleCubicField[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; y`gensym7: T)" href="field/simplecubicfield.html#/%3D%2C%2CT">simplecubicfield: proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; y`gensym7: T)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `/=`[T](a: SIMXVec[T]; b: SIMXVec[T])" href="kokkos/simd.html#/%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `/=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `/=`[T](a: SIMXVec[T]; b: T)" href="kokkos/simd.html#/%3D%2CSIMXVec%5BT%5D%2CT">simd: proc `/=`[T](a: SIMXVec[T]; b: T)</a></li>
           </ul></dd>
 <dt><a name="%60/%60" href="#%60/%60"><span>`/`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `/`[T](fx`gensym7, fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#/%2C%2C">simplecubicfield: proc `/`[T](fx`gensym7, fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `/`[T](fx`gensym7: SimpleCubicField[T]; y`gensym7: T): SimpleCubicField[T]" href="field/simplecubicfield.html#/%2C%2CT">simplecubicfield: proc `/`[T](fx`gensym7: SimpleCubicField[T]; y`gensym7: T): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `/`[T](x`gensym7: T; fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]" href="field/simplecubicfield.html#/%2CT%2C">simplecubicfield: proc `/`[T](x`gensym7: T; fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="simd: proc `/`[T](a, b: SIMXVec[T]): SIMXVec[T]" href="kokkos/simd.html#/%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `/`[T](a, b: SIMXVec[T]): SIMXVec[T]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc `/`[A: SomeInteger; B: SomeInteger](a: openArray[A]; b: openArray[B]): auto" href="utils/nimutils.html#/%2CopenArray%5BA%5D%2CopenArray%5BB%5D">nimutils: proc `/`[A: SomeInteger; B: SomeInteger](a: openArray[A]; b: openArray[B]): auto</a></li>
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc `/`(sa, sb: string): string" href="utils/nimutils.html#/%2Cstring%2Cstring">nimutils: proc `/`(sa, sb: string): string</a></li>
           </ul></dd>
+<dt><a name="%60%3A%3D%60" href="#%60%3A%3D%60"><span>`:=`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `:=`[T](f: var SimpleCubicField[T]; value: T)" href="field/simplecubicfield.html#%3A%3D%2CSimpleCubicField%5BT%5D%2CT">simplecubicfield: proc `:=`[T](f: var SimpleCubicField[T]; value: T)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `:=`[T](x: SIMXVec[T]; value: T)" href="kokkos/simd.html#%3A%3D%2CSIMXVec%5BT%5D%2CT">simd: proc `:=`[T](x: SIMXVec[T]; value: T)</a></li>
+          </ul></dd>
+<dt><a name="%60%3Dcopy%60" href="#%60%3Dcopy%60"><span>`=copy`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc `=copy`[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T])" href="field/simplecubicfield.html#%3Dcopy%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D">simplecubicfield: proc `=copy`[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `=copy`[T](x: var SIMXVec[T]; y: SIMXVec[T])" href="kokkos/simd.html#%3Dcopy%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D">simd: proc `=copy`[T](x: var SIMXVec[T]; y: SIMXVec[T])</a></li>
+          </ul></dd>
 <dt><a name="%60%5B%5D%3D%60" href="#%60%5B%5D%3D%60"><span>`[]=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="simplecubicfield: proc `[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])" href="field/simplecubicfield.html#%5B%5D%3D%2CSimpleCubicField%5BT%5D%2CSomeInteger%2CSIMXVec%5BT%5D">simplecubicfield: proc `[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc `[]=`[T](simd: var SIMXVec[T]; lane: int; value: T)" href="kokkos/simd.html#%5B%5D%3D%2CSIMXVec%5BT%5D%2Cint%2CT">simd: proc `[]=`[T](simd: var SIMXVec[T]; lane: int; value: T)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="views: proc `[]=`[T](view: var StaticView[T]; n: SomeInteger; value: T)" href="kokkos/views.html#%5B%5D%3D%2CStaticView%5BT%5D%2CSomeInteger%2CT">views: proc `[]=`[T](view: var StaticView[T]; n: SomeInteger; value: T)</a></li>
           </ul></dd>
@@ -82,9 +152,7 @@
 <li><a class="reference external"
           data-doc-search-tag="simplecubicfield: proc `[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]" href="field/simplecubicfield.html#%5B%5D%2CSimpleCubicField%5BT%5D%2CSomeInteger">simplecubicfield: proc `[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="simd: proc `[]`[T](a: SIMXVec[T]; lane: int): T" href="kokkos/simd.html#%5B%5D%2CSIMXVec%5BT%5D%2Cint">simd: proc `[]`[T](a: SIMXVec[T]; lane: int): T</a></li>
-          <li><a class="reference external"
-          data-doc-search-tag="simd: proc `[]`[T](a: var SIMXVec[T]; lane: int): var T" href="kokkos/simd.html#%5B%5D%2CSIMXVec%5BT%5D%2Cint_2">simd: proc `[]`[T](a: var SIMXVec[T]; lane: int): var T</a></li>
+          data-doc-search-tag="simd: proc `[]`[T](simd: SIMXVec[T]; lane: int): T" href="kokkos/simd.html#%5B%5D%2CSIMXVec%5BT%5D%2Cint">simd: proc `[]`[T](simd: SIMXVec[T]; lane: int): T</a></li>
           <li><a class="reference external"
           data-doc-search-tag="views: proc `[]`[T](view: StaticView[T]; n: SomeInteger): T" href="kokkos/views.html#%5B%5D%2CStaticView%5BT%5D%2CSomeInteger">views: proc `[]`[T](view: StaticView[T]; n: SomeInteger): T</a></li>
           </ul></dd>
@@ -108,9 +176,17 @@
 <li><a class="reference external"
           data-doc-search-tag="nimutils: proc cargv(argc: cint): cstringArray" href="utils/nimutils.html#cargv%2Ccint">nimutils: proc cargv(argc: cint): cstringArray</a></li>
           </ul></dd>
+<dt><a name="conformable" href="#conformable"><span>conformable:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: proc conformable[T](fx, fy: SimpleCubicField[T])" href="field/simplecubicfield.html#conformable%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D">simplecubicfield: proc conformable[T](fx, fy: SimpleCubicField[T])</a></li>
+          </ul></dd>
 <dt><a name="CoordinateType" href="#CoordinateType"><span>CoordinateType:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="latticeconcept: type CoordinateType" href="lattice/latticeconcept.html#CoordinateType">latticeconcept: type CoordinateType</a></li>
+          </ul></dd>
+<dt><a name="defineBinaryOperations" href="#defineBinaryOperations"><span>defineBinaryOperations:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="simplecubicfield: template defineBinaryOperations(op: untyped; ope: untyped)" href="field/simplecubicfield.html#defineBinaryOperations.t%2Cuntyped%2Cuntyped">simplecubicfield: template defineBinaryOperations(op: untyped; ope: untyped)</a></li>
           </ul></dd>
 <dt><a name="deleteGlobalPointer" href="#deleteGlobalPointer"><span>deleteGlobalPointer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -123,10 +199,6 @@
 <dt><a name="dimensions" href="#dimensions"><span>dimensions:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="nimutils: iterator dimensions[T](arr: openArray[T]): int" href="utils/nimutils.html#dimensions.i%2CopenArray%5BT%5D">nimutils: iterator dimensions[T](arr: openArray[T]): int</a></li>
-          </ul></dd>
-<dt><a name="dispatch" href="#dispatch"><span>dispatch:</span></a></dt><dd><ul class="simple">
-<li><a class="reference external"
-          data-doc-search-tag="dispatch: template dispatch(): untyped" href="kokkos/dispatch.html#dispatch.t">dispatch: template dispatch(): untyped</a></li>
           </ul></dd>
 <dt><a name="divides" href="#divides"><span>divides:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -143,10 +215,6 @@
 <dt><a name="Field" href="#Field"><span>Field:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="fieldconcept: type Field" href="field/fieldconcept.html#Field">fieldconcept: type Field</a></li>
-          </ul></dd>
-<dt><a name="forall" href="#forall"><span>forall:</span></a></dt><dd><ul class="simple">
-<li><a class="reference external"
-          data-doc-search-tag="dispatch: proc forall(start, stop: SomeInteger; body: proc (i: int) {.cdecl.})" href="kokkos/dispatch.html#forall%2CSomeInteger%2CSomeInteger%2Cproc%28int%29">dispatch: proc forall(start, stop: SomeInteger; body: proc (i: int) {.cdecl.})</a></li>
           </ul></dd>
 <dt><a name="GeometryType" href="#GeometryType"><span>GeometryType:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -206,12 +274,6 @@
 <li><a class="reference external"
           data-doc-search-tag="globalptr: proc newGlobalPointerArray(size: csize_t; T: typedesc): GlobalPointer[T]" href="upcxx/globalptr.html#newGlobalPointerArray%2Ccsize_t%2Ctypedesc">globalptr: proc newGlobalPointerArray(size: csize_t; T: typedesc): GlobalPointer[T]</a></li>
           </ul></dd>
-<dt><a name="newLatticeInitializationError" href="#newLatticeInitializationError"><span>newLatticeInitializationError:</span></a></dt><dd><ul class="simple">
-<li><a class="reference external"
-          data-doc-search-tag="simplecubiclattice: template newLatticeInitializationError(err: LatticeInitializationErrors;
-                              appendToMessage: untyped): untyped" href="lattice/simplecubiclattice.html#newLatticeInitializationError.t%2CLatticeInitializationErrors%2Cuntyped">simplecubiclattice: template newLatticeInitializationError(err: LatticeInitializationErrors;
-                              appendToMessage: untyped): untyped</a></li>
-          </ul></dd>
 <dt><a name="newSimpleCubicLattice" href="#newSimpleCubicLattice"><span>newSimpleCubicLattice:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="simplecubiclattice: proc newSimpleCubicLattice[L: SomeInteger; D: SomeInteger](
@@ -242,6 +304,10 @@
           </ul></dd>
 <dt><a name="newSIMXVec" href="#newSIMXVec"><span>newSIMXVec:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="simd: proc newSIMXVec[T](values: openArray[T]): SIMXVec[T]" href="kokkos/simd.html#newSIMXVec%2CopenArray%5BT%5D">simd: proc newSIMXVec[T](values: openArray[T]): SIMXVec[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc newSIMXVec[T](values: seq[T]): SIMXVec[T]" href="kokkos/simd.html#newSIMXVec%2Cseq%5BT%5D">simd: proc newSIMXVec[T](values: seq[T]): SIMXVec[T]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="simd: proc newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]" href="kokkos/simd.html#newSIMXVec%2CSIMXVec%5BT%5D">simd: proc newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="simd: proc newSIMXVec[T](value: T): SIMXVec[T]" href="kokkos/simd.html#newSIMXVec%2CT">simd: proc newSIMXVec[T](value: T): SIMXVec[T]</a></li>
@@ -294,11 +360,19 @@
           </ul></dd>
 <dt><a name="reliqFinalize" href="#reliqFinalize"><span>reliqFinalize:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="runtime: proc reliqFinalize()" href="runtime.html#reliqFinalize">runtime: proc reliqFinalize()</a></li>
+          data-doc-search-tag="runtime: proc reliqFinalize(printRuntimeTiming: bool = true;
+              printExecutionTiming: bool = true;
+              printFinalizeTiming: bool = true)" href="runtime.html#reliqFinalize%2Cbool%2Cbool%2Cbool">runtime: proc reliqFinalize(printRuntimeTiming: bool = true;
+              printExecutionTiming: bool = true;
+              printFinalizeTiming: bool = true)</a></li>
           </ul></dd>
 <dt><a name="reliqInit" href="#reliqInit"><span>reliqInit:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="runtime: proc reliqInit()" href="runtime.html#reliqInit">runtime: proc reliqInit()</a></li>
+          data-doc-search-tag="runtime: proc reliqInit(printInitTiming: bool = true)" href="runtime.html#reliqInit%2Cbool">runtime: proc reliqInit(printInitTiming: bool = true)</a></li>
+          </ul></dd>
+<dt><a name="reliqLog" href="#reliqLog"><span>reliqLog:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="runtime: proc reliqLog(msg: string)" href="runtime.html#reliqLog%2Cstring">runtime: proc reliqLog(msg: string)</a></li>
           </ul></dd>
 <dt><a name="reversedDimensions" href="#reversedDimensions"><span>reversedDimensions:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -318,11 +392,25 @@
           </ul></dd>
 <dt><a name="sites" href="#sites"><span>sites:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simplecubiclattice: iterator sites(l: SimpleCubicLattice): int" href="lattice/simplecubiclattice.html#sites.i%2CSimpleCubicLattice">simplecubiclattice: iterator sites(l: SimpleCubicLattice): int</a></li>
+          data-doc-search-tag="simplecubicfield: template sites[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped" href="field/simplecubicfield.html#sites.t%2CSimpleCubicField%5BT%5D%2Cuntyped%2Cuntyped">simplecubicfield: template sites[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simplecubiclattice: template sites(l: SimpleCubicLattice; n: untyped; work: untyped): untyped" href="lattice/simplecubiclattice.html#sites.t%2CSimpleCubicLattice%2Cuntyped%2Cuntyped">simplecubiclattice: template sites(l: SimpleCubicLattice; n: untyped; work: untyped): untyped</a></li>
           </ul></dd>
 <dt><a name="StaticView" href="#StaticView"><span>StaticView:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="views: object StaticView" href="kokkos/views.html#StaticView">views: object StaticView</a></li>
+          </ul></dd>
+<dt><a name="tic" href="#tic"><span>tic:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="runtime: proc tic(tags: varargs[string]): Timer" href="runtime.html#tic%2Cvarargs%5Bstring%5D">runtime: proc tic(tags: varargs[string]): Timer</a></li>
+          </ul></dd>
+<dt><a name="Timer" href="#Timer"><span>Timer:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="runtime: object Timer" href="runtime.html#Timer">runtime: object Timer</a></li>
+          </ul></dd>
+<dt><a name="toc" href="#toc"><span>toc:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="runtime: proc toc(timer: Timer)" href="runtime.html#toc%2CTimer">runtime: proc toc(timer: Timer)</a></li>
           </ul></dd>
 <dt><a name="toSeq" href="#toSeq"><span>toSeq:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -331,6 +419,12 @@
           data-doc-search-tag="nimutils: proc toSeq[I](arr: openArray[I]): auto" href="utils/nimutils.html#toSeq%2CopenArray%5BI%5D">nimutils: proc toSeq[I](arr: openArray[I]): auto</a></li>
           <li><a class="reference external"
           data-doc-search-tag="nimutils: proc toSeq[I](arr: openArray[I]; T: typedesc): seq[T:type]" href="utils/nimutils.html#toSeq%2CopenArray%5BI%5D%2Ctypedesc">nimutils: proc toSeq[I](arr: openArray[I]; T: typedesc): seq[T:type]</a></li>
+          </ul></dd>
+<dt><a name="toSIMXVec" href="#toSIMXVec"><span>toSIMXVec:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="simd: proc toSIMXVec[T](values: openArray[T]): SIMXVec[T]" href="kokkos/simd.html#toSIMXVec%2CopenArray%5BT%5D">simd: proc toSIMXVec[T](values: openArray[T]): SIMXVec[T]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="simd: proc toSIMXVec[T](values: seq[T]): SIMXVec[T]" href="kokkos/simd.html#toSIMXVec%2Cseq%5BT%5D">simd: proc toSIMXVec[T](values: seq[T]): SIMXVec[T]</a></li>
           </ul></dd>
 <dt><a name="upcxx" href="#upcxx"><span>upcxx:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -352,19 +446,15 @@
 <li><a class="reference external"
           data-doc-search-tag="simd: iterator values[T](a: SIMXVec[T]): T" href="kokkos/simd.html#values.i%2CSIMXVec%5BT%5D">simd: iterator values[T](a: SIMXVec[T]): T</a></li>
           </ul></dd>
-<dt><a name="views" href="#views"><span>views:</span></a></dt><dd><ul class="simple">
-<li><a class="reference external"
-          data-doc-search-tag="views: template views(): untyped" href="kokkos/views.html#views.t">views: template views(): untyped</a></li>
-          </ul></dd>
 <dt><a name="width" href="#width"><span>width:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="simd: proc width[T](a: SIMXVec[T]): int" href="kokkos/simd.html#width%2CSIMXVec%5BT%5D">simd: proc width[T](a: SIMXVec[T]): int</a></li>
+          data-doc-search-tag="simd: proc width[T](simd: SIMXVec[T]): int" href="kokkos/simd.html#width%2CSIMXVec%5BT%5D">simd: proc width[T](simd: SIMXVec[T]): int</a></li>
           </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-07 16:14:48 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
       </div>
     </div>
   </div>

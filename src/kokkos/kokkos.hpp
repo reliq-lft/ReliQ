@@ -48,11 +48,31 @@ using DynamicView = Kokkos::DynRankView<T>;
 // typedef for C function pointer to be passed to Kokkos parallel_for
 typedef void (*NimProc)(int);
 
-// wrapper for Kokkos parallel_for
+// typedef for Kokkos TeamPolicy member type
+typedef Kokkos::TeamPolicy<>::member_type TeamMember;
+
+// wrapper for Kokkos parallel_for w/ range policy
 inline void parallel_for_range(int start, int stop, NimProc proc) {
-  auto execPolicy = Kokkos::RangePolicy<>(start, stop);
-  Kokkos::parallel_for(execPolicy, KOKKOS_LAMBDA (const int n) { proc(n); });
+  Kokkos::parallel_for(
+    Kokkos::RangePolicy<>(start, stop), 
+    KOKKOS_LAMBDA (const int n) { proc(n); }
+  );
 }
+
+// !!!! vvvv DO NOT DELETE; IMPORTANT TEMPLATE FOR "THREADS" CONSTRUCT vvvv !!!!
+/*
+// wrapper for Kokkos parallel_for w/ team policy
+inline void parallel_for_team(int league_size, int team_size, NimProc proc) {
+  auto execPolicy = Kokkos::RangePolicy<>(start, stop);
+  Kokkos::parallel_for(
+    Kokkos::TeamPolicy<>(league_size, team_size), 
+    KOKKOS_LAMBDA (const TeamMember& team) { 
+      
+      proc(n); 
+  });
+}
+*/
+// !!!! ^^^^ DO NOT DELETE; IMPORTANT TEMPLATE FOR "THREADS" CONSTRUCT ^^^^ !!!!
 
 /* simd wrappers */
 

@@ -33,6 +33,6 @@ type
   Lattice* = concept l, type LatticeCoordinate, type FieldType, type Field
     ## Generic lattice concept
     ## <in need of documentation>
-    for site in l.sites(): discard
+    l.sites(untyped): discard
     l.latticeCoordinate(n: int): LatticeCoordinate
     l.newField(FieldType): Field

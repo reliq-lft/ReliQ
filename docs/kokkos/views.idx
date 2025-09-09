@@ -1,15 +1,14 @@
 nimTitle	views	kokkos/views.html	module kokkos/views		0
-nim	views	kokkos/views.html#views.t	template views(): untyped		33
-nim	StaticView	kokkos/views.html#StaticView	object StaticView		38
-nim	DynamicView	kokkos/views.html#DynamicView	object DynamicView		39
-nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,typedesc	proc newStaticView(n: SomeInteger; T: typedesc): StaticView[T]		77
-nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,ptr.T	proc newStaticView[T](n: SomeInteger; localPointer: ptr T): StaticView[T]		81
-nim	newStaticView	kokkos/views.html#newStaticView,ptr.T,SomeInteger	proc newStaticView[T](localPointer: ptr T; n: SomeInteger): StaticView[T]		85
-nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,GlobalPointer[T]	proc newStaticView[T](n: SomeInteger; globalPointer: GlobalPointer[T]): StaticView[T]		91
-nim	newStaticView	kokkos/views.html#newStaticView,GlobalPointer[T],SomeInteger	proc newStaticView[T](globalPointer: GlobalPointer[T]; n: SomeInteger): StaticView[T]		95
-nim	newDynamicView	kokkos/views.html#newDynamicView,openArray[SomeInteger],typedesc	proc newDynamicView(dims: openArray[SomeInteger]; T: typedesc): DynamicView[T]		121
-nim	newDynamicView	kokkos/views.html#newDynamicView,typedesc,openArray[SomeInteger]	proc newDynamicView(T: typedesc; dims: openArray[SomeInteger]): DynamicView[T]		141
-nim	`[]`	kokkos/views.html#[],StaticView[T],SomeInteger	proc `[]`[T](view: StaticView[T]; n: SomeInteger): T		157
-nim	`[]=`	kokkos/views.html#[]=,StaticView[T],SomeInteger,T	proc `[]=`[T](view: var StaticView[T]; n: SomeInteger; value: T)		164
-nimgrp	newstaticview	kokkos/views.html#newStaticView-procs-all	proc		77
-nimgrp	newdynamicview	kokkos/views.html#newDynamicView-procs-all	proc		121
+nim	StaticView	kokkos/views.html#StaticView	object StaticView		36
+nim	DynamicView	kokkos/views.html#DynamicView	object DynamicView		37
+nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,typedesc	proc newStaticView(n: SomeInteger; T: typedesc): StaticView[T]		75
+nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,ptr.T	proc newStaticView[T](n: SomeInteger; localPointer: ptr T): StaticView[T]		79
+nim	newStaticView	kokkos/views.html#newStaticView,ptr.T,SomeInteger	proc newStaticView[T](localPointer: ptr T; n: SomeInteger): StaticView[T]		83
+nim	newStaticView	kokkos/views.html#newStaticView,SomeInteger,GlobalPointer[T]	proc newStaticView[T](n: SomeInteger; globalPointer: GlobalPointer[T]): StaticView[T]		89
+nim	newStaticView	kokkos/views.html#newStaticView,GlobalPointer[T],SomeInteger	proc newStaticView[T](globalPointer: GlobalPointer[T]; n: SomeInteger): StaticView[T]		93
+nim	newDynamicView	kokkos/views.html#newDynamicView,openArray[SomeInteger],typedesc	proc newDynamicView(dims: openArray[SomeInteger]; T: typedesc): DynamicView[T]		119
+nim	newDynamicView	kokkos/views.html#newDynamicView,typedesc,openArray[SomeInteger]	proc newDynamicView(T: typedesc; dims: openArray[SomeInteger]): DynamicView[T]		139
+nim	`[]`	kokkos/views.html#[],StaticView[T],SomeInteger	proc `[]`[T](view: StaticView[T]; n: SomeInteger): T		155
+nim	`[]=`	kokkos/views.html#[]=,StaticView[T],SomeInteger,T	proc `[]=`[T](view: var StaticView[T]; n: SomeInteger; value: T)		162
+nimgrp	newstaticview	kokkos/views.html#newStaticView-procs-all	proc		75
+nimgrp	newdynamicview	kokkos/views.html#newDynamicView-procs-all	proc		119

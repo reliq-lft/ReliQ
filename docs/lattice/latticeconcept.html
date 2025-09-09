@@ -54,8 +54,7 @@
       <li><a class="reference" href="#CoordinateType" title="CoordinateType = int32">CoordinateType</a></li>
 <li><a class="reference" href="#GeometryType" title="GeometryType = int16">GeometryType</a></li>
 <li><a class="reference" href="#Lattice" title="Lattice = concept ltypeof(LatticeCoordinate)typeof(FieldType)typeof(Field)
-    for site in l.sites():
-      discard
+    l.sites(untyped):(discard )
     l.latticeCoordinate(n: int):
       LatticeCoordinate
     l.newField(FieldType):
@@ -94,8 +93,7 @@
 </div>
 <div id="Lattice">
   <dt><pre><a href="latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a> <span class="Other">=</span> <span class="Keyword">concept</span> <span class="Identifier">l</span><span class="Keyword">typeof</span><span class="Other">(</span><span class="Identifier">LatticeCoordinate</span><span class="Other">)</span><span class="Keyword">typeof</span><span class="Other">(</span><span class="Identifier">FieldType</span><span class="Other">)</span><span class="Keyword">typeof</span><span class="Other">(</span><span class="Identifier">Field</span><span class="Other">)</span>
-    <span class="Keyword">for</span> <span class="Identifier">site</span> <span class="Keyword">in</span> <span class="Identifier">l</span><span class="Other">.</span><span class="Identifier">sites</span><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span>
-      <span class="Keyword">discard</span>
+    <span class="Identifier">l</span><span class="Other">.</span><span class="Identifier">sites</span><span class="Other">(</span><span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span><span class="Other">(</span><span class="Keyword">discard</span> <span class="Other">)</span>
     <span class="Identifier">l</span><span class="Other">.</span><span class="Identifier">latticeCoordinate</span><span class="Other">(</span><span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span>
       <span class="Identifier">LatticeCoordinate</span>
     <span class="Identifier">l</span><span class="Other">.</span><span class="Identifier">newField</span><span class="Other">(</span><span class="Identifier">FieldType</span><span class="Other">)</span><span class="Other">:</span>
@@ -116,7 +114,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-07 16:14:48 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
       </div>
     </div>
   </div>

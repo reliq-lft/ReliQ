@@ -28,7 +28,6 @@
 import upcxx/[upcxxbase, globalptr]
 import kokkos/[kokkosbase]
 import kokkos/[views, simd]
-import kokkos/[dispatch]
 
 export upcxxbase
 export globalptr
@@ -36,7 +35,6 @@ export globalptr
 export kokkosbase
 export views
 export simd
-export dispatch
 
 # template returning UPC++ and Kokkos pragmas including core headers
 template backend*(pragmas: untyped): untyped =

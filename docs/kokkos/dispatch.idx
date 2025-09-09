@@ -1,3 +1,0 @@
-nimTitle	dispatch	kokkos/dispatch.html	module kokkos/dispatch		0
-nim	dispatch	kokkos/dispatch.html#dispatch.t	template dispatch(): untyped		31
-nim	forall	kokkos/dispatch.html#forall,SomeInteger,SomeInteger,proc(int)	proc forall(start, stop: SomeInteger; body: proc (i: int) {.cdecl.})		77

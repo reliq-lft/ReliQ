@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/kokkos/views.nim
+  Source file: src/kokkos/simd.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -68,6 +68,17 @@ proc `[]=`*[T](simd: var SIMXVec[T], lane: int, value: T) =
   where(m, `simd`) = c;
   """.}
 
+# copy assignment hook
+proc `=copy`*[T](x: var SIMXVec[T]; y: SIMXVec[T]) 
+  {.importcpp: "#.operator=(#)", simd.}
+
+# assignment to scalar
+proc `:=`*[T](x: SIMXVec[T]; value: T) =
+  {.emit: """
+  Kokkos::Experimental::simd<`T`> c(`value`);
+  `x` = c;
+  """.}
+
 # Kokkos SIMXVec arithematic overloads
 proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
 proc `-`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator-(#, #)", simd.}
@@ -75,10 +86,16 @@ proc `*`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator*(#, #)", simd.
 proc `/`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator/(#, #)", simd.}
 
 # Kokkos SIMXVec compound arithematic assignment overloads
-proc `+=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator+=(#, #)", simd.}
-proc `-=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator-=(#, #)", simd.}
-proc `*=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator*=(#, #)", simd.}
-proc `/=`*[T](a: var SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator/=(#, #)", simd.}
+proc `+=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator+=(#, #)", simd.}
+proc `-=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator-=(#, #)", simd.}
+proc `*=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator*=(#, #)", simd.}
+proc `/=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator/=(#, #)", simd.}
+
+# Kokkos SIMXVec compound arithematic assignment overloads
+proc `+=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator+=(#, #)", simd.}
+proc `-=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator-=(#, #)", simd.}
+proc `*=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator*=(#, #)", simd.}
+proc `/=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator/=(#, #)", simd.}
 
 # SIMXVec vector iterator
 iterator values*[T](a: SIMXVec[T]): T =
@@ -120,8 +137,9 @@ when isMainModule:
     for v in t.values: print $v
     t[3] = 3.0
     print $t
-    let 
+    var 
       sqva = newSIMXVec(sq)
       sqvb = sq.toSIMXVec()
     print sqva
     print sqvb
+    sqva = sqvb

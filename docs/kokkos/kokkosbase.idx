@@ -1,5 +1,5 @@
 nimTitle	kokkosbase	kokkos/kokkosbase.html	module kokkos/kokkosbase		0
 nim	kokkos	kokkos/kokkosbase.html#kokkos.t,untyped	template kokkos(pragmas: untyped): untyped		37
-nim	kokkosInit	kokkos/kokkosbase.html#kokkosInit	proc kokkosInit()		47
-nim	kokkosFinalize	kokkos/kokkosbase.html#kokkosFinalize	proc kokkosFinalize()		55
-nim	numThreads	kokkos/kokkosbase.html#numThreads	proc numThreads(): cint		60
+nim	kokkosInit	kokkos/kokkosbase.html#kokkosInit	proc kokkosInit()		48
+nim	kokkosFinalize	kokkos/kokkosbase.html#kokkosFinalize	proc kokkosFinalize()		56
+nim	numThreads	kokkos/kokkosbase.html#numThreads	proc numThreads(): cint		61

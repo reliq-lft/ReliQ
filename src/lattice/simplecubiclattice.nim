@@ -30,13 +30,16 @@
 ]#
 
 import backend
+import runtime
 import utils
 import latticeconcept
+
+# import backend header files
+backend: discard
 
 #[ frontend: simple cubic lattice type definition ]#
 
 type
-  # !!!! WHAT IF WE HAVE LATTICEROOT... BE... OR PROVIDE.... THE FUNCTOR FUNC !!!!
   SimpleCubicRankDim = tuple[start, stop, size: GeometryType]
   SimpleCubicLatticeRoot {.inheritable.} = object of RootObj
     ## Root object for simple cubic lattice types
@@ -72,7 +75,7 @@ type LatticeInitializationError = object of CatchableError
 
 #[ backend: implementation of exception handling types ]#
 
-template newLatticeInitializationError*(
+template newLatticeInitializationError(
   err: LatticeInitializationErrors,
   appendToMessage: untyped
 ): untyped =
@@ -92,7 +95,7 @@ template newLatticeInitializationError*(
     errorMessage = printBreak & errorMessage
     appendToMessage
     print errorMessage & printBreak
-  if (myRank() == 0): raise newException(LatticeInitializationError, "")
+    raise newException(LatticeInitializationError, "")
 
 #[ backend: helper procedures: for constructors ]#
 
@@ -167,9 +170,7 @@ proc newLocalStrides(rb: seq[SimpleCubicRankDim]): seq[GeometryType] =
 #[ frontend: print lattice information ]#
 
 proc `$`*(l: SimpleCubicLattice): string =
-  ## Convert SimpleCubicLattice to string
-  ##
-  ## <in need of documentation>
+  ## String representation of SimpleCubicLattice
   let
     localGeometry = l.globalGeometry / l.localPartition
     vectorGeometry = localGeometry / l.vecLatticePartition
@@ -307,7 +308,7 @@ proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger, S: SomeInteger](
     localVecLattices: sublattices,
     numVecSites: numVecSites
   )
-  if printLatticeGeometrySummary: print $result
+  if printLatticeGeometrySummary: reliqLog $result
 
 proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger](
   latticeGeometry: openArray[L],
@@ -358,10 +359,6 @@ proc newSimpleCubicLattice*(
 
 #[ frontend: Lattice concept conformance ]#
 
-# implement sites method for Lattice concept
-iterator sites*(l: SimpleCubicLattice): int =
-  for n in 0..<l.numVecSites: yield n
-
 # implement latticeCoordinate method for Lattice concept
 proc latticeCoordinate*(l: SimpleCubicLattice; n: int): seq[int] =
   ## Gets lattice coordinate from flattened index
@@ -373,6 +370,25 @@ proc latticeCoordinate*(l: SimpleCubicLattice; n: int): seq[int] =
     result[mu] = l.localGeometry[mu].start + nIdx div l.localStrides[mu]
     nIdx = nIdx mod l.localStrides[mu]
 
+# wrap parallel for range
+proc rangeDispatch(start, stop: SomeInteger; body: proc(i: int) {.cdecl.}) 
+  {.importcpp: "parallel_for_range(@)", kokkos_wrapper.}
+
+# frontend: foreach method
+template sites*(l: SimpleCubicLattice; n: untyped; work: untyped): untyped =
+  let
+    numSites = l.numVecSites div numThreads()
+    remainderSites = l.numVecSites mod numThreads()
+  proc body(thread: int) {.cdecl.} = 
+    let
+      start = thread * numSites
+      stop = case thread != numThreads() - 1:
+        of true: start + numSites
+        of false: (thread + 1) * numSites + remainderSites
+    proc myThread(): int {.inject.} = thread
+    for n in start..<stop: work
+  rangeDispatch(0, numThreads(), body)
+
 # Lessons learned:
 # * To have procedure signatures not interpret numerous concept types as
 #   needing to be the same type have signature be:
@@ -380,7 +396,6 @@ proc latticeCoordinate*(l: SimpleCubicLattice; n: int): seq[int] =
 #   -  proc foo*(a: ConceptInterface, b: ConceptInterface)
 #   See newSimpleCubicSubLattice constructor for example.
 when isMainModule:
-  import runtime
   const verbosity = 1
   reliq:
     let latGeom = [8, 8, 8, 16]
@@ -391,11 +406,8 @@ when isMainModule:
     
     print "# local sites (latA):" + $latA.numLocalSites
     print "# vectorized local sites (latA):" + $latA.numVecSites
-    
-    for site in latA.sites:
-      let coord = latA.latticeCoordinate(site)
-      for mu in coord.dimensions:
-        assert(coord[mu] >= latA.localGeometry[mu].start)
-        assert(coord[mu] <= latA.localGeometry[mu].stop)
+  
+    latA.sites(n):
+      let coord = latA.latticeCoordinate(n)
       if verbosity > 1: 
-        echo "[" & $myRank() & "] " & "latA site: ", site, " coord: ", coord
+        print "[" & $myRank() & "," + $myThread() & "]", "latA site:", n

@@ -73,7 +73,8 @@
 
 </ul>
 <ul class="simple nested-toc-section">*=
-  <li><a class="reference" href="#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`*=`[T](a: var SIMXVec[T]; b: SIMXVec[T])">`*=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+  <li><a class="reference" href="#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`*=`[T](a: SIMXVec[T]; b: SIMXVec[T])">`*=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+<li><a class="reference" href="#%2A%3D%2CSIMXVec%5BT%5D%2CT" title="`*=`[T](a: SIMXVec[T]; b: T)">`*=`[T](a: SIMXVec[T]; b: T)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">+
@@ -81,7 +82,8 @@
 
 </ul>
 <ul class="simple nested-toc-section">+=
-  <li><a class="reference" href="#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`+=`[T](a: var SIMXVec[T]; b: SIMXVec[T])">`+=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+  <li><a class="reference" href="#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`+=`[T](a: SIMXVec[T]; b: SIMXVec[T])">`+=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+<li><a class="reference" href="#%2B%3D%2CSIMXVec%5BT%5D%2CT" title="`+=`[T](a: SIMXVec[T]; b: T)">`+=`[T](a: SIMXVec[T]; b: T)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">-
@@ -89,7 +91,8 @@
 
 </ul>
 <ul class="simple nested-toc-section">-=
-  <li><a class="reference" href="#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`-=`[T](a: var SIMXVec[T]; b: SIMXVec[T])">`-=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+  <li><a class="reference" href="#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`-=`[T](a: SIMXVec[T]; b: SIMXVec[T])">`-=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+<li><a class="reference" href="#-%3D%2CSIMXVec%5BT%5D%2CT" title="`-=`[T](a: SIMXVec[T]; b: T)">`-=`[T](a: SIMXVec[T]; b: T)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">/
@@ -97,26 +100,45 @@
 
 </ul>
 <ul class="simple nested-toc-section">/=
-  <li><a class="reference" href="#%2F%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`/=`[T](a: var SIMXVec[T]; b: SIMXVec[T])">`/=`[T](a: var SIMXVec[T]; b: SIMXVec[T])</a></li>
+  <li><a class="reference" href="#%2F%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`/=`[T](a: SIMXVec[T]; b: SIMXVec[T])">`/=`[T](a: SIMXVec[T]; b: SIMXVec[T])</a></li>
+<li><a class="reference" href="#%2F%3D%2CSIMXVec%5BT%5D%2CT" title="`/=`[T](a: SIMXVec[T]; b: T)">`/=`[T](a: SIMXVec[T]; b: T)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">:=
+  <li><a class="reference" href="#%3A%3D%2CSIMXVec%5BT%5D%2CT" title="`:=`[T](x: SIMXVec[T]; value: T)">`:=`[T](x: SIMXVec[T]; value: T)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">=copy
+  <li><a class="reference" href="#%3Dcopy%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D" title="`=copy`[T](x: var SIMXVec[T]; y: SIMXVec[T])">`=copy`[T](x: var SIMXVec[T]; y: SIMXVec[T])</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">[]
-  <li><a class="reference" href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint" title="`[]`[T](a: SIMXVec[T]; lane: int): T">`[]`[T](a: SIMXVec[T]; lane: int): T</a></li>
-<li><a class="reference" href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint_2" title="`[]`[T](a: var SIMXVec[T]; lane: int): var T">`[]`[T](a: var SIMXVec[T]; lane: int): var T</a></li>
+  <li><a class="reference" href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint" title="`[]`[T](simd: SIMXVec[T]; lane: int): T">`[]`[T](simd: SIMXVec[T]; lane: int): T</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">[]=
+  <li><a class="reference" href="#%5B%5D%3D%2CSIMXVec%5BT%5D%2Cint%2CT" title="`[]=`[T](simd: var SIMXVec[T]; lane: int; value: T)">`[]=`[T](simd: var SIMXVec[T]; lane: int; value: T)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newSIMXVec
   <li><a class="reference" href="#newSIMXVec%2Ctypedesc" title="newSIMXVec(T: typedesc): SIMXVec[T]">newSIMXVec(T: typedesc): SIMXVec[T]</a></li>
 <li><a class="reference" href="#newSIMXVec%2CSIMXVec%5BT%5D" title="newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]">newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]</a></li>
 <li><a class="reference" href="#newSIMXVec%2CT" title="newSIMXVec[T](value: T): SIMXVec[T]">newSIMXVec[T](value: T): SIMXVec[T]</a></li>
+<li><a class="reference" href="#newSIMXVec%2CopenArray%5BT%5D" title="newSIMXVec[T](values: openArray[T]): SIMXVec[T]">newSIMXVec[T](values: openArray[T]): SIMXVec[T]</a></li>
+<li><a class="reference" href="#newSIMXVec%2Cseq%5BT%5D" title="newSIMXVec[T](values: seq[T]): SIMXVec[T]">newSIMXVec[T](values: seq[T]): SIMXVec[T]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">toSeq
   <li><a class="reference" href="#toSeq%2CSIMXVec%5BT%5D" title="toSeq[T](a: SIMXVec[T]): seq[T]">toSeq[T](a: SIMXVec[T]): seq[T]</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">toSIMXVec
+  <li><a class="reference" href="#toSIMXVec%2CopenArray%5BT%5D" title="toSIMXVec[T](values: openArray[T]): SIMXVec[T]">toSIMXVec[T](values: openArray[T]): SIMXVec[T]</a></li>
+<li><a class="reference" href="#toSIMXVec%2Cseq%5BT%5D" title="toSIMXVec[T](values: seq[T]): SIMXVec[T]">toSIMXVec[T](values: seq[T]): SIMXVec[T]</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">width
-  <li><a class="reference" href="#width%2CSIMXVec%5BT%5D" title="width[T](a: SIMXVec[T]): int">width[T](a: SIMXVec[T]): int</a></li>
+  <li><a class="reference" href="#width%2CSIMXVec%5BT%5D" title="width[T](simd: SIMXVec[T]): int">width[T](simd: SIMXVec[T]): int</a></li>
 
 </ul>
 
@@ -193,8 +215,18 @@
 </div>
 <div id="*=-procs-all">
   <div id="*=,SIMXVec[T],SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`*=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator*=(#, #)&quot;</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`*=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator*=(#, #)&quot;</span><span class="Other">,</span>
     <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="*=,SIMXVec[T],T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%3D%2CSIMXVec%5BT%5D%2CT"><span class="Identifier">`*=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator*=(#, #)&quot;</span><span class="Other">,</span>
+                                    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -217,8 +249,18 @@
 </div>
 <div id="+=-procs-all">
   <div id="+=,SIMXVec[T],SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`+=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator+=(#, #)&quot;</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`+=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator+=(#, #)&quot;</span><span class="Other">,</span>
     <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="+=,SIMXVec[T],T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%3D%2CSIMXVec%5BT%5D%2CT"><span class="Identifier">`+=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator+=(#, #)&quot;</span><span class="Other">,</span>
+                                    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -241,8 +283,18 @@
 </div>
 <div id="-=-procs-all">
   <div id="-=,SIMXVec[T],SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`-=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator-=(#, #)&quot;</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#-%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`-=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator-=(#, #)&quot;</span><span class="Other">,</span>
     <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="-=,SIMXVec[T],T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#-%3D%2CSIMXVec%5BT%5D%2CT"><span class="Identifier">`-=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator-=(#, #)&quot;</span><span class="Other">,</span>
+                                    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -265,7 +317,40 @@
 </div>
 <div id="/=-procs-all">
   <div id="/=,SIMXVec[T],SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`/=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator/=(#, #)&quot;</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%3D%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`/=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator/=(#, #)&quot;</span><span class="Other">,</span>
+    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="/=,SIMXVec[T],T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%3D%2CSIMXVec%5BT%5D%2CT"><span class="Identifier">`/=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;operator/=(#, #)&quot;</span><span class="Other">,</span>
+                                    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id=":=-procs-all">
+  <div id=":=,SIMXVec[T],T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%3A%3D%2CSIMXVec%5BT%5D%2CT"><span class="Identifier">`:=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="=copy-procs-all">
+  <div id="=copy,SIMXVec[T],SIMXVec[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%3Dcopy%2CSIMXVec%5BT%5D%2CSIMXVec%5BT%5D"><span class="Identifier">`=copy`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.operator=(#)&quot;</span><span class="Other">,</span>
     <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -277,7 +362,7 @@
 </div>
 <div id="[]-procs-all">
   <div id="[],SIMXVec[T],int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint"><span class="Identifier">`[]`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">lane</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">T</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.operator[](#)&quot;</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint"><span class="Identifier">`[]`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">simd</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">lane</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">T</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.operator[](#)&quot;</span><span class="Other">,</span>
     <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -285,10 +370,11 @@
     
   </dd>
 </div>
-<div id="[],SIMXVec[T],int_2">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CSIMXVec%5BT%5D%2Cint_2"><span class="Identifier">`[]`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">lane</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">T</span> {.
-    <span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.operator[](#)&quot;</span><span class="Other">,</span> <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+
+</div>
+<div id="[]=-procs-all">
+  <div id="[]=,SIMXVec[T],int,T">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%3D%2CSIMXVec%5BT%5D%2Cint%2CT"><span class="Identifier">`[]=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">simd</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">lane</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span></pre></dt>
   <dd>
     
     
@@ -326,6 +412,22 @@
     
   </dd>
 </div>
+<div id="newSIMXVec,openArray[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSIMXVec%2CopenArray%5BT%5D"><span class="Identifier">newSIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">values</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="newSIMXVec,seq[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSIMXVec%2Cseq%5BT%5D"><span class="Identifier">newSIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">values</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
 
 </div>
 <div id="toSeq-procs-all">
@@ -339,11 +441,30 @@
 </div>
 
 </div>
+<div id="toSIMXVec-procs-all">
+  <div id="toSIMXVec,openArray[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#toSIMXVec%2CopenArray%5BT%5D"><span class="Identifier">toSIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">values</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="toSIMXVec,seq[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#toSIMXVec%2Cseq%5BT%5D"><span class="Identifier">toSIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">values</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
 <div id="width-procs-all">
   <div id="width,SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#width%2CSIMXVec%5BT%5D"><span class="Identifier">width</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.size()&quot;</span><span class="Other">,</span>
-                                    <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-                                    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#width%2CSIMXVec%5BT%5D"><span class="Identifier">width</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">simd</span><span class="Other">:</span> <a href="simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;#.size()&quot;</span><span class="Other">,</span>
+                                       <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;Kokkos_SIMD.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                       <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -379,7 +500,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-07 16:14:48 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
       </div>
     </div>
   </div>

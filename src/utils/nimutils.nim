@@ -44,6 +44,12 @@ proc `/`*(sa, sb: string): string = sa & "/" & sb
 # concatenate strings with space between
 proc `+`*(sa, sb: string): string = sa & " " & sb
 
+# concatenate strings with new line
+proc `&&`*(sa, sb: string): string = sa & "\n" & sb
+
+# append to string with new line
+proc `&&=`*(sa: var string, sb: string) = sa = sa && sb
+
 # append string with space
 proc `+=`*(sa: var string, sb: string) = sa = sa + sb
 

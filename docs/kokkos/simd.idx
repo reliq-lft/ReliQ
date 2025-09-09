@@ -1,21 +1,35 @@
 nimTitle	simd	kokkos/simd.html	module kokkos/simd		0
-nim	SIMXVec	kokkos/simd.html#SIMXVec	object SIMXVec		36
-nim	newSIMXVec	kokkos/simd.html#newSIMXVec,typedesc	proc newSIMXVec(T: typedesc): SIMXVec[T]		44
-nim	newSIMXVec	kokkos/simd.html#newSIMXVec,T	proc newSIMXVec[T](value: T): SIMXVec[T]		45
-nim	newSIMXVec	kokkos/simd.html#newSIMXVec,SIMXVec[T]	proc newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]		47
-nim	width	kokkos/simd.html#width,SIMXVec[T]	proc width[T](a: SIMXVec[T]): int		52
-nim	`[]`	kokkos/simd.html#[],SIMXVec[T],int	proc `[]`[T](a: SIMXVec[T]; lane: int): T		55
-nim	`[]`	kokkos/simd.html#[],SIMXVec[T],int_2	proc `[]`[T](a: var SIMXVec[T]; lane: int): var T		58
-nim	`+`	kokkos/simd.html#+,SIMXVec[T],SIMXVec[T]	proc `+`[T](a, b: SIMXVec[T]): SIMXVec[T]		66
-nim	`-`	kokkos/simd.html#-,SIMXVec[T],SIMXVec[T]	proc `-`[T](a, b: SIMXVec[T]): SIMXVec[T]		67
-nim	`*`	kokkos/simd.html#*,SIMXVec[T],SIMXVec[T]	proc `*`[T](a, b: SIMXVec[T]): SIMXVec[T]		68
-nim	`/`	kokkos/simd.html#/,SIMXVec[T],SIMXVec[T]	proc `/`[T](a, b: SIMXVec[T]): SIMXVec[T]		69
-nim	`+=`	kokkos/simd.html#+=,SIMXVec[T],SIMXVec[T]	proc `+=`[T](a: var SIMXVec[T]; b: SIMXVec[T])		72
-nim	`-=`	kokkos/simd.html#-=,SIMXVec[T],SIMXVec[T]	proc `-=`[T](a: var SIMXVec[T]; b: SIMXVec[T])		73
-nim	`*=`	kokkos/simd.html#*=,SIMXVec[T],SIMXVec[T]	proc `*=`[T](a: var SIMXVec[T]; b: SIMXVec[T])		74
-nim	`/=`	kokkos/simd.html#/=,SIMXVec[T],SIMXVec[T]	proc `/=`[T](a: var SIMXVec[T]; b: SIMXVec[T])		75
-nim	values	kokkos/simd.html#values.i,SIMXVec[T]	iterator values[T](a: SIMXVec[T]): T		78
-nim	toSeq	kokkos/simd.html#toSeq,SIMXVec[T]	proc toSeq[T](a: SIMXVec[T]): seq[T]		82
-nim	`$`	kokkos/simd.html#$,SIMXVec[T]	proc `$`[T](a: SIMXVec[T]): string		87
-nimgrp	newsimxvec	kokkos/simd.html#newSIMXVec-procs-all	proc		44
-nimgrp	[]	kokkos/simd.html#[]-procs-all	proc		55
+nim	SIMXVec	kokkos/simd.html#SIMXVec	object SIMXVec		35
+nim	newSIMXVec	kokkos/simd.html#newSIMXVec,typedesc	proc newSIMXVec(T: typedesc): SIMXVec[T]		43
+nim	newSIMXVec	kokkos/simd.html#newSIMXVec,T	proc newSIMXVec[T](value: T): SIMXVec[T]		44
+nim	newSIMXVec	kokkos/simd.html#newSIMXVec,SIMXVec[T]	proc newSIMXVec[T](other: SIMXVec[T]): SIMXVec[T]		46
+nim	newSIMXVec	kokkos/simd.html#newSIMXVec,seq[T]	proc newSIMXVec[T](values: seq[T]): SIMXVec[T]		48
+nim	newSIMXVec	kokkos/simd.html#newSIMXVec,openArray[T]	proc newSIMXVec[T](values: openArray[T]): SIMXVec[T]		57
+nim	width	kokkos/simd.html#width,SIMXVec[T]	proc width[T](simd: SIMXVec[T]): int		60
+nim	`[]`	kokkos/simd.html#[],SIMXVec[T],int	proc `[]`[T](simd: SIMXVec[T]; lane: int): T		63
+nim	`[]=`	kokkos/simd.html#[]=,SIMXVec[T],int,T	proc `[]=`[T](simd: var SIMXVec[T]; lane: int; value: T)		64
+nim	`=copy`	kokkos/simd.html#=copy,SIMXVec[T],SIMXVec[T]	proc `=copy`[T](x: var SIMXVec[T]; y: SIMXVec[T])		72
+nim	`:=`	kokkos/simd.html#:=,SIMXVec[T],T	proc `:=`[T](x: SIMXVec[T]; value: T)		76
+nim	`+`	kokkos/simd.html#+,SIMXVec[T],SIMXVec[T]	proc `+`[T](a, b: SIMXVec[T]): SIMXVec[T]		83
+nim	`-`	kokkos/simd.html#-,SIMXVec[T],SIMXVec[T]	proc `-`[T](a, b: SIMXVec[T]): SIMXVec[T]		84
+nim	`*`	kokkos/simd.html#*,SIMXVec[T],SIMXVec[T]	proc `*`[T](a, b: SIMXVec[T]): SIMXVec[T]		85
+nim	`/`	kokkos/simd.html#/,SIMXVec[T],SIMXVec[T]	proc `/`[T](a, b: SIMXVec[T]): SIMXVec[T]		86
+nim	`+=`	kokkos/simd.html#+=,SIMXVec[T],SIMXVec[T]	proc `+=`[T](a: SIMXVec[T]; b: SIMXVec[T])		89
+nim	`-=`	kokkos/simd.html#-=,SIMXVec[T],SIMXVec[T]	proc `-=`[T](a: SIMXVec[T]; b: SIMXVec[T])		90
+nim	`*=`	kokkos/simd.html#*=,SIMXVec[T],SIMXVec[T]	proc `*=`[T](a: SIMXVec[T]; b: SIMXVec[T])		91
+nim	`/=`	kokkos/simd.html#/=,SIMXVec[T],SIMXVec[T]	proc `/=`[T](a: SIMXVec[T]; b: SIMXVec[T])		92
+nim	`+=`	kokkos/simd.html#+=,SIMXVec[T],T	proc `+=`[T](a: SIMXVec[T]; b: T)		95
+nim	`-=`	kokkos/simd.html#-=,SIMXVec[T],T	proc `-=`[T](a: SIMXVec[T]; b: T)		96
+nim	`*=`	kokkos/simd.html#*=,SIMXVec[T],T	proc `*=`[T](a: SIMXVec[T]; b: T)		97
+nim	`/=`	kokkos/simd.html#/=,SIMXVec[T],T	proc `/=`[T](a: SIMXVec[T]; b: T)		98
+nim	values	kokkos/simd.html#values.i,SIMXVec[T]	iterator values[T](a: SIMXVec[T]): T		101
+nim	toSIMXVec	kokkos/simd.html#toSIMXVec,seq[T]	proc toSIMXVec[T](values: seq[T]): SIMXVec[T]		105
+nim	toSIMXVec	kokkos/simd.html#toSIMXVec,openArray[T]	proc toSIMXVec[T](values: openArray[T]): SIMXVec[T]		106
+nim	toSeq	kokkos/simd.html#toSeq,SIMXVec[T]	proc toSeq[T](a: SIMXVec[T]): seq[T]		109
+nim	`$`	kokkos/simd.html#$,SIMXVec[T]	proc `$`[T](a: SIMXVec[T]): string		114
+nimgrp	+=	kokkos/simd.html#+=-procs-all	proc		89
+nimgrp	newsimxvec	kokkos/simd.html#newSIMXVec-procs-all	proc		43
+nimgrp	tosimxvec	kokkos/simd.html#toSIMXVec-procs-all	proc		105
+nimgrp	-=	kokkos/simd.html#-=-procs-all	proc		90
+nimgrp	/=	kokkos/simd.html#/=-procs-all	proc		92
+nimgrp	*=	kokkos/simd.html#*=-procs-all	proc		91
