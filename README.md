@@ -66,7 +66,7 @@ The `<reliq_src>/bootstrap` script performs a local installation of [Spack](http
 
 * `<reliq_build>/external`: The local install of `Spack`, `Nim`, `UPC++`, and `Kokkos`.
 
-The `<reliq_src>/bootstrap` script also comes with a number of options that are configurably by specifying flags. To see available options, run
+The `<reliq_src>/bootstrap` script also comes with a number of options that are configurable by specifying flags. To see available options, run
 ```
 <reliq_src>/bootstrap --help
 ```
