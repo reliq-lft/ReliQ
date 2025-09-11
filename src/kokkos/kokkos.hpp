@@ -46,11 +46,19 @@ using DynamicView = Kokkos::DynRankView<T>;
 /* dispatch wrappers */
 
 // typedef for C function pointer to be passed to Kokkos parallel_for
-typedef void (*NimProc)(int);
+typedef void (*NimProc)(int, void*);
 
 // typedef for Kokkos TeamPolicy member type
 typedef Kokkos::TeamPolicy<>::member_type TeamMember;
 
+inline void parallel_for_range(int start, int stop, NimProc proc, void* ctx) {
+  Kokkos::parallel_for(
+    Kokkos::RangePolicy<>(start, stop),
+    KOKKOS_LAMBDA (const int n) { proc(n, ctx); }
+  );
+}
+
+/*
 // wrapper for Kokkos parallel_for w/ range policy
 inline void parallel_for_range(int start, int stop, NimProc proc) {
   Kokkos::parallel_for(
@@ -58,6 +66,7 @@ inline void parallel_for_range(int start, int stop, NimProc proc) {
     KOKKOS_LAMBDA (const int n) { proc(n); }
   );
 }
+*/
 
 // !!!! vvvv DO NOT DELETE; IMPORTANT TEMPLATE FOR "THREADS" CONSTRUCT vvvv !!!!
 /*

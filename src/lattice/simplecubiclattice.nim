@@ -55,6 +55,7 @@ type
     ## Simple cubic Bravais lattice
     ## 
     ## <in need of documentation>
+    paddingGeometry: seq[GeometryType]
     vecLatticePartition: seq[GeometryType]
     vecLatticeGeometry: seq[GeometryType]
     localVecLattices: seq[SimpleCubicLatticeRoot]
@@ -295,6 +296,7 @@ proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger, S: SomeInteger](
   # define result as SimpleCubicLattice with all attributes specified
   result = SimpleCubicLattice(
     # distributed memory attributes
+    paddingGeometry: newSeq[GeometryType](lg.len),
     globalGeometry: lg,
     localPartition: dg,
     localBlockCoordinate: rc,
@@ -375,12 +377,11 @@ proc rangeDispatch(start, stop: SomeInteger; body: proc(i: int) {.cdecl.})
   {.importcpp: "parallel_for_range(@)", kokkos_wrapper.}
 
 # frontend: foreach method
-template sites*(l: SimpleCubicLattice; n: untyped; work: untyped): untyped =
-  let
-    numSites = l.numVecSites div numThreads()
-    remainderSites = l.numVecSites mod numThreads()
+template sites*(l: var SimpleCubicLattice; n: untyped; work: untyped): untyped =
   proc body(thread: int) {.cdecl.} = 
     let
+      numSites = l.numVecSites div numThreads()
+      remainderSites = l.numVecSites mod numThreads()
       start = thread * numSites
       stop = case thread != numThreads() - 1:
         of true: start + numSites
@@ -407,7 +408,9 @@ when isMainModule:
     print "# local sites (latA):" + $latA.numLocalSites
     print "# vectorized local sites (latA):" + $latA.numVecSites
   
+    var sq = newSeq[int](latA.numLocalSites)
     latA.sites(n):
       let coord = latA.latticeCoordinate(n)
       if verbosity > 1: 
         print "[" & $myRank() & "," + $myThread() & "]", "latA site:", n
+      sq[0] = 1

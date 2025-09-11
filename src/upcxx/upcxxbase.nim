@@ -50,7 +50,7 @@ proc myRank*: cint {.importcpp: "upcxx::rank_me()", upcxx.}
 proc numRanks*: cint {.importcpp: "upcxx::rank_n()", upcxx.}
 
 # set barrier
-proc upcxxBarrier* {.importcpp: "upcxx::barrier()", upcxx.}
+proc globalBarrier* {.importcpp: "upcxx::barrier()", upcxx.}
 
 when isMainModule:
   upcxxInit()

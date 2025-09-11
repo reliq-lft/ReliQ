@@ -25,8 +25,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import backend
 import utils
+import backend
 import lattice/[simplecubiclattice]
 
 # shorten pragmas pointing to UPC++ & Kokkos headers and include field view wrapper
@@ -41,6 +41,7 @@ type
     ## <in need of documentation>
     lattice: ptr SimpleCubicLattice
     field: GlobalPointer[SIMXVec[T]]
+    #fieldDist: DistributedObject[GlobalPointer[SIMXVec[T]]]
     fieldView: StaticView[SIMXVec[T]]
 
 #[ backend: types for exception handling ]#
@@ -84,10 +85,12 @@ proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
   ##
   ## <in need of documentation>
   let numVecSites = csize_t(lattice.numVecSites)
-  let 
-    field = newGlobalPointerArray(numVecSites, SIMXVec[T])
-    view = field.newStaticView(numVecSites)
-  result = SimpleCubicField[T](lattice: addr lattice, field: field, fieldView: view)
+  result = SimpleCubicField[T](
+    lattice: addr lattice, 
+    field: newGlobalPointerArray(numVecSites, SIMXVec[T])
+  )
+  #result.fieldDist = result.field.newDistributedObject()
+  result.fieldView = result.field.newStaticView(numVecSites)
 
 #[ frontend: implement field concept ]#
 
@@ -97,13 +100,12 @@ proc lattice*[T](f: SimpleCubicField[T]): SimpleCubicLattice =
   ## <in need of documentation>
   return f.lattice[]
 
-#[ frontend: basic SimpleCubicField methods ]#
-
+# vvvvv----- ????? ?????? ??????
 template sites*[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped =
   ## Iterate over all local sites of field
   ##
   ## <in need of documentation>
-  for n in 0..<f.lattice[].numVecSites: work
+  f.lattice[].sites(n): work
 
 proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T] {.inline.} =
   ## Access field value at given local site
@@ -113,7 +115,7 @@ proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T] {.inline.} =
   return f.fieldView[n]
 
 proc `[]=`*[T](
-  f: var SimpleCubicField[T]; 
+  f: SimpleCubicField[T]; 
   n: SomeInteger; 
   value: SIMXVec[T]
 ) {.inline.} =
@@ -123,18 +125,13 @@ proc `[]=`*[T](
   ## <in need of documentation>
   f.fieldView[n] = value
 
-proc `=copy`*[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T]) {.inline.} =
-  ## Copy all field values from another field
+proc `:=`*[T](fx: SimpleCubicField[T]; fy: SimpleCubicField[T]) {.inline.} =
+  ## Set all field values to given scalar value
   ##
   ## <in need of documentation>
-  conformable(fx, fy)
-  fx = SimpleCubicField[T](
-    lattice: fy.lattice, 
-    field: fy.field, 
-    fieldView: fy.fieldView
-  )
+  fx.sites(n): fx[n] = fy[n]
 
-proc `:=`*[T](f: var SimpleCubicField[T]; value: T) {.inline.} =
+proc `:=`*[T](f: SimpleCubicField[T]; value: T) {.inline.} =
   ## Set all field values to given scalar value
   ##
   ## <in need of documentation>
@@ -142,23 +139,23 @@ proc `:=`*[T](f: var SimpleCubicField[T]; value: T) {.inline.} =
 
 # frontend: slick Nim trick for defining binary operations
 template defineBinaryOperations*(op: untyped; ope: untyped) =
+  # idea for a later point: Chapel had a neat way of promiting arithematic
+  # expressions, such that the whole expression was turned into a single loop;
+  # I want this eventually, but I want to focus first on base-level functionality
   proc `op`*[T](fx, fy: SimpleCubicField[T]): SimpleCubicField[T] {.inline.} =
     conformable(fx, fy)
-    let l = fx.lattice
-    result = l[].newField(T)
+    result = fx.lattice[].newField(T)
     result.sites(n): result[n] = op(fx[n], fy[n])
-  proc ope*[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T]) {.inline.} =
-    conformable(fx, fy)
-    fx.sites(n): ope(fx[n], fy[n])
   proc `op`*[T](fx: SimpleCubicField[T]; y: T): SimpleCubicField[T] {.inline.} =
-    let l = fx.lattice
-    result = l[].newField(T)
+    result = fx.lattice[].newField(T)
     result.sites(n): result[n] = op(fx[n], newSIMXVec(y))
   proc `op`*[T](x: T; fy: SimpleCubicField[T]): SimpleCubicField[T] {.inline.} =
-    let l = fy.lattice
-    result = l[].newField(T)
+    result = fy.lattice[].newField(T)
     result.sites(n): result[n] = op(newSIMXVec(x), fy[n])
-  proc `ope`*[T](fx: var SimpleCubicField[T]; y: T) {.inline.} =
+  proc ope*[T](fx: SimpleCubicField[T]; fy: SimpleCubicField[T]) {.inline.} =
+    conformable(fx, fy)
+    fx.sites(n): ope(fx[n], fy[n])
+  proc `ope`*[T](fx: SimpleCubicField[T]; y: T) {.inline.} =
     fx.sites(n): ope(fx[n], newSIMXVec(y))
 defineBinaryOperations(`+`, `+=`) # addition
 defineBinaryOperations(`-`, `-=`) # subtraction
@@ -166,6 +163,11 @@ defineBinaryOperations(`*`, `*=`) # multiplication
 defineBinaryOperations(`/`, `/=`) # division
 
 # ... next: proper "threads" block...
+
+# ... !!!ALSO!!! a parallel reduce (sum):
+#     I imagine that this will store the result of a 
+#     Kokkos reduction in a GlobalPointer, followed by
+#     a distributed reduction across all ranks...
 
 # demonstration/testing
 when isMainModule:
@@ -196,13 +198,13 @@ when isMainModule:
 
     fa := 2.0
     fb := 3.0
-    fc = fa + fb
+    fc := fa + fb
     print fc[0], "after addition"
-    fc = fa - fb
+    fc := fa - fb
     print fc[0], "after subtraction"
-    fc = fa * fb
+    fc := fa * fb
     print fc[0], "after multiplication"
-    fc = fa / fb
+    fc := fa / fb
     print fc[0], "after division"
 
     fc += fa
@@ -214,21 +216,21 @@ when isMainModule:
     fc /= fb
     print fc[0], "after division assignment"
 
-    fc = fa + 1.0
+    fc := fa + 1.0
     print fc[0], "after addition with scalar"
-    fc = 1.0 + fb
+    fc := 1.0 + fb
     print fc[0], "after addition with scalar"
-    fc = fa - 1.0
+    fc := fa - 1.0
     print fc[0], "after subtraction with scalar"
-    fc = 1.0 - fb
+    fc := 1.0 - fb
     print fc[0], "after subtraction with scalar"
-    fc = fa * 2.0
+    fc := fa * 2.0
     print fc[0], "after multiplication with scalar"
-    fc = 2.0 * fb
+    fc := 2.0 * fb
     print fc[0], "after multiplication with scalar"
-    fc = fa / 2.0
+    fc := fa / 2.0
     print fc[0], "after division with scalar"
-    fc = 2.0 / fb
+    fc := 2.0 / fb
     print fc[0], "after division with scalar"
 
     fc += 1.0
@@ -247,3 +249,19 @@ when isMainModule:
     print field[0], "after sites"
     print fa[1], "after sites"
     print fb[1], "after sites"
+
+    type 
+      SimpleCubicFieldTest = object
+        lattice: ptr SimpleCubicLattice
+        field: GlobalPointer[SIMXVec[float]]
+        fieldDist: DistributedObject[GlobalPointer[SIMXVec[float]]]
+    
+    proc newSimpleCubicFieldTest(lattice: SimpleCubicLattice): SimpleCubicFieldTest =
+      let numVecSites = csize_t(lattice.numVecSites)
+      result = SimpleCubicFieldTest(
+        lattice: addr lattice,
+        field: newGlobalPointerArray(numVecSites, SIMXVec[float])
+      )
+      result.fieldDist = result.field.newDistributedObject()
+    
+    var tfa = l.newSimpleCubicFieldTest()

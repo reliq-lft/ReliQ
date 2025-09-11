@@ -1,16 +1,16 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/backend.nim
+  Source file: src/upcxx/globalptr.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
   
   Copyright (c) 2025 reliq-lft
   
-  Permission is hereby granted, free of chadge, to any person obtaining a copy
+  Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -25,31 +25,21 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import upcxx/[upcxxbase]
-import upcxx/[globalptr, distobject]
-import kokkos/[kokkosbase]
-import kokkos/[views, simd]
-import backend/[dispatch]
+import upcxxbase
+import globalptr
 
-export upcxxbase
-export globalptr
-export distobject
+# include upcxx headers
+upcxx: discard
 
-export kokkosbase
-export views
-export simd
+type # wrapper of UPC++ distributed object type
+  DistributedObject*[G] {.importcpp: "upcxx::dist_object", upcxx.} = object
+  
+# UPC++ distributed object constructor
+proc newDistributedObject*[G](gPtr: G): DistributedObject[G] 
+  {.importcpp: "upcxx::dist_object<'*0>(#)", constructor, upcxx.}
 
-export dispatch
-
-# template returning UPC++ and Kokkos pragmas including core headers
-template backend*(pragmas: untyped): untyped =
-  kokkos: discard
-  upcxx: discard
-  pragmas
-
-proc numLanes*: int =
-  # Fetch number of SIMD (SIMT) lanes
-  # * on CPU: number of SIMD lanes
-  # * on GPU: warp size
-  let t = newSIMXVec(float64)
-  return t.width
+when isMainModule:
+  upcxxInit()   
+  let gp = newGlobalPointerArray(10, int)
+  let dobj = gp.newDistributedObject()
+  upcxxFinalize()

@@ -79,6 +79,13 @@ proc `:=`*[T](x: SIMXVec[T]; value: T) =
   `x` = c;
   """.}
 
+# assignment to another vector
+proc `:=`*[T](x: SIMXVec[T]; value: SIMXVec[T]) =
+  {.emit: """
+  Kokkos::Experimental::simd<`T`> c(`value`);
+  `x` = c;
+  """.}
+
 # Kokkos SIMXVec arithematic overloads
 proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
 proc `-`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator-(#, #)", simd.}
