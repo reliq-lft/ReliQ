@@ -45,21 +45,24 @@ type
     ## Root object for simple cubic lattice types
     ##
     ## <in need of documentation>
-    globalGeometry: seq[GeometryType]
-    localPartition: seq[GeometryType]
-    localBlockCoordinate: seq[GeometryType]
-    localGeometry: seq[SimpleCubicRankDim]
-    localStrides: seq[GeometryType]
-    numLocalSites*: GeometryType
+    
+    # encapsulating geometry
+    geometry, partition, strides: seq[GeometryType]
+    coordinate: seq[GeometryType]
+    numSites*: GeometryType
+
+  LocalSimpleCubicLattice = object of SimpleCubicLatticeRoot
+    ## Local simple cubic lattice
+    ## 
+    ## <in need of documentation>
+    localVectorLattices: seq[SimpleCubicLatticeRoot]
+
   SimpleCubicLattice* = object of SimpleCubicLatticeRoot
     ## Simple cubic Bravais lattice
     ## 
     ## <in need of documentation>
-    paddingGeometry: seq[GeometryType]
-    vecLatticePartition: seq[GeometryType]
-    vecLatticeGeometry: seq[GeometryType]
-    localVecLattices: seq[SimpleCubicLatticeRoot]
-    numVecSites*: GeometryType
+    globalGeometry: seq[GeometryType]
+    localLattices: seq[LocalSimpleCubicLattice]
 
 #[ backend: types for exception handling ]#
 
@@ -173,11 +176,11 @@ proc newLocalStrides(rb: seq[SimpleCubicRankDim]): seq[GeometryType] =
 proc `$`*(l: SimpleCubicLattice): string =
   ## String representation of SimpleCubicLattice
   let
-    localGeometry = l.globalGeometry / l.localPartition
+    localGeometry = l.geometry / l.partition
     vectorGeometry = localGeometry / l.vecLatticePartition
   result = "SimpleCubicLattice:\n"
-  result &= "  geometry:" + $(l.globalGeometry) + "\n"
-  result &= "  rank partition:" + $(l.localPartition) + "\n"
+  result &= "  geometry:" + $(l.geometry) + "\n"
+  result &= "  rank partition:" + $(l.partition) + "\n"
   result &= "  rank geometry:" + $localGeometry + "\n"
   result &= "  local SIMX vector partition:" + $(l.vecLatticePartition) + "\n"
   result &= "  vectorized local geometry:" + $vectorGeometry
@@ -190,9 +193,9 @@ proc newSimpleCubicLattice*(other: SimpleCubicLattice): SimpleCubicLattice =
   ## Copy constructor for SimpleCubicLattice.
   ## <in need of more documentation>
   result = SimpleCubicLattice(
-    globalGeometry: other.globalGeometry,
-    localPartition: other.localPartition,
-    localBlockCoordinate: other.localBlockCoordinate,
+    geometry: other.geometry,
+    partition: other.partition,
+    coordinate: other.coordinate,
     localGeometry: other.localGeometry,
     localStrides: other.localStrides,
     numLocalSites: other.numLocalSites,
@@ -203,20 +206,20 @@ proc newSimpleCubicLattice*(other: SimpleCubicLattice): SimpleCubicLattice =
 
 proc newSimpleCubicSubLattice[A: SomeInteger, B: SomeInteger, C: SomeInteger](
   localLatticeGeometry: openArray[A],
-  sharedMemoryGeometry: openArray[B],
+  shrdMemoryGeometry: openArray[B],
   lane: C
 ): SimpleCubicLatticeRoot =
   ## SimpleCubicLatticeRoot copy constructor
   ## 
   ## Copy constructor for SimpleCubicLatticeRoot.
   ## <in need of more documentation>
-  if sharedMemoryGeometry.len != localLatticeGeometry.len:
+  if shrdMemoryGeometry.len != localLatticeGeometry.len:
      newLatticeInitializationError(IncompatibleShrdMemoryGeometryError):
-      errorMessage &= "\nshared memory geometry:" + $sharedMemoryGeometry
+      errorMessage &= "\nshared memory geometry:" + $shrdMemoryGeometry
       errorMessage &= "\nlocal lattice geometry:" + $localLatticeGeometry
-  if sharedMemoryGeometry.product != numLanes():
+  if shrdMemoryGeometry.product != numLanes():
      newLatticeInitializationError(BadShrdMemoryGeometrySpecificationError):
-      errorMessage &= "\nshared memory geometry:" + $sharedMemoryGeometry
+      errorMessage &= "\nshared memory geometry:" + $shrdMemoryGeometry
       errorMessage &= "\n# SIMD lanes:" + $numLanes()
   
   # set up lattice geometry
@@ -224,7 +227,7 @@ proc newSimpleCubicSubLattice[A: SomeInteger, B: SomeInteger, C: SomeInteger](
   
   # set up distributed memory geometry
   let
-    sg = sharedMemoryGeometry.toSeq(GeometryType)
+    sg = shrdMemoryGeometry.toSeq(GeometryType)
     lc = newLaneCoord(sg, lane)
     lb = newLaneBlock(llg, sg, lc)
     ls = newLocalStrides(lb)
@@ -233,18 +236,21 @@ proc newSimpleCubicSubLattice[A: SomeInteger, B: SomeInteger, C: SomeInteger](
 
   # return instantiated SimpleCubicLatticeRoot
   return SimpleCubicLatticeRoot(
-    globalGeometry: llg,
-    localPartition: sg,
-    localBlockCoordinate: lc,
+    geometry: llg,
+    partition: sg,
+    coordinate: lc,
     localGeometry: lb,
     localStrides: ls,
     numLocalSites: numLocalSites
   )
 
-proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger, S: SomeInteger](
+proc newSimpleCubicLattice*[
+  L: SomeInteger, D: SomeInteger, S: SomeInteger, V: SomeInteger
+](
   latticeGeometry: openArray[L],
   distMemoryGeometry: openArray[D],
-  sharedMemoryGeometry: openArray[S],
+  shrdMemoryGeometry: openArray[S],
+  vectorLaneGeometry: openArray[V],
   printLatticeGeometrySummary: bool = false
 ): SimpleCubicLattice =
   ## SimpleCubicLattice constructor
@@ -284,7 +290,7 @@ proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger, S: SomeInteger](
 
   # set up shared memory geometry
   let 
-    sg = sharedMemoryGeometry.toSeq(GeometryType)
+    sg = shrdMemoryGeometry.toSeq(GeometryType)
     slg = lg / dg / sg
   var 
     sublattices = newSeq[SimpleCubicLatticeRoot](numLanes())
@@ -297,9 +303,9 @@ proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger, S: SomeInteger](
   result = SimpleCubicLattice(
     # distributed memory attributes
     paddingGeometry: newSeq[GeometryType](lg.len),
-    globalGeometry: lg,
-    localPartition: dg,
-    localBlockCoordinate: rc,
+    geometry: lg,
+    partition: dg,
+    coordinate: rc,
     localGeometry: rb,
     localStrides: ls,
     numLocalSites: numLocalSites,
@@ -336,7 +342,7 @@ proc newSimpleCubicLattice*[L: SomeInteger, D: SomeInteger](
 
 proc newSimpleCubicLattice*(
   latticeGeometry: openArray[SomeInteger],
-  startWithLastDimensionInLocalPartition: bool = true,
+  startWithLastDimensionInpartition: bool = true,
   startWithLastDimensionInVectorPartition: bool = false,
   printLatticeGeometrySummary: bool = true
 ): SimpleCubicLattice = 
@@ -353,7 +359,7 @@ proc newSimpleCubicLattice*(
   ## Please refer to primary constructor method for further details.
   let 
     g = latticeGeometry.toSeq(GeometryType)
-    dg = g.partition(numRanks(), startWithLast = startWithLastDimensionInLocalPartition)
+    dg = g.partition(numRanks(), startWithLast = startWithLastDimensionInpartition)
     lg = g / dg
     sg = lg.partition(numLanes(), startWithLast = startWithLastDimensionInVectorPartition)
   let quiet = printLatticeGeometrySummary
@@ -405,8 +411,8 @@ when isMainModule:
       rankGeomB = latGeom.partition(numRanks()) # used here for test: not exposed
       latB = newSimpleCubicLattice(latGeom, rankGeomB)
     
-    print "# local sites (latA):" + $latA.numLocalSites
-    print "# vectorized local sites (latA):" + $latA.numVecSites
+    print "# local sites (latA):", latA.numLocalSites
+    print "# vectorized local sites (latA):", latA.numVecSites
   
     var sq = newSeq[int](latA.numLocalSites)
     latA.sites(n):

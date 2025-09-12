@@ -66,6 +66,7 @@ proc reliqInit*(printInitTiming: bool = true) {.inline.} =
   runtimeTimer = tic "ReliQ runtime"
   upcxxInit()
   kokkosInit()
+  globalBarrier()
   executionTimer = tic "ReliQ execution"
   if printInitTiming: timer.toc()
 
@@ -85,6 +86,7 @@ proc reliqFinalize*(
   ## b.) Finalize UPC++ runtime environemnt
   let timer = tic "ReliQ runtime finalization"
   if printExecutionTiming: executionTimer.toc()
+  globalBarrier()
   kokkosFinalize()
   upcxxFinalize()
   if printFinalizeTiming: timer.toc()

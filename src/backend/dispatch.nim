@@ -89,18 +89,20 @@ template each*(ctx: ParallelForContext; n, work: untyped): untyped =
   #   ... sort of
   let body: ParallelForFunctor = proc(
       thread: int; 
-      context: ParallelForContext
+      pctx: ParallelForContext
     ) {.cdecl.} =
-    let 
-      iters = context.iters div numThreads()
-      remdr = context.iters mod numThreads()
-    let
-      start = thread * iters
-      stop = case thread != numThreads() - 1:
-        of true: start + iters
-        of false: (thread + 1) * iters + remdr
-    proc myThread(): int {.inject.} = thread 
-    for n in start..<stop: work
+      var context {.inject.} = pctx
+      proc myThread(): int {.inject.} = thread 
+      let 
+        iters = context.iters div numThreads()
+        remdr = context.iters mod numThreads()
+      let
+        start = myThread() * iters
+        stop = case myThread() != numThreads() - 1:
+          of true: start + iters - 1
+          of false: (myThread() + 1) * iters + remdr - 1
+      print "task =", myRank(), "thread =", myThread(), "start =", start, "stop =", stop
+      for n in start..<stop: work
   parallelForRange(0, numThreads(), body, ctx)
 
 # lessons learned:
@@ -121,8 +123,8 @@ when isMainModule:
     print "x =", x
     print "y =", y
     ctx.each(i):
-      let x = cast[ptr float](ctx.ptrs[0])
-      let y = cast[ptr float](ctx.ptrs[1])
+      let x = cast[ptr float](context.ptrs[0])
+      let y = cast[ptr float](context.ptrs[1])
       if myThread() == 0: 
         x[] += 1.0
         y[] += 1.0

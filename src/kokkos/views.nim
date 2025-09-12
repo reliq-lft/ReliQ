@@ -147,12 +147,23 @@ proc newDynamicView*(
 proc getViewElement[T](view: StaticView[T]; n: cint): T 
   {.importcpp: "#.operator[](#)", inline, kokkos_wrapper.}
 
+# backend: static view accessor method
+proc getViewElement[T](view: var StaticView[T]; n: cint): var T 
+  {.importcpp: "#.operator[](#)", inline, kokkos_wrapper.}
+
 # backend: set view element
 proc setViewElement[T](view: var StaticView[T]; n: cint; value: T) 
   {.importcpp: "#.operator[](#) = #", inline, kokkos_wrapper.}
 
 # public static view accessor method
 proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T {.inline.} =
+  ## Access element of Kokkos static view
+  ##
+  ## <in need of documentation>
+  return view.getViewElement(cint(n))
+
+# public static view accessor method
+proc `[]`*[T](view: var StaticView[T]; n: SomeInteger): var T {.inline.} =
   ## Access element of Kokkos static view
   ##
   ## <in need of documentation>

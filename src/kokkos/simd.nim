@@ -73,14 +73,14 @@ proc `=copy`*[T](x: var SIMXVec[T]; y: SIMXVec[T])
   {.importcpp: "#.operator=(#)", simd.}
 
 # assignment to scalar
-proc `:=`*[T](x: SIMXVec[T]; value: T) =
+proc `:=`*[T](x: var SIMXVec[T]; value: T) =
   {.emit: """
   Kokkos::Experimental::simd<`T`> c(`value`);
   `x` = c;
   """.}
 
 # assignment to another vector
-proc `:=`*[T](x: SIMXVec[T]; value: SIMXVec[T]) =
+proc `:=`*[T](x: var SIMXVec[T]; value: SIMXVec[T]) =
   {.emit: """
   Kokkos::Experimental::simd<`T`> c(`value`);
   `x` = c;
