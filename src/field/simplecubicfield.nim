@@ -25,8 +25,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils
 import backend
+import utils
 import lattice/[simplecubiclattice]
 
 # shorten pragmas pointing to UPC++ & Kokkos headers and include field view wrapper
@@ -35,261 +35,33 @@ backend: discard
 #[ frontend: simple cubic field type definition ]#
 
 type
-  SimpleCubicField*[T] = object
-    ## Field on simple cubic Bravais lattice
-    ##
-    ## <in need of documentation>
-    lattice: ptr SimpleCubicLattice
-    field: GlobalPointer[SIMXVec[T]]
-    #fieldDist: DistributedObject[GlobalPointer[SIMXVec[T]]]
-    fieldView: StaticView[SIMXVec[T]]
+  FieldData[T] = UncheckedArray[SIMDArray[T]]
+  DistributedSimpleCubicField*[T] = object
+    lattice: ptr DistributedSimpleCubicLattice
+    data: seq[ptr FieldData[T]]
+  SimpleCubicField*[T] = GlobalPointer[DistributedSimpleCubicField[T]]
 
-#[ backend: types for exception handling ]#
+#[ frontend: constructors ]#
 
-type # enumerate possible errors that a user may run into
-  SimpleCubicFieldErrors = enum 
-    LatticeConformabilityError
-
-# special error type for handling field exception
-type SimpleCubicFieldError = object of CatchableError
-
-#[ backend: exception handling ]#
-
-template newSimpleCubicFieldError(
-  err: SimpleCubicFieldErrors,
-  appendToMessage: untyped
-): untyped =
-  # constructs error to be raised according to SimpleCubicFieldErrors spec
-  if myRank() == 0:
-    var errorMessage {.inject.} = case err:
-      of LatticeConformabilityError: "Lattices must match for field operations"
-    errorMessage = printBreak & errorMessage
-    appendToMessage
-    print errorMessage & printBreak
-    raise newException(SimpleCubicFieldError, "")
-
-#[ frontend: helpful simple cubic field methods ]#
-
-proc conformable*[T](fx, fy: SimpleCubicField[T]) =
-  ## Check if two fields are conformable (i.e., defined on the same lattice)
+proc newFieldData(l: SimpleCubicLattice; T: typedesc): seq[ptr FieldData[T]] =
+  ## Create new field data on distributed simple cubic Bravais lattice
   ##
   ## <in need of documentation>
-  if fx.lattice[] != fy.lattice[]: 
-    newSimpleCubicFieldError(LatticeConformabilityError): 
-      errorMessage &&= $(fx.lattice[]) && $(fy.lattice[])
+  let size = l.numVectorLaneSites * sizeof(SIMDArray[T])
+  result = newSeq[ptr FieldData[T]](numThreads())
+  for thread in 0..<numThreads(): result[thread] = cast[ptr FieldData[T]](alloc(size))
 
-#[ frontend: SimpleCubicField constructor ]#
-
-proc newField*(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T] =
+proc newField*(l: SimpleCubicLattice; T: typedesc): SimpleCubicField*[T] =
   ## Create new field on simple cubic Bravais lattice
   ##
   ## <in need of documentation>
-  let numVecSites = csize_t(lattice.numVecSites)
-  result = SimpleCubicField[T](
-    lattice: addr lattice, 
-    field: newGlobalPointerArray(numVecSites, SIMXVec[T])
-  )
-  #result.fieldDist = result.field.newDistributedObject()
-  result.fieldView = result.field.newStaticView(numVecSites)
+  result = DistributedSimpleCubicField[T](lattice: l.local()).newGlobalPointer()
+  result.local()[].data = l.newFieldData(T)
 
-#[ frontend: implement field concept ]#
-
-proc lattice*[T](f: SimpleCubicField[T]): SimpleCubicLattice =
-  ## Return lattice associated with field
-  ##
-  ## <in need of documentation>
-  return f.lattice[]
-
-proc numVecSites*[T](f: SimpleCubicField[T]): int =
-  ## Return number of vectorized sites in field
-  ##
-  ## <in need of documentation>
-  return f.lattice[].numVecSites
-
-proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T] {.inline.} =
-  ## Access field value at given local site
-  ##
-  ## This is for testing; it is most certainly not optimal or efficient
-  ## <in need of documentation>
-  return f.fieldView[n]
-
-proc `[]`*[T](f: var SimpleCubicField[T]; n: SomeInteger): var SIMXVec[T] {.inline.} =
-  ## Access field value at given local site
-  ##
-  ## This is for testing; it is most certainly not optimal or efficient
-  ## <in need of documentation>
-  return f.fieldView[n]
-
-proc `[]=`*[T](
-  f: var SimpleCubicField[T]; 
-  n: SomeInteger; 
-  value: SIMXVec[T]
-) {.inline.} =
-  ## Set field value at given local site
-  ##
-  ## This is for testing; it is most certainly not optimal or efficient
-  ## <in need of documentation>
-  f.fieldView[n] := value
-
-proc `:=`*[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T]) =
-  ## Set all field values to given scalar value
-  ##
-  ## <in need of documentation>
-  conformable(fx, fy)
-  var ctx = newParallelForContext(fx.numVecSites)
-  ctx.pack(fx, fy)
-  ctx.each(n):
-    let fx = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-    let fy = cast[ptr SimpleCubicField[T]](context.ptrs[1])
-    fx[][n] := fy[][n]
-
-# I WONDER IF THE PROBLEM IS THAT ALL THREADS TRY TO ACCESS THE SAME
-# MEMORY LOCATION AT ONCE... IF SO, I NEED TO MAKE SURE THAT THEY
-# ARE ALL ACCESSING DIFFERENT LOCATIONS. MAYBE I NEED TO BREAK IT
-# UP INTO CHUNKS, AND HAVE EACH THREAD DEAL WITH A CHUNK AT A TIME...
-# ... OR MAYBE I NEED TO JUST HAVE EACH THREAD DEAL WITH A SINGLE
-# LOCATION AT A TIME, AND LET KOKKOS HANDLE THE REST...
-proc `:=`*[T](f: var SimpleCubicField[T]; value: T) =
-  ## Set all field values to given scalar value
-  ##
-  ## <in need of documentation>
-  var ctx = newParallelForContext(f.numVecSites, flts = @[float(value)])
-  ctx.pack(f)
-  ctx.each(n):
-    let f = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-    f[][n] := newSIMXVec(T(context.flts[0]))
-
-# frontend: slick Nim trick for defining binary operations
-template defineBinaryOperations*(op: untyped; ope: untyped) =
-  # idea for a later point: Chapel had a neat way of promiting arithematic
-  # expressions, such that the whole expression was turned into a single loop;
-  # I want this eventually, but I want to focus first on base-level functionality
-  proc `op`*[T](fx, fy: SimpleCubicField[T]): SimpleCubicField[T] {.inline.} =
-    conformable(fx, fy)
-    var ctx = newParallelForContext(fx.numVecSites)
-    var fr = fx.lattice[].newField(T)
-    ctx.pack(fr, fx, fy)
-    ctx.each(n):
-      let fr = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-      let fx = cast[ptr SimpleCubicField[T]](context.ptrs[1])
-      let fy = cast[ptr SimpleCubicField[T]](context.ptrs[2])
-      fr[][n] := `op`(fx[][n], fy[][n])
-    return fr
-  proc `op`*[T](fx: SimpleCubicField[T]; y: T): SimpleCubicField[T] {.inline.} =
-    var ctx = newParallelForContext(fx.numVecSites, flts = @[float(y)])
-    var fr = fx.lattice[].newField(T)
-    ctx.pack(fr, fx)
-    ctx.each(n):
-      let fr = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-      let fx = cast[ptr SimpleCubicField[T]](context.ptrs[1])
-      fr[][n] := `op`(fx[][n], newSIMXVec(T(context.flts[0])))
-    return fr
-  proc `op`*[T](x: T; fy: SimpleCubicField[T]): SimpleCubicField[T] {.inline.} =
-    var ctx = newParallelForContext(fy.numVecSites, flts = @[float(x)])
-    var fr = fy.lattice[].newField(T)
-    ctx.pack(fr, fy)
-    ctx.each(n):
-      let fr = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-      let fy = cast[ptr SimpleCubicField[T]](context.ptrs[1])
-      fr[][n] := `op`(fy[][n], newSIMXVec(T(context.flts[0])))
-    return fr
-  proc `ope`*[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T]) {.inline.} =
-    conformable(fx, fy)
-    var ctx = newParallelForContext(fx.numVecSites)
-    ctx.pack(fx, fy)
-    ctx.each(n):
-      let fx = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-      let fy = cast[ptr SimpleCubicField[T]](context.ptrs[1])
-      `ope`(fx[][n], fy[][n])
-  proc `ope`*[T](fx: var SimpleCubicField[T]; y: T) {.inline.} =
-    var ctx = newParallelForContext(fx.numVecSites, flts = @[float(y)])
-    ctx.pack(fx)
-    ctx.each(n):
-      let fx = cast[ptr SimpleCubicField[T]](context.ptrs[0])
-      `ope`(fx[][n], newSIMXVec(T(context.flts[0])))
-defineBinaryOperations(`+`, `+=`) # addition
-defineBinaryOperations(`-`, `-=`) # subtraction
-defineBinaryOperations(`*`, `*=`) # multiplication
-defineBinaryOperations(`/`, `/=`) # division
-
-# ... next: proper "threads" block...
-
-# ... !!!ALSO!!! a parallel reduce (sum):
-#     I imagine that this will store the result of a 
-#     Kokkos reduction in a GlobalPointer, followed by
-#     a distributed reduction across all ranks...
-
-# demonstration/testing
 when isMainModule:
   import runtime
-  import lattice/[latticeconcept]
-  const verbosity = 1
   reliq:
-    let l = newSimpleCubicLattice([8, 8, 8, 16])
-    var field = l.newField(float)
-    var 
-      fa = l.newField(float)
-      fb = l.newField(float)
-      fc = l.newField(float)
-
-    if compiles(Lattice(l, seq[int], float)): 
-      print "SimpleCubicLattice conforms to Lattice concept"
-    else: print "SimpleCubicLattice does not conform to Lattice concept"
-
-    discard field.lattice()
-
-    print field[0], "before"
-    field[0] := newSIMXVec(1.0)
-    print field[0], "after"
-
-    print field[1], "before"
-    field := 2.0
-    print field[1], "after"
-
-    fa := 2.0
-    fb := 3.0
-    #[
-    fc := fa + fb
-    print fc[0], "after addition"
-    fc := fa - fb
-    print fc[0], "after subtraction"
-    fc := fa * fb
-    print fc[0], "after multiplication"
-    fc := fa / fb
-    print fc[0], "after division"
-
-    fc += fa
-    print fc[0], "after addition assignment"
-    fc -= fb
-    print fc[0], "after subtraction assignment"
-    fc *= fa
-    print fc[0], "after multiplication assignment"
-    fc /= fb
-    print fc[0], "after division assignment"
-
-    fc := fa + 1.0
-    print fc[0], "after addition with scalar"
-    fc := 1.0 + fb
-    print fc[0], "after addition with scalar"
-    fc := fa - 1.0
-    print fc[0], "after subtraction with scalar"
-    fc := 1.0 - fb
-    print fc[0], "after subtraction with scalar"
-    fc := fa * 2.0
-    print fc[0], "after multiplication with scalar"
-    fc := 2.0 * fb
-    print fc[0], "after multiplication with scalar"
-    fc := fa / 2.0
-    print fc[0], "after division with scalar"
-    fc := 2.0 / fb
-    print fc[0], "after division with scalar"
-
-    fc += 1.0
-    print fc[0], "after addition assignment with scalar"
-    fc -= 1.0
-    print fc[0], "after subtraction assignment with scalar"
-    fc *= 2.0
-    print fc[0], "after multiplication assignment with scalar"
-    fc /= 2.0
-    print fc[0], "after division assignment with scalar"
-    ]#
+    let 
+      geometry = [8, 8, 8, 16]
+      lattice = geometry.newSimpleCubicLattice() 
+    var fieldA = lattice.newField(float)

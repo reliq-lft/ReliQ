@@ -51,5 +51,5 @@ proc numLanes*: int =
   # Fetch number of SIMD (SIMT) lanes
   # * on CPU: number of SIMD lanes
   # * on GPU: warp size
-  let t = newSIMXVec(float64)
+  let t = newSIMDArray(float64)
   return t.width

@@ -64,12 +64,12 @@ template newKokkosViewError(
 #[ frontend/backend: static view constructors ]#
 
 # backend: Kokkos static view constructor
-proc newStaticView[T](tag: cstring; n1: csize_t): StaticView[T]
-  {.importcpp: "StaticView" & "<'*0>(#, @)", constructor, inline, kokkos_wrapper.}
+proc newStaticView[T](tag: cstring; n: csize_t): StaticView[T]
+  {.importcpp: "StaticView<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
 
 # backend: Kokkos static view constructor from pointer
 proc newStaticView[T](localPtr: ptr T; n: csize_t): StaticView[T] 
-  {.importcpp: "StaticView" & "<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
+  {.importcpp: "StaticView<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
 
 # frontend: base Kokkos static view constructor
 proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] {.inline.} = 

@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
-  Source file: src/upcxx/globalptr.nim
+  Source file: src/upcxx/distobject.nim
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -32,10 +32,10 @@ import globalptr
 upcxx: discard
 
 type # wrapper of UPC++ distributed object type
-  DistributedObject*[G] {.importcpp: "upcxx::dist_object", upcxx.} = object
+  DistributedObject*[T] {.importcpp: "upcxx::dist_object", upcxx.} = object
   
 # UPC++ distributed object constructor
-proc newDistributedObject*[G](gPtr: G): DistributedObject[G] 
+proc newDistributedObject*[T](data: T): DistributedObject[T] 
   {.importcpp: "upcxx::dist_object<'*0>(#)", constructor, upcxx.}
 
 when isMainModule:

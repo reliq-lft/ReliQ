@@ -32,21 +32,21 @@ import utils
 kokkos: {.pragma: simd, header: "<Kokkos_SIMD.hpp>".}
 
 type 
-  SIMXVec*[T] {.importcpp: "Kokkos::Experimental::simd", simd.} = object
-  ## ReliQ wrapper for Kokkos SIMXVec type
+  SIMDArray*[T] {.importcpp: "Kokkos::Experimental::simd", simd.} = object
+  ## ReliQ wrapper for Kokkos SIMDArray type
   ## 
   ## <in need of documentation>
 
-# SIMXVec constructors
-proc newSIMXVec[T](): SIMXVec[T] 
+# SIMDArray constructors
+proc newSIMDArray*[T]: SIMDArray[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
-proc newSIMXVec*(T: typedesc): SIMXVec[T] = newSIMXVec[T]()
-proc newSIMXVec*[T](value: T): SIMXVec[T] 
+proc newSIMDArray*(T: typedesc): SIMDArray[T] = newSIMDArray[T]()
+proc newSIMDArray*[T](value: T): SIMDArray[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
-proc newSIMXVec*[T](other: SIMXVec[T]): SIMXVec[T] 
+proc newSIMDArray*[T](other: SIMDArray[T]): SIMDArray[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>(#)", simd.}
-proc newSIMXVec*[T](values: seq[T]): SIMXVec[T] =
-  result = newSIMXVec(T)
+proc newSIMDArray*[T](values: seq[T]): SIMDArray[T] =
+  result = newSIMDArray(T)
   for l in 0..<min(result.width, values.len): 
     let value = values[l]
     {.emit: """
@@ -54,14 +54,14 @@ proc newSIMXVec*[T](values: seq[T]): SIMXVec[T] =
     Kokkos::Experimental::simd<`T`> c(`value`);
     where(m, result) = c;
     """.}
-proc newSIMXVec*[T](values: openArray[T]): SIMXVec[T] = newSIMXVec(values.toSeq())
+proc newSIMDArray*[T](values: openArray[T]): SIMDArray[T] = newSIMDArray(values.toSeq())
 
-# SIMXVec width
-proc width*[T](simd: SIMXVec[T]): int {.importcpp: "#.size()", simd.}
+# SIMDArray width
+proc width*[T](simd: SIMDArray[T]): int {.importcpp: "#.size()", simd.}
 
 # array access operator overloads
-proc `[]`*[T](simd: SIMXVec[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
-proc `[]=`*[T](simd: var SIMXVec[T], lane: int, value: T) =
+proc `[]`*[T](simd: SIMDArray[T], lane: int): T {.importcpp: "#.operator[](#)", simd.}
+proc `[]=`*[T](simd: var SIMDArray[T], lane: int, value: T) =
   {.emit: """
   Kokkos::Experimental::simd_mask<`T`> m([&] (std::size_t i) { return i == `lane`; });
   Kokkos::Experimental::simd<`T`> c(`value`);
@@ -69,66 +69,66 @@ proc `[]=`*[T](simd: var SIMXVec[T], lane: int, value: T) =
   """.}
 
 # copy assignment hook
-proc `=copy`*[T](x: var SIMXVec[T]; y: SIMXVec[T]) 
+proc `=copy`*[T](x: var SIMDArray[T]; y: SIMDArray[T]) 
   {.importcpp: "#.operator=(#)", simd.}
 
 # assignment to scalar
-proc `:=`*[T](x: var SIMXVec[T]; value: T) =
+proc `:=`*[T](x: var SIMDArray[T]; value: T) =
   {.emit: """
   Kokkos::Experimental::simd<`T`> c(`value`);
   `x` = c;
   """.}
 
 # assignment to another vector
-proc `:=`*[T](x: var SIMXVec[T]; value: SIMXVec[T]) =
+proc `:=`*[T](x: var SIMDArray[T]; value: SIMDArray[T]) =
   {.emit: """
   Kokkos::Experimental::simd<`T`> c(`value`);
   `x` = c;
   """.}
 
-# Kokkos SIMXVec arithematic overloads
-proc `+`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator+(#, #)", simd.}
-proc `-`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator-(#, #)", simd.}
-proc `*`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator*(#, #)", simd.}
-proc `/`*[T](a, b: SIMXVec[T]): SIMXVec[T] {.importcpp: "operator/(#, #)", simd.}
+# Kokkos SIMDArray arithematic overloads
+proc `+`*[T](a, b: SIMDArray[T]): SIMDArray[T] {.importcpp: "operator+(#, #)", simd.}
+proc `-`*[T](a, b: SIMDArray[T]): SIMDArray[T] {.importcpp: "operator-(#, #)", simd.}
+proc `*`*[T](a, b: SIMDArray[T]): SIMDArray[T] {.importcpp: "operator*(#, #)", simd.}
+proc `/`*[T](a, b: SIMDArray[T]): SIMDArray[T] {.importcpp: "operator/(#, #)", simd.}
 
-# Kokkos SIMXVec compound arithematic assignment overloads
-proc `+=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator+=(#, #)", simd.}
-proc `-=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator-=(#, #)", simd.}
-proc `*=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator*=(#, #)", simd.}
-proc `/=`*[T](a: SIMXVec[T], b: SIMXVec[T]) {.importcpp: "operator/=(#, #)", simd.}
+# Kokkos SIMDArray compound arithematic assignment overloads
+proc `+=`*[T](a: SIMDArray[T], b: SIMDArray[T]) {.importcpp: "operator+=(#, #)", simd.}
+proc `-=`*[T](a: SIMDArray[T], b: SIMDArray[T]) {.importcpp: "operator-=(#, #)", simd.}
+proc `*=`*[T](a: SIMDArray[T], b: SIMDArray[T]) {.importcpp: "operator*=(#, #)", simd.}
+proc `/=`*[T](a: SIMDArray[T], b: SIMDArray[T]) {.importcpp: "operator/=(#, #)", simd.}
 
-# Kokkos SIMXVec compound arithematic assignment overloads
-proc `+=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator+=(#, #)", simd.}
-proc `-=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator-=(#, #)", simd.}
-proc `*=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator*=(#, #)", simd.}
-proc `/=`*[T](a: SIMXVec[T], b: T) {.importcpp: "operator/=(#, #)", simd.}
+# Kokkos SIMDArray compound arithematic assignment overloads
+proc `+=`*[T](a: SIMDArray[T], b: T) {.importcpp: "operator+=(#, #)", simd.}
+proc `-=`*[T](a: SIMDArray[T], b: T) {.importcpp: "operator-=(#, #)", simd.}
+proc `*=`*[T](a: SIMDArray[T], b: T) {.importcpp: "operator*=(#, #)", simd.}
+proc `/=`*[T](a: SIMDArray[T], b: T) {.importcpp: "operator/=(#, #)", simd.}
 
-# SIMXVec vector iterator
-iterator values*[T](a: SIMXVec[T]): T =
+# SIMDArray vector iterator
+iterator values*[T](a: SIMDArray[T]): T =
   for l in 0..<a.width: yield a[l]
 
-# conversion from sequence to SIMXVec
-proc toSIMXVec*[T](values: seq[T]): SIMXVec[T] = newSIMXVec(values)
-proc toSIMXVec*[T](values: openArray[T]): SIMXVec[T] = newSIMXVec(values.toSeq())
+# conversion from sequence to SIMDArray
+proc toSIMDArray*[T](values: seq[T]): SIMDArray[T] = newSIMDArray(values)
+proc toSIMDArray*[T](values: openArray[T]): SIMDArray[T] = newSIMDArray(values.toSeq())
 
 # conversion to sequence
-proc toSeq*[T](a: SIMXVec[T]): seq[T] =
+proc toSeq*[T](a: SIMDArray[T]): seq[T] =
   result = newSeq[T](a.width)
   for l in 0..<a.width: result[l] = a[l]
 
 # conversion to string
-proc `$`*[T](a: SIMXVec[T]): string = "SIMXVec:" + $(a.toSeq())
+proc `$`*[T](a: SIMDArray[T]): string = "SIMDArray:" + $(a.toSeq())
 
 when isMainModule:
   import runtime
   reliq:
     let sq = @[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     var 
-      l = newSIMXVec(float)
-      x = newSIMXVec(1.0)
-      y = newSIMXVec(2.0)
-      z = newSIMXVec(l)
+      l = newSIMDArray(float)
+      x = newSIMDArray(1.0)
+      y = newSIMDArray(2.0)
+      z = newSIMDArray(l)
       t = x + y
     t = x + y
     t = x - y
@@ -145,8 +145,8 @@ when isMainModule:
     t[3] = 3.0
     print $t
     var 
-      sqva = newSIMXVec(sq)
-      sqvb = sq.toSIMXVec()
+      sqva = newSIMDArray(sq)
+      sqvb = sq.toSIMDArray()
     print sqva
     print sqvb
     sqva = sqvb
