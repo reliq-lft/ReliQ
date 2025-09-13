@@ -35,28 +35,34 @@ backend: discard
 #[ frontend: simple cubic field type definition ]#
 
 type
-  FieldData[T] = UncheckedArray[SIMDArray[T]]
   DistributedSimpleCubicField*[T] = object
+    len: int
     lattice: ptr DistributedSimpleCubicLattice
-    data: seq[ptr FieldData[T]]
+    data: ptr UncheckedArray[SIMDArray[T]]
   SimpleCubicField*[T] = GlobalPointer[DistributedSimpleCubicField[T]]
 
 #[ frontend: constructors ]#
 
-proc newFieldData(l: SimpleCubicLattice; T: typedesc): seq[ptr FieldData[T]] =
-  ## Create new field data on distributed simple cubic Bravais lattice
-  ##
-  ## <in need of documentation>
-  let size = l.numVectorLaneSites * sizeof(SIMDArray[T])
-  result = newSeq[ptr FieldData[T]](numThreads())
-  for thread in 0..<numThreads(): result[thread] = cast[ptr FieldData[T]](alloc(size))
+proc newFieldData*[T](f: SimpleCubicField[T]): auto =
+  return cast[ptr UncheckedArray[SIMDArray[T]]](alloc(f.local()[].len))
 
-proc newField*(l: SimpleCubicLattice; T: typedesc): SimpleCubicField*[T] =
+proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
   ## Create new field on simple cubic Bravais lattice
   ##
   ## <in need of documentation>
-  result = DistributedSimpleCubicField[T](lattice: l.local()).newGlobalPointer()
-  result.local()[].data = l.newFieldData(T)
+  result = DistributedSimpleCubicField[T](
+    lattice: l.local(),
+    len: numThreads() * l.numVectorLaneSites * sizeof(SIMDArray[T])
+  ).newGlobalPointer()
+  result.local()[].data = result.newFieldData()
+
+#[ frontend: methods ]#
+
+template view*[T](symbol: untyped; f: SimpleCubicField[T]): untyped =
+  ## Create Kokkos static view of field data
+  ##
+  ## <in need of documentation>
+  var symbol = newStaticView(f.local()[].len, f.local()[].data)
 
 when isMainModule:
   import runtime
@@ -64,4 +70,7 @@ when isMainModule:
     let 
       geometry = [8, 8, 8, 16]
       lattice = geometry.newSimpleCubicLattice() 
-    var fieldA = lattice.newField(float)
+    var 
+      fieldA = lattice.newField(float)
+      fieldB = lattice.newField(float)
+    view(fieldAView, fieldA) # like in Grid!
