@@ -26,7 +26,6 @@
 ]#
 
 import backend
-import utils
 import lattice/[simplecubiclattice]
 
 # shorten pragmas pointing to UPC++ & Kokkos headers and include field view wrapper
@@ -43,8 +42,9 @@ type
 
 #[ frontend: constructors ]#
 
-proc newFieldData*[T](f: SimpleCubicField[T]): auto =
-  return cast[ptr UncheckedArray[SIMDArray[T]]](alloc(f.local()[].len))
+proc newFieldData[T](f: SimpleCubicField[T]): auto =
+  let sizeSIMD = sizeof(SIMDArray[T])
+  return cast[ptr UncheckedArray[SIMDArray[T]]](alloc(f.local()[].len * sizeSIMD))
 
 proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
   ## Create new field on simple cubic Bravais lattice
@@ -52,17 +52,47 @@ proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
   ## <in need of documentation>
   result = DistributedSimpleCubicField[T](
     lattice: l.local(),
-    len: numThreads() * l.numVectorLaneSites * sizeof(SIMDArray[T])
+    len: numThreads() * l.numVectorLaneSites
   ).newGlobalPointer()
   result.local()[].data = result.newFieldData()
 
-#[ frontend: methods ]#
+#[ frontend: "virtual attribute" accessors ]#
 
-template view*[T](symbol: untyped; f: SimpleCubicField[T]): untyped =
+template sites*[T](f: SimpleCubicField[T]): untyped =
+  ## Gets number of local lattice sites
+  f.local()[].lattice[].numVectorLaneSites 
+
+#[ frontend: view converters ]#
+
+template autoView*[T](symbol: untyped; f: SimpleCubicField[T]): untyped =
   ## Create Kokkos static view of field data
   ##
   ## <in need of documentation>
-  var symbol = newStaticView(f.local()[].len, f.local()[].data)
+  var symbol = newStaticView(f.local()[].len, addr f.local()[].data[][0])
+
+proc newView*[T](f: SimpleCubicField[T]): StaticView[SIMDArray[T]] =
+  ## Create Kokkos static view of field data
+  ##
+  ## <in need of documentation>
+  return newStaticView(f.local()[].len, addr f.local()[].data[][0])
+
+#[ frontend: methods/procedures ]#
+
+proc `:=`*[T](fx: var SimpleCubicField[T], fy: SimpleCubicField[T]) =
+  ## Assign field fy to field fx
+  ##
+  ## <in need of documentation>
+  var fxView = fx.newView()
+  var fyView = fy.newView()
+  threads:
+    for i in 0..<10:
+      discard fxView[i]
+
+# ideas:
+# - i'd like to have some notion of Chapel's promotion of scalar to array types 
+# - use atomics to define elementary field operations?
+# - have an internal "each" procedure that distributes
+#   iterations across each shared-memory subdomain
 
 when isMainModule:
   import runtime
@@ -73,4 +103,7 @@ when isMainModule:
     var 
       fieldA = lattice.newField(float)
       fieldB = lattice.newField(float)
-    view(fieldAView, fieldA) # like in Grid!
+    autoView(fieldAView, fieldA) # like in Grid!
+    var fieldBView = fieldB.newView()
+    fieldA := fieldB
+    print fieldAView[0]

@@ -28,6 +28,12 @@
 import std/[macros]
 import upcxx/[upcxxbase]
 
+template importExportedPragma*: untyped =
+  {.pragma: exported, exportc, cdecl, raises: [].}
+
+template importImportedPragma*: untyped =
+  {.pragma: imported, importc, cdecl, raises: [], gcsafe.}
+
 # macro that implements Nim "echo"; written for the fun of it, tbh
 macro reliqPrint(args: varargs[untyped]): untyped =
   var statements: seq[NimNode]

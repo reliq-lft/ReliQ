@@ -25,31 +25,25 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import upcxx/[upcxxbase]
-import upcxx/[globalptr, distobject]
-import kokkos/[kokkosbase]
-import kokkos/[views, simd]
-import backend/[dispatch]
+import utils
+import upcxx/[upcxxbase, globalptr, distobject]
+import kokkos/[kokkosbase, kokkosthreads]
+import kokkos/[simdarray, staticview, dynamicview]
+
+export utils
 
 export upcxxbase
 export globalptr
 export distobject
 
 export kokkosbase
-export views
-export simd
-
-export dispatch
+export kokkosthreads
+export simdarray
+export staticview
+export dynamicview
 
 # template returning UPC++ and Kokkos pragmas including core headers
 template backend*(pragmas: untyped): untyped =
   kokkos: discard
   upcxx: discard
   pragmas
-
-proc numLanes*: int =
-  # Fetch number of SIMD (SIMT) lanes
-  # * on CPU: number of SIMD lanes
-  # * on GPU: warp size
-  let t = newSIMDArray(float64)
-  return t.width

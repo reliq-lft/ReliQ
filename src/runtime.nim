@@ -29,6 +29,8 @@ import std/[times, strformat, strutils]
 import utils/[reliqutils]
 import backend
 
+backend: discard
+
 type # ReliQ timer type
   Timer* = object
     ## Timer
@@ -66,7 +68,6 @@ proc reliqInit*(printInitTiming: bool = true) {.inline.} =
   runtimeTimer = tic "ReliQ runtime"
   upcxxInit()
   kokkosInit()
-  globalBarrier()
   executionTimer = tic "ReliQ execution"
   if printInitTiming: timer.toc()
 
@@ -86,7 +87,6 @@ proc reliqFinalize*(
   ## b.) Finalize UPC++ runtime environemnt
   let timer = tic "ReliQ runtime finalization"
   if printExecutionTiming: executionTimer.toc()
-  globalBarrier()
   kokkosFinalize()
   upcxxFinalize()
   if printFinalizeTiming: timer.toc()
@@ -96,7 +96,7 @@ template reliq*(work: untyped): untyped =
   ## Encapsulates ReliQ's runtime environment in workload block
   ## Author: Curtis Taylor Peterson
   reliqInit()
-  work
+  block: work
   reliqFinalize()
   
 

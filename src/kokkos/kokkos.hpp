@@ -33,56 +33,42 @@
 #ifndef RELIQ_KOKKOS_HPP
 #define RELIQ_KOKKOS_HPP
 
-/* view wrappers */
+// view wrappers
+namespace Views {
+  // wrap Kokkos View; called "static" bc the rank is fixed at compile time
+  template <typename T>
+  using StaticView = Kokkos::View<T*>;
 
-// wrap Kokkos View; called "static" bc the rank is fixed at compile time
-template <class T>
-using StaticView = Kokkos::View<T*>;
-
-// wrap Kokkos DynRankView; called "dynamic" bc the rank is determined at runtime
-template <class T>
-using DynamicView = Kokkos::DynRankView<T>;
-
-/* dispatch wrappers */
-
-// typedef for C function pointer to be passed to Kokkos parallel_for
-typedef void (*NimProc)(int, void*);
-
-// typedef for Kokkos TeamPolicy member type
-typedef Kokkos::TeamPolicy<>::member_type TeamMember;
-
-inline void parallel_for_range(int start, int stop, NimProc proc, void* ctx) {
-  Kokkos::parallel_for(
-    Kokkos::RangePolicy<>(start, stop),
-    KOKKOS_LAMBDA (const int n) { proc(n, ctx); }
-  );
+  // wrap Kokkos DynRankView; called "dynamic" bc the rank is determined at runtime
+  template <typename T>
+  using DynamicView = Kokkos::DynRankView<T>;
 }
 
-/*
-// wrapper for Kokkos parallel_for w/ range policy
-inline void parallel_for_range(int start, int stop, NimProc proc) {
-  Kokkos::parallel_for(
-    Kokkos::RangePolicy<>(start, stop), 
-    KOKKOS_LAMBDA (const int n) { proc(n); }
-  );
-}
-*/
+// wrappers for parallel_for constructs
+namespace Distpatch {
+  // some typedefs
+  typedef Kokkos::TeamPolicy<>::member_type TeamMember;
+  typedef void (*NimKernel)(const TeamMember&);
 
-// !!!! vvvv DO NOT DELETE; IMPORTANT TEMPLATE FOR "THREADS" CONSTRUCT vvvv !!!!
-/*
-// wrapper for Kokkos parallel_for w/ team policy
-inline void parallel_for_team(int league_size, int team_size, NimProc proc) {
-  auto execPolicy = Kokkos::RangePolicy<>(start, stop);
-  Kokkos::parallel_for(
-    Kokkos::TeamPolicy<>(league_size, team_size), 
-    KOKKOS_LAMBDA (const TeamMember& team) { 
-      
-      proc(n); 
-  });
-}
-*/
-// !!!! ^^^^ DO NOT DELETE; IMPORTANT TEMPLATE FOR "THREADS" CONSTRUCT ^^^^ !!!!
+  // get team rank of team member
+  extern "C" inline int rank(const TeamMember& member) { return member.league_rank(); }
 
-/* simd wrappers */
+  // team barrier
+  extern "C" inline void barrier(const TeamMember& member) { member.team_barrier(); }
+
+  // team parallel for wrapper; OpenMP analogue of parallel region
+  extern "C" void team_parallel_for(Kokkos::TeamPolicy<> policy, NimKernel proc) {
+    Kokkos::parallel_for(
+      "team_parallel_for_wrapper", 
+      policy,
+      KOKKOS_LAMBDA (const TeamMember& member) { 
+        // v--- maybe import this???
+        //extern "C" int trank(const TeamMember& member) { return member.league_rank(); }
+        std::cout << "team_parallel_for thread " << member.league_rank() << "\n";
+        std::cout << "team_parallel_for thread: " << rank(member) << "\n";
+        (*proc)(member); }
+    );
+  }
+}
 
 #endif // RELIQ_KOKKOS_HPP

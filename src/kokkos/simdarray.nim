@@ -120,6 +120,13 @@ proc toSeq*[T](a: SIMDArray[T]): seq[T] =
 # conversion to string
 proc `$`*[T](a: SIMDArray[T]): string = "SIMDArray:" + $(a.toSeq())
 
+proc numLanes*: int =
+  # Fetch number of SIMD (SIMT) lanes
+  # * on CPU: number of SIMD lanes
+  # * on GPU: warp size
+  let t = newSIMDArray(float64)
+  return t.width
+
 when isMainModule:
   import runtime
   reliq:

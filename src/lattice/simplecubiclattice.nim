@@ -31,7 +31,6 @@
 
 import backend
 import runtime
-import utils
 import latticeconcept
 
 # import backend header files

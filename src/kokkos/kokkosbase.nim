@@ -40,6 +40,14 @@ template kokkos*(pragmas: untyped): untyped =
   pragmas
 kokkos: discard
 
+# enumerate possible errors that a user may run into
+type KokkosViewErrors* = enum 
+  TooManyDynamicViewDimensionsError,
+  EmptyDynamicViewDimensionsError
+
+# special error type for handling exception during lattice initialization
+type KokkosViewError* = object of CatchableError
+
 #[ frontend: runtime initializers/finalizers ]#
 
 # initializes Kokkos runtime
@@ -59,3 +67,20 @@ proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
 # get number of threads
 proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
+
+# implementation of exception handling type
+template newKokkosViewError*(
+  err: KokkosViewErrors,
+  appendToMessage: untyped
+): untyped =
+  # constructs error to be raised according to LatticeInitializationErrors spec
+  if myRank() == 0:
+    var errorMessage {.inject.} = case err:
+      of TooManyDynamicViewDimensionsError:
+        "Kokkos dynamic rank views support only up to seven dimensions."
+      of EmptyDynamicViewDimensionsError:
+        "ReliQ wrapper of Kokkos dynamic rank view must have at least one dimension."
+    errorMessage = printBreak & errorMessage
+    appendToMessage
+    print errorMessage & printBreak
+  newException(KokkosViewError, "")
