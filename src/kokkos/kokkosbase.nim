@@ -36,7 +36,6 @@ import utils/[nimutils]
 # template returning Kokkos_Core include through pragma
 template kokkos*(pragmas: untyped): untyped = 
   {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-  {.pragma: kokkos_wrapper, header: "../kokkos/kokkos.hpp".}
   pragmas
 kokkos: discard
 
@@ -67,6 +66,9 @@ proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
 # get number of threads
 proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
+
+# fence
+proc localBarrier* {.importcpp: "Kokkos::fence()", inline, kokkos.}
 
 # implementation of exception handling type
 template newKokkosViewError*(

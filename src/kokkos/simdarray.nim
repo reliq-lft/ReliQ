@@ -38,7 +38,7 @@ type
   ## <in need of documentation>
 
 # SIMDArray constructors
-proc newSIMDArray*[T]: SIMDArray[T] 
+proc newSIMDArray[T]: SIMDArray[T] 
   {.importcpp: "Kokkos::Experimental::simd<'*0>()", simd.}
 proc newSIMDArray*(T: typedesc): SIMDArray[T] = newSIMDArray[T]()
 proc newSIMDArray*[T](value: T): SIMDArray[T] 
@@ -78,6 +78,14 @@ proc `:=`*[T](x: var SIMDArray[T]; value: T) =
   Kokkos::Experimental::simd<`T`> c(`value`);
   `x` = c;
   """.}
+
+# copy from pointer
+proc load*[T](x: var SIMDArray[T]; mem: ptr T) 
+  {.importcpp: "#.copy_from(#, Kokkos::Experimental::simd_flag_default)", simd.}
+
+# store to aligned memory starting at pointer
+proc store*[T](x: SIMDArray[T]; mem: ptr T) 
+  {.importcpp: "#.copy_to(#, Kokkos::Experimental::simd_flag_default)", simd.}
 
 # assignment to another vector
 proc `:=`*[T](x: var SIMDArray[T]; value: SIMDArray[T]) =

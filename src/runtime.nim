@@ -98,7 +98,10 @@ template reliq*(work: untyped): untyped =
   reliqInit()
   block: work
   reliqFinalize()
-  
+
+template barrier*: untyped =
+  localBarrier()
+  globalBarrier()  
 
 when isMainModule:
   import utils

@@ -25,6 +25,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[macros]
+
 import backend
 import lattice/[simplecubiclattice]
 
@@ -34,66 +36,129 @@ backend: discard
 #[ frontend: simple cubic field type definition ]#
 
 type
-  DistributedSimpleCubicField*[T] = object
-    len: int
-    lattice: ptr DistributedSimpleCubicLattice
-    data: ptr UncheckedArray[SIMDArray[T]]
-  SimpleCubicField*[T] = GlobalPointer[DistributedSimpleCubicField[T]]
+  DistributedFieldData[T] = object
+    vectorStrides, threadStrides, len, bytes: int # metadata
+    lattice: ref DistributedSimpleCubicLattice # reference to local lattice
+    data: ptr UncheckedArray[T] # local CPU storage
+  SimpleCubicField*[T] = GlobalPointer[DistributedFieldData[T]]
 
 #[ frontend: constructors ]#
 
-proc newFieldData[T](f: SimpleCubicField[T]): auto =
-  let sizeSIMD = sizeof(SIMDArray[T])
-  return cast[ptr UncheckedArray[SIMDArray[T]]](alloc(f.local()[].len * sizeSIMD))
+proc newFieldLattice[T](f: var DistributedFieldData[T]; l: SimpleCubicLattice) =
+  new(f.lattice)
+  f.lattice[] = l.local()[]
+
+proc newFieldData[T](f: var DistributedFieldData[T]) =
+  f.data = cast[ptr UncheckedArray[T]](alloc(f.bytes))
 
 proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
   ## Create new field on simple cubic Bravais lattice
   ##
   ## <in need of documentation>
-  result = DistributedSimpleCubicField[T](
-    lattice: l.local(),
-    len: numThreads() * l.numVectorLaneSites
-  ).newGlobalPointer()
-  result.local()[].data = result.newFieldData()
+  let 
+    vectorStrides = numLanes()
+    threadStrides = vectorStrides * l.numVectorLaneSites
+    len = threadStrides * numThreads()
+    bytes = len * sizeof(T)
+  var field = DistributedFieldData[T](
+    threadStrides: threadStrides, 
+    vectorStrides: vectorStrides,
+    len: len, 
+    bytes: bytes
+  )
+  field.newFieldLattice(l)
+  field.newFieldData()
+  return field.newGlobalPointer()
 
-#[ frontend: "virtual attribute" accessors ]#
+#[ backend: destructors and move semantics ]#
 
-template sites*[T](f: SimpleCubicField[T]): untyped =
+# ... do in parallel???
+
+#[ frontend: virtual attributes ]#
+
+proc threadStrides*[T](f: SimpleCubicField[T]): int =
+  ## Gets number strides across threads
+  return f.local()[].threadStrides
+
+proc vectorStrides*[T](f: SimpleCubicField[T]): int =
+  ## Gets number strides across SIMD lanes
+  return f.local()[].vectorStrides
+
+proc len*[T](f: SimpleCubicField[T]): int =
   ## Gets number of local lattice sites
-  f.local()[].lattice[].numVectorLaneSites 
+  return f.local()[].len
 
-#[ frontend: view converters ]#
+proc numSites*[T](f: SimpleCubicField[T]): int =
+  ## Gets number of local lattice sites
+  return f.threadStrides div f.vectorStrides
 
-template autoView*[T](symbol: untyped; f: SimpleCubicField[T]): untyped =
-  ## Create Kokkos static view of field data
-  ##
-  ## <in need of documentation>
-  var symbol = newStaticView(f.local()[].len, addr f.local()[].data[][0])
+proc data*[T](f: SimpleCubicField[T]): ptr UncheckedArray[T] =
+  ## Downcast global pointer to local field data pointer
+  return f.local()[].data
 
-proc newView*[T](f: SimpleCubicField[T]): StaticView[SIMDArray[T]] =
-  ## Create Kokkos static view of field data
-  ##
-  ## <in need of documentation>
-  return newStaticView(f.local()[].len, addr f.local()[].data[][0])
+#[ frontend: downcasting ]#
 
-#[ frontend: methods/procedures ]#
+proc localField*[T](f: SimpleCubicField[T]): StaticView[T] =
+  ## Downcast global pointer to local field data wrapped with Kokkos view
+  return (addr f.data[][0]).newStaticView(f.len)
 
-proc `:=`*[T](fx: var SimpleCubicField[T], fy: SimpleCubicField[T]) =
-  ## Assign field fy to field fx
-  ##
-  ## <in need of documentation>
-  var fxView = fx.newView()
-  var fyView = fy.newView()
-  threads:
-    for i in 0..<10:
-      discard fxView[i]
+#[ frontend: accessors ]#
+
+proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): T =
+  ## Access field element at local index n; cannot mutate
+  return f.data[][n]
+
+#[ frontend: setters ]#
+
+template `<-`*[T](f: var SimpleCubicField[T]; value: T): untyped =
+  ## Set all field elements to scalar value
+  let 
+    strides = f.vectorStrides
+    arr = newSIMDArray(value)
+  var fdata = f.data
+  forall(0, f.numSites() div strides, n): arr.store(addr fdata[][n*strides])
+
+#[ frontend: Chapel-like promotion/fusion of elementary arithematic operations ]#
+
+#macro `:=`*(f: var SimpleCubicField[T]; exp: untyped): untyped =
+
+#[
+macro `:=`*[T](f: var SimpleCubicField[T]; exp: untyped): untyped =
+  ## Fused, elementwise assignment with promotion for SimpleCubicField
+  ## - Casts all SimpleCubicField to localField() views
+  ## - Uses forall for parallelism
+
+  # Helper: recursively replace SimpleCubicField symbols with their localField() view
+  proc promoteFields(e: NimNode): NimNode =
+    case e.kind
+    of nnkIdent, nnkSym:
+      # Try to detect if it's a SimpleCubicField symbol (by name convention or type info)
+      # Here, we conservatively wrap all symbols except the destination
+      if $e != $f:
+        result = newCall(bindSym"localField", e)
+      else:
+        result = e
+    of nnkCall, nnkInfix, nnkPrefix:
+      result = copyNimNode(e)
+      for c in e:
+        result.add(promoteFields(c))
+    else:
+      result = e
+
+  let rhs = promoteFields(exp)
+  let nSym = genSym(nskLet, "n")
+  result = quote do:
+    let n = `f`.len
+    let destView = `f`.localField()
+    forall(0, n, `nSym`):
+      destView[`nSym`] = `rhs`[`nSym`]
+]#
 
 # ideas:
 # - i'd like to have some notion of Chapel's promotion of scalar to array types 
 # - use atomics to define elementary field operations?
 # - have an internal "each" procedure that distributes
 #   iterations across each shared-memory subdomain
-
 when isMainModule:
   import runtime
   reliq:
@@ -103,7 +168,6 @@ when isMainModule:
     var 
       fieldA = lattice.newField(float)
       fieldB = lattice.newField(float)
-    autoView(fieldAView, fieldA) # like in Grid!
-    var fieldBView = fieldB.newView()
-    fieldA := fieldB
-    print fieldAView[0]
+    var localFieldA = fieldA.localField()
+    fieldB <- 3.14
+    print fieldB[0]

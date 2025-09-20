@@ -28,7 +28,7 @@
 import utils
 import upcxx/[upcxxbase, globalptr, distobject]
 import kokkos/[kokkosbase, kokkosthreads]
-import kokkos/[simdarray, staticview, dynamicview]
+import kokkos/[simdarray, staticview]
 
 export utils
 
@@ -40,7 +40,6 @@ export kokkosbase
 export kokkosthreads
 export simdarray
 export staticview
-export dynamicview
 
 # template returning UPC++ and Kokkos pragmas including core headers
 template backend*(pragmas: untyped): untyped =

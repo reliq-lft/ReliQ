@@ -32,67 +32,52 @@ import kokkosbase
 kokkos: discard
 
 type # frontend: Kokkos dynamic rank view
-  StaticView*[T] {.importcpp: "Views::StaticView", kokkos_wrapper.} = object
+  StaticView*[T] {.importcpp: "Kokkos::View<'*0*>", kokkos.} = object
 
 #[ frontend/backend: static view constructors ]#
 
 # backend: Kokkos static view constructor
 proc newStaticView[T](tag: cstring; n: csize_t): StaticView[T]
-  {.importcpp: "Views::StaticView<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
+  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, inline, kokkos.}
 
 # backend: Kokkos static view constructor from pointer
 proc newStaticView[T](localPtr: ptr T; n: csize_t): StaticView[T] 
-  {.importcpp: "Views::StaticView<'*0>(#, #)", constructor, inline, kokkos_wrapper.}
+  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, inline, kokkos.}
 
 # frontend: base Kokkos static view constructor
 proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] {.inline.} = 
-  return newStaticView[T]("Views::StaticView", csize_t(n))
+  return newStaticView[T]("StaticView", csize_t(n))
 
 # frontend: Kokkos static view constructor from pointer
-proc newStaticView*[T](
-  n: SomeInteger;
-  localPointer: ptr T
-): StaticView[T] {.inline.} = newStaticView(localPointer, csize_t(n))
-proc newStaticView*[T](
-  localPointer: ptr T;
-  n: SomeInteger
-): StaticView[T] {.inline.} = newStaticView(localPointer, csize_t(n))
+proc newStaticView*[T](localPointer: ptr T; len: int): StaticView[T] {.inline.} = 
+  return localPointer.newStaticView(csize_t(len))
 
 #[ frontend: static view methods ]#
 
-# backend: static view accessor method
-proc getViewElement[T](view: StaticView[T]; n: cint): T 
-  {.importcpp: "#.operator()(#)", inline, kokkos_wrapper.}
+# accessors
+proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T
+  {.importcpp: "#.operator()(#)", inline, kokkos.}
+proc `[]`*[T](view: var StaticView[T]; n: SomeInteger): var T
+  {.importcpp: "#.operator()(#)", inline, kokkos.}
 
-# backend: static view accessor method
-proc getViewElement[T](view: var StaticView[T]; n: cint): var T 
-  {.importcpp: "#.operator()(#)", inline, kokkos_wrapper.}
-
-# backend: set view element
-proc setViewElement[T](view: var StaticView[T]; n: cint; value: T) 
-  {.importcpp: "#.operator()(#) = #", inline, kokkos_wrapper.}
-
-proc `[]`*[T](view: StaticView[T]; n: SomeInteger): T {.inline.} =
-  return view.getViewElement(cint(n))
-
-proc `[]`*[T](view: var StaticView[T]; n: SomeInteger): var T {.inline.} =
-  return view.getViewElement(cint(n))
-
-proc `[]=`*[T](view: var StaticView[T]; n: SomeInteger; value: T) {.inline.} =
-  view.setViewElement(cint(n), value)
+# setters
+proc `[]=`*[T](view: var StaticView[T]; n: SomeInteger; value: T)
+  {.importcpp: "#.operator()(#) = #", inline, kokkos.}
 
 when isMainModule:
   import runtime
+  import kokkos/[simdarray]
   reliq:
     var v = newStaticView(100, int)
     v[0] = 42
     print v[0]
     print v[1]
     print v[99]
-    type T = float
+    #[
+    type T = SIMDArray[float]
     let size = 100
     var ta = cast[ptr UncheckedArray[T]](alloc(size*sizeof(T)))
-    var tav = newStaticView(size, addr ta[][0])
-    discard tav[0]
-    # v[100] = 1 # out of bounds
-    # echo v[100] # out of bounds
+    var pta = addr ta[][0]
+    var tav = pta.newStaticView(size)
+    #discard tav[0]
+    ]#
