@@ -1,9 +1,0 @@
-nimTitle	runtime	runtime.html	module runtime		0
-nim	Timer	runtime.html#Timer	object Timer		37
-nim	reliqLog	runtime.html#reliqLog,string	proc reliqLog(msg: string)		50
-nim	tic	runtime.html#tic,varargs[string]	proc tic(tags: varargs[string]): Timer		53
-nim	toc	runtime.html#toc,Timer	proc toc(timer: Timer)		56
-nim	reliqInit	runtime.html#reliqInit,bool	proc reliqInit(printInitTiming: bool = true)		60
-nim	reliqFinalize	runtime.html#reliqFinalize,bool,bool,bool	proc reliqFinalize(printRuntimeTiming: bool = true;\n              printExecutionTiming: bool = true;\n              printFinalizeTiming: bool = true)		77
-nim	reliq	runtime.html#reliq.t,untyped	template reliq(work: untyped): untyped		97
-nim	barrier	runtime.html#barrier.t	template barrier(): untyped		104

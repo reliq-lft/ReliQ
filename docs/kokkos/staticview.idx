@@ -1,9 +1,0 @@
-nimTitle	staticview	kokkos/staticview.html	module kokkos/staticview		0
-nim	StaticView	kokkos/staticview.html#StaticView	object StaticView		37
-nim	newStaticView	kokkos/staticview.html#newStaticView,SomeInteger,typedesc	proc newStaticView(n: SomeInteger; T: typedesc): StaticView[T]		50
-nim	newStaticView	kokkos/staticview.html#newStaticView,ptr.T,int	proc newStaticView[T](localPointer: ptr T; len: int): StaticView[T]		54
-nim	`[]`	kokkos/staticview.html#[],StaticView[T],SomeInteger	proc `[]`[T](view: StaticView[T]; n: SomeInteger): T		60
-nim	`[]`	kokkos/staticview.html#[],StaticView[T],SomeInteger_2	proc `[]`[T](view: var StaticView[T]; n: SomeInteger): var T		62
-nim	`[]=`	kokkos/staticview.html#[]=,StaticView[T],SomeInteger,T	proc `[]=`[T](view: var StaticView[T]; n: SomeInteger; value: T)		66
-nimgrp	newstaticview	kokkos/staticview.html#newStaticView-procs-all	proc		50
-nimgrp	[]	kokkos/staticview.html#[]-procs-all	proc		60

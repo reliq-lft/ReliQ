@@ -1,7 +1,0 @@
-nimTitle	upcxxbase	upcxx/upcxxbase.html	module upcxx/upcxxbase		0
-nim	upcxx	upcxx/upcxxbase.html#upcxx.t,untyped	template upcxx(pragmas: untyped): untyped		42
-nim	upcxxInit	upcxx/upcxxbase.html#upcxxInit	proc upcxxInit()		47
-nim	upcxxFinalize	upcxx/upcxxbase.html#upcxxFinalize	proc upcxxFinalize()		48
-nim	myRank	upcxx/upcxxbase.html#myRank	proc myRank(): cint		51
-nim	numRanks	upcxx/upcxxbase.html#numRanks	proc numRanks(): cint		52
-nim	globalBarrier	upcxx/upcxxbase.html#globalBarrier	proc globalBarrier()		55

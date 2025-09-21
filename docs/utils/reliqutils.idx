@@ -1,4 +1,0 @@
-nimTitle	reliqutils	utils/reliqutils.html	module utils/reliqutils		0
-nim	importExportedPragma	utils/reliqutils.html#importExportedPragma.t	template importExportedPragma(): untyped		33
-nim	importImportedPragma	utils/reliqutils.html#importImportedPragma.t	template importImportedPragma(): untyped		36
-nim	print	utils/reliqutils.html#print.t,varargs[untyped]	template print(args: varargs[untyped]): untyped		50
