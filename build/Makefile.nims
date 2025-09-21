@@ -1,6 +1,8 @@
 #[ 
-  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: build/Makefile.nims
+  Contact: reliq-lft@proton.me
+
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License

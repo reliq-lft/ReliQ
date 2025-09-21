@@ -1,6 +1,8 @@
 #[ 
-  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: src/reliq.nim
+  Contact: reliq-lft@proton.me
+
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -42,6 +44,7 @@ export latticeconcept
 export simplecubiclattice
 
 #[ ReliQ field types ]#
+
 import field/[fieldconcept]
 import field/[simplecubicfield]
 

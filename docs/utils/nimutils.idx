@@ -1,25 +1,25 @@
 nimTitle	nimutils	utils/nimutils.html	module utils/nimutils		0
-nim	printBreak	utils/nimutils.html#printBreak	const printBreak		33
-nim	dimensions	utils/nimutils.html#dimensions.i,openArray[T]	iterator dimensions[T](arr: openArray[T]): int		37
-nim	`/`	utils/nimutils.html#/,string,string	proc `/`(sa, sb: string): string		42
-nim	`+`	utils/nimutils.html#+,string,string	proc `+`(sa, sb: string): string		45
-nim	`&&`	utils/nimutils.html#&&,string,string	proc `&&`(sa, sb: string): string		48
-nim	`&&=`	utils/nimutils.html#&&=,string,string	proc `&&=`(sa: var string; sb: string)		51
-nim	`+=`	utils/nimutils.html#+=,string,string	proc `+=`(sa: var string; sb: string)		54
-nim	`/`	utils/nimutils.html#/,openArray[A],openArray[B]	proc `/`[A: SomeInteger; B: SomeInteger](a: openArray[A]; b: openArray[B]): auto		57
-nim	reversedDimensions	utils/nimutils.html#reversedDimensions.i,openArray[T],int	iterator reversedDimensions[T](arr: openArray[T]; start: int = 0): int		62
-nim	any	utils/nimutils.html#any,varargs[bool]	proc any(args: varargs[bool]): bool		66
-nim	all	utils/nimutils.html#all,varargs[bool]	proc all(args: varargs[bool]): bool		72
-nim	ones	utils/nimutils.html#ones,int,typedesc	proc ones(nd: int; T: typedesc): seq[T:type]		78
-nim	divides	utils/nimutils.html#divides,SomeInteger,SomeInteger	proc divides(a, b: SomeInteger): bool		84
-nim	dividesSomeElement	utils/nimutils.html#dividesSomeElement,A,seq[B]	proc dividesSomeElement[A: SomeInteger; B: SomeInteger](a: A; bs: seq[B]): bool		86
-nim	toSeq	utils/nimutils.html#toSeq,openArray[I],typedesc	proc toSeq[I](arr: openArray[I]; T: typedesc): seq[T:type]		95
-nim	toSeq	utils/nimutils.html#toSeq,openArray[I]	proc toSeq[I](arr: openArray[I]): auto		99
-nim	product	utils/nimutils.html#product,openArray[T]	proc product[T](arr: openArray[T]): T		103
-nim	`$`	utils/nimutils.html#$,seq[SomeInteger]	proc `$`(sq: seq[SomeInteger]): string		109
-nim	`$`	utils/nimutils.html#$,seq[SomeNumber]	proc `$`(sq: seq[SomeNumber]): string		112
-nim	cargc	utils/nimutils.html#cargc	proc cargc(): cint		115
-nim	cargv	utils/nimutils.html#cargv,cint	proc cargv(argc: cint): cstringArray		117
-nimgrp	$	utils/nimutils.html#$-procs-all	proc		109
-nimgrp	/	utils/nimutils.html#/-procs-all	proc		42
-nimgrp	toseq	utils/nimutils.html#toSeq-procs-all	proc		95
+nim	printBreak	utils/nimutils.html#printBreak	const printBreak		35
+nim	dimensions	utils/nimutils.html#dimensions.i,openArray[T]	iterator dimensions[T](arr: openArray[T]): int		39
+nim	`/`	utils/nimutils.html#/,string,string	proc `/`(sa, sb: string): string		44
+nim	`+`	utils/nimutils.html#+,string,string	proc `+`(sa, sb: string): string		47
+nim	`&&`	utils/nimutils.html#&&,string,string	proc `&&`(sa, sb: string): string		50
+nim	`&&=`	utils/nimutils.html#&&=,string,string	proc `&&=`(sa: var string; sb: string)		53
+nim	`+=`	utils/nimutils.html#+=,string,string	proc `+=`(sa: var string; sb: string)		56
+nim	`/`	utils/nimutils.html#/,openArray[A],openArray[B]	proc `/`[A: SomeInteger; B: SomeInteger](a: openArray[A]; b: openArray[B]): auto		59
+nim	reversedDimensions	utils/nimutils.html#reversedDimensions.i,openArray[T],int	iterator reversedDimensions[T](arr: openArray[T]; start: int = 0): int		64
+nim	any	utils/nimutils.html#any,varargs[bool]	proc any(args: varargs[bool]): bool		68
+nim	all	utils/nimutils.html#all,varargs[bool]	proc all(args: varargs[bool]): bool		74
+nim	ones	utils/nimutils.html#ones,int,typedesc	proc ones(nd: int; T: typedesc): seq[T:type]		80
+nim	divides	utils/nimutils.html#divides,SomeInteger,SomeInteger	proc divides(a, b: SomeInteger): bool		86
+nim	dividesSomeElement	utils/nimutils.html#dividesSomeElement,A,seq[B]	proc dividesSomeElement[A: SomeInteger; B: SomeInteger](a: A; bs: seq[B]): bool		88
+nim	toSeq	utils/nimutils.html#toSeq,openArray[I],typedesc	proc toSeq[I](arr: openArray[I]; T: typedesc): seq[T:type]		97
+nim	toSeq	utils/nimutils.html#toSeq,openArray[I]	proc toSeq[I](arr: openArray[I]): auto		101
+nim	product	utils/nimutils.html#product,openArray[T]	proc product[T](arr: openArray[T]): T		105
+nim	`$`	utils/nimutils.html#$,seq[SomeInteger]	proc `$`(sq: seq[SomeInteger]): string		111
+nim	`$`	utils/nimutils.html#$,seq[SomeNumber]	proc `$`(sq: seq[SomeNumber]): string		114
+nim	cargc	utils/nimutils.html#cargc	proc cargc(): cint		117
+nim	cargv	utils/nimutils.html#cargv,cint	proc cargv(argc: cint): cstringArray		119
+nimgrp	$	utils/nimutils.html#$-procs-all	proc		111
+nimgrp	/	utils/nimutils.html#/-procs-all	proc		44
+nimgrp	toseq	utils/nimutils.html#toSeq-procs-all	proc		97

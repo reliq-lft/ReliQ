@@ -1,6 +1,8 @@
 #[ 
-  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: src/kokkos/kokkosthreads.nim
+  Contact: reliq-lft@proton.me
+
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -40,6 +42,14 @@ const
   PARFOR = "Kokkos::parallel_for"
   TEAMFORALL = PARFOR & "(*#," + LAMBDA + "(const" + MEMBERTYPE +  "team) { #(team); })"
 const FORALL = PARFOR & "(*#," + LAMBDA + "(const int idx) { #(idx); })"
+const TEAMTHREADFORALLVAL = PARFOR & "(#," + "[=] (int& idx) { #(idx); })"
+const TEAMTHREADFORALLREF = PARFOR & "(#," + "[&] (int& idx) { #(idx); })"
+const TEAMVECTORFORALLVAL = PARFOR & "(#," + "[=] (int& idx) { #(idx); })"
+const TEAMVECTORFORALLREF = PARFOR & "(#," + "[&] (int& idx) { #(idx); })"
+
+type
+  LambdaCaptureKind* = enum ByRef, ByVal
+  TeamRangeKind* = enum ThreadRange, VectorRange
 
 type # backend: range/team policy types
   RangePolicy {.importcpp: "Kokkos::RangePolicy<>", kokkos.} = object
@@ -49,8 +59,18 @@ type # backend: range/team policy types
 type ThreadTeam* {.importcpp: "Kokkos::TeamPolicy<>::member_type", kokkos.} = object
 
 type # frontend: team thread/vector range wrappers
-  TeamThreadRange* {.importcpp: "Kokkos::TeamThreadRange", kokkos.} = object
-  TeamVectorRange* {.importcpp: "Kokkos::TeamVectorRange", kokkos.} = object
+  TeamThreadRange {.importcpp: "Kokkos::TeamThreadRange", kokkos.} = object
+  TeamVectorRange {.importcpp: "Kokkos::ThreadVectorRange", kokkos.} = object
+
+type # combined team range
+  TeamRange* = object
+    case kind: TeamRangeKind
+      of ThreadRange: 
+        threadRange: TeamThreadRange
+      of VectorRange: 
+        vectorRange: TeamVectorRange
+    lower, upper: int
+    capture: LambdaCaptureKind
 
 type # backend: Nim --> C++ procedure kernels
   NimRangeKernel = proc(idx: cint) {.cdecl.}
@@ -65,6 +85,30 @@ proc deleteRangePolicy(policy: ptr RangePolicy) {.importcpp: "delete #", kokkos.
 proc newTeamPolicy(leagueSize, teamSize: int): ptr TeamPolicy 
   {.importcpp: "new Kokkos::TeamPolicy<>(#, #)", constructor, kokkos.}
 proc deleteTeamPolicy(policy: ptr TeamPolicy) {.importcpp: "delete #", kokkos.}
+
+# backend: C++ new/delete bindings for TeamThreadRange
+proc newTeamThreadRange(lower, upper: int): TeamThreadRange 
+  {.importcpp: "Kokkos::TeamThreadRange(#, #)", constructor, kokkos.}
+
+# backend: C++ new/delete bindings for TeamVectorRange
+proc newTeamVectorRange(lower, upper: int): TeamVectorRange 
+  {.importcpp: "Kokkos::TeamVectorRange(#, #)", constructor, kokkos.}
+
+# backend: C++ new/delete constructor for TeamRange
+proc newTeamRange*(
+  lower, upper: SomeInteger; 
+  kind: TeamRangeKind; 
+  capture: LambdaCaptureKind = ByRef
+): TeamRange {.inline.} =
+  result = TeamRange(
+    lower: lower.int, 
+    upper: upper.int, 
+    kind: kind,
+    capture: capture
+  )
+  case kind:
+    of ThreadRange: result.threadRange = newTeamThreadRange(lower.int, upper.int)
+    of VectorRange: result.vectorRange = newTeamVectorRange(lower.int, upper.int)
 
 # frontend: gets team size
 proc teamSize*(team: ThreadTeam): int {.importcpp: "#.team_size()", inline, kokkos.}
@@ -92,6 +136,14 @@ proc forall(policy: ptr TeamPolicy; body: NimTeamKernel)
   {.importcpp: TEAMFORALL, kokkos.}
 proc forall(policy: ptr RangePolicy; body: NimRangeKernel) 
   {.importcpp: FORALL, kokkos.}
+proc threadforeachval(rng: TeamThreadRange; body: NimRangeKernel) 
+  {.importcpp: TEAMTHREADFORALLVAL, kokkos.}
+proc threadforeachref(rng: TeamThreadRange; body: NimRangeKernel) 
+  {.importcpp: TEAMTHREADFORALLREF, kokkos.}
+proc vectorforeachval(rng: TeamVectorRange; body: NimRangeKernel) 
+  {.importcpp: TEAMVECTORFORALLVAL, kokkos.}
+proc vectorforeachref(rng: TeamVectorRange; body: NimRangeKernel) 
+  {.importcpp: TEAMVECTORFORALLREF, kokkos.}
 
 # backend: range for all
 proc rangeForAll(lower, upper: int; body: NimRangeKernel) {.inline.} =
@@ -105,8 +157,20 @@ proc teamForAll(leagueSize, teamSize: int; body: NimTeamKernel) {.inline.} =
   policy.forall(body)
   deleteTeamPolicy(policy)
 
+# backend: team thread range for all
+proc teamForEach(teamRange: TeamRange; body: NimRangeKernel) {.inline.} =
+  case teamRange.kind:
+    of ThreadRange: 
+      case teamRange.capture:
+        of ByRef: threadforeachref(teamRange.threadRange, body)
+        of ByVal: threadforeachval(teamRange.threadRange, body)
+    of VectorRange: 
+      case teamRange.capture:
+        of ByRef: vectorforeachref(teamRange.vectorRange, body)
+        of ByVal: vectorforeachval(teamRange.vectorRange, body)
+
 # frontend: flexible number of threads per team member
-template threadTeams*(leagueSize, teamSize: int; body: untyped): untyped =
+template threadTeams*(leagueSize, teamSize: SomeInteger; body: untyped): untyped =
   teamForAll(leagueSize, teamSize): 
     proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
       let team {.inject.} = localTeamHandle
@@ -122,12 +186,19 @@ template threads*(body: untyped): untyped =
   localBarrier()
 
 # frontend: forall construct
-template forall*(lower, upper: int; n: untyped; body: untyped): untyped =
+template forall*(lower, upper: SomeInteger; n: untyped; body: untyped): untyped =
   rangeForAll(lower, upper):
     proc(idx: cint) {.cdecl.} = 
       let n = idx
       body
   localBarrier()
+
+# frontend: foreach construct; to be used within thread team
+template foreach*(teamRange: TeamRange; n: untyped; body: untyped): untyped =
+  teamRange.teamForEach: 
+    proc(idx: cint) {.cdecl.} = 
+      let n = idx
+      body
 
 # lessons learned:
 # * nested procedures that are to be passed to a call expecting a specific 
@@ -147,6 +218,7 @@ when isMainModule:
       print "Hello from team member with league rank:", rank
       team.wait()
       print "Goodbye from team member with league rank:", rank
+      #let teamRange = newTeamRange(0, 4, ThreadRange)
     threads:
       let rank = thread.myRank()
       print "Hello from team member with my rank:", rank

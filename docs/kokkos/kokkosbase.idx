@@ -1,5 +1,11 @@
 nimTitle	kokkosbase	kokkos/kokkosbase.html	module kokkos/kokkosbase		0
-nim	kokkos	kokkos/kokkosbase.html#kokkos.t,untyped	template kokkos(pragmas: untyped): untyped		37
-nim	kokkosInit	kokkos/kokkosbase.html#kokkosInit	proc kokkosInit()		48
-nim	kokkosFinalize	kokkos/kokkosbase.html#kokkosFinalize	proc kokkosFinalize()		56
-nim	numThreads	kokkos/kokkosbase.html#numThreads	proc numThreads(): cint		61
+nim	kokkos	kokkos/kokkosbase.html#kokkos.t,untyped	template kokkos(pragmas: untyped): untyped		39
+nim	TooManyDynamicViewDimensionsError	kokkos/kokkosbase.html#TooManyDynamicViewDimensionsError	KokkosViewErrors.TooManyDynamicViewDimensionsError		45
+nim	EmptyDynamicViewDimensionsError	kokkos/kokkosbase.html#EmptyDynamicViewDimensionsError	KokkosViewErrors.EmptyDynamicViewDimensionsError		45
+nim	KokkosViewErrors	kokkos/kokkosbase.html#KokkosViewErrors	enum KokkosViewErrors		45
+nim	KokkosViewError	kokkos/kokkosbase.html#KokkosViewError	object KokkosViewError		50
+nim	kokkosInit	kokkos/kokkosbase.html#kokkosInit	proc kokkosInit()		57
+nim	kokkosFinalize	kokkos/kokkosbase.html#kokkosFinalize	proc kokkosFinalize()		65
+nim	numThreads	kokkos/kokkosbase.html#numThreads	proc numThreads(): cint		70
+nim	localBarrier	kokkos/kokkosbase.html#localBarrier	proc localBarrier()		73
+nim	newKokkosViewError	kokkos/kokkosbase.html#newKokkosViewError.t,KokkosViewErrors,untyped	template newKokkosViewError(err: KokkosViewErrors; appendToMessage: untyped): untyped		76

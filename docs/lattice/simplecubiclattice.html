@@ -54,8 +54,10 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#SimpleCubicLattice" title="SimpleCubicLattice = object of SimpleCubicLatticeRoot
-  numVecSites*: GeometryType">SimpleCubicLattice</a></li>
+      <li><a class="reference" href="#DistributedSimpleCubicLattice" title="DistributedSimpleCubicLattice = object of SimpleCubicLatticeRoot">DistributedSimpleCubicLattice</a></li>
+<li><a class="reference" href="#PaddedDistributedSimpleCubicLattice" title="PaddedDistributedSimpleCubicLattice = object of SimpleCubicLatticeRoot">PaddedDistributedSimpleCubicLattice</a></li>
+<li><a class="reference" href="#PaddedSimpleCubicLattice" title="PaddedSimpleCubicLattice = GlobalPointer[PaddedDistributedSimpleCubicLattice]">PaddedSimpleCubicLattice</a></li>
+<li><a class="reference" href="#SimpleCubicLattice" title="SimpleCubicLattice = GlobalPointer[DistributedSimpleCubicLattice]">SimpleCubicLattice</a></li>
 
     </ul>
   </details>
@@ -68,33 +70,29 @@
   <li><a class="reference" href="#%24%2CSimpleCubicLattice" title="`$`(l: SimpleCubicLattice): string">`$`(l: SimpleCubicLattice): string</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">latticeCoordinate
-  <li><a class="reference" href="#latticeCoordinate%2CSimpleCubicLattice%2Cint" title="latticeCoordinate(l: SimpleCubicLattice; n: int): seq[int]">latticeCoordinate(l: SimpleCubicLattice; n: int): seq[int]</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">newSimpleCubicLattice
-  <li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2Cbool%2Cbool%2Cbool" title="newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
-                      startWithLastDimensionInLocalPartition: bool = true;
-                      startWithLastDimensionInVectorPartition: bool = false;
-                      printLatticeGeometrySummary: bool = true): SimpleCubicLattice">newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
-                      startWithLastDimensionInLocalPartition: bool = true;
-                      startWithLastDimensionInVectorPartition: bool = false;
-                      printLatticeGeometrySummary: bool = true): SimpleCubicLattice</a></li>
-<li><a class="reference" href="#newSimpleCubicLattice%2CSimpleCubicLattice" title="newSimpleCubicLattice(other: SimpleCubicLattice): SimpleCubicLattice">newSimpleCubicLattice(other: SimpleCubicLattice): SimpleCubicLattice</a></li>
-<li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2CopenArray%5BS%5D%2Cbool" title="newSimpleCubicLattice[L: SomeInteger; D: SomeInteger; S: SomeInteger](
-    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];
-    sharedMemoryGeometry: openArray[S];
-    printLatticeGeometrySummary: bool = false): SimpleCubicLattice">newSimpleCubicLattice[L: SomeInteger; D: SomeInteger; S: SomeInteger](
-    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];
-    sharedMemoryGeometry: openArray[S];
-    printLatticeGeometrySummary: bool = false): SimpleCubicLattice</a></li>
-<li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2Cbool%2Cbool" title="newSimpleCubicLattice[L: SomeInteger; D: SomeInteger](
-    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];
-    startWithLastDimensionInVectorPartition: bool = false;
-    printLatticeGeometrySummary: bool = true): SimpleCubicLattice">newSimpleCubicLattice[L: SomeInteger; D: SomeInteger](
-    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];
-    startWithLastDimensionInVectorPartition: bool = false;
-    printLatticeGeometrySummary: bool = true): SimpleCubicLattice</a></li>
+  <li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2Cbool" title="newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      distributedMemoryPartition: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice">newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      distributedMemoryPartition: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice</a></li>
+<li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2Cbool" title="newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      distributedMemoryPartition: openArray[SomeInteger];
+                      sharedMemoryPartition: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice">newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      distributedMemoryPartition: openArray[SomeInteger];
+                      sharedMemoryPartition: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice</a></li>
+<li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2Cbool" title="newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice">newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];
+                      quiet: bool = false): SimpleCubicLattice</a></li>
+<li><a class="reference" href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2CopenArray%5BS%5D%2CopenArray%5BV%5D%2Cbool" title="newSimpleCubicLattice[L, D, S, V: SomeInteger](latticeGeometry: openArray[L];
+    distributedMemoryPartition: openArray[D];
+    sharedMemoryPartition: openArray[S]; vectorLanePartition: openArray[V];
+    quiet: bool = false): SimpleCubicLattice">newSimpleCubicLattice[L, D, S, V: SomeInteger](latticeGeometry: openArray[L];
+    distributedMemoryPartition: openArray[D];
+    sharedMemoryPartition: openArray[S]; vectorLanePartition: openArray[V];
+    quiet: bool = false): SimpleCubicLattice</a></li>
 
 </ul>
 
@@ -105,8 +103,48 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#18" id="68">Templates</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">sites
-  <li><a class="reference" href="#sites.t%2CSimpleCubicLattice%2Cuntyped%2Cuntyped" title="sites(l: SimpleCubicLattice; n: untyped; work: untyped): untyped">sites(l: SimpleCubicLattice; n: untyped; work: untyped): untyped</a></li>
+      <ul class="simple nested-toc-section">distributedMemoryGeometry
+  <li><a class="reference" href="#distributedMemoryGeometry.t%2CSimpleCubicLattice" title="distributedMemoryGeometry(l: SimpleCubicLattice): untyped">distributedMemoryGeometry(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">distributedMemoryPartition
+  <li><a class="reference" href="#distributedMemoryPartition.t%2CSimpleCubicLattice" title="distributedMemoryPartition(l: SimpleCubicLattice): untyped">distributedMemoryPartition(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">globalGeometry
+  <li><a class="reference" href="#globalGeometry.t%2CSimpleCubicLattice" title="globalGeometry(l: SimpleCubicLattice): untyped">globalGeometry(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">numDistributedSites
+  <li><a class="reference" href="#numDistributedSites.t%2CSimpleCubicLattice" title="numDistributedSites(l: SimpleCubicLattice): untyped">numDistributedSites(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">numGlobalSites
+  <li><a class="reference" href="#numGlobalSites.t%2CSimpleCubicLattice" title="numGlobalSites(l: SimpleCubicLattice): untyped">numGlobalSites(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">numSharedSites
+  <li><a class="reference" href="#numSharedSites.t%2CSimpleCubicLattice" title="numSharedSites(l: SimpleCubicLattice): untyped">numSharedSites(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">numVectorLaneSites
+  <li><a class="reference" href="#numVectorLaneSites.t%2CSimpleCubicLattice" title="numVectorLaneSites(l: SimpleCubicLattice): untyped">numVectorLaneSites(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">sharedMemoryGeometry
+  <li><a class="reference" href="#sharedMemoryGeometry.t%2CSimpleCubicLattice" title="sharedMemoryGeometry(l: SimpleCubicLattice): untyped">sharedMemoryGeometry(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">sharedMemoryPartition
+  <li><a class="reference" href="#sharedMemoryPartition.t%2CSimpleCubicLattice" title="sharedMemoryPartition(l: SimpleCubicLattice): untyped">sharedMemoryPartition(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">vectorLaneGeometry
+  <li><a class="reference" href="#vectorLaneGeometry.t%2CSimpleCubicLattice" title="vectorLaneGeometry(l: SimpleCubicLattice): untyped">vectorLaneGeometry(l: SimpleCubicLattice): untyped</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">vectorLanePartition
+  <li><a class="reference" href="#vectorLanePartition.t%2CSimpleCubicLattice" title="vectorLanePartition(l: SimpleCubicLattice): untyped">vectorLanePartition(l: SimpleCubicLattice): untyped</a></li>
 
 </ul>
 
@@ -125,20 +163,41 @@
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="../backend.html">../backend</a>, <a class="reference external" href="../runtime.html">../runtime</a>, <a class="reference external" href="../utils.html">../utils</a>, <a class="reference external" href="latticeconcept.html">latticeconcept</a>
+    <a class="reference external" href="../backend.html">../backend</a>, <a class="reference external" href="../runtime.html">../runtime</a>, <a class="reference external" href="latticeconcept.html">latticeconcept</a>
   </dl>
 </div>
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="SimpleCubicLattice">
-  <dt><pre><a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">SimpleCubicLatticeRoot</span>
-  <span class="Identifier">numVecSites</span><span class="Operator">*</span><span class="Other">:</span> <a href="latticeconcept.html#GeometryType"><span class="Identifier">GeometryType</span></a></pre></dt>
+    <div id="DistributedSimpleCubicLattice">
+  <dt><pre><a href="simplecubiclattice.html#DistributedSimpleCubicLattice"><span class="Identifier">DistributedSimpleCubicLattice</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">SimpleCubicLatticeRoot</span></pre></dt>
   <dd>
     
-    <p>Simple cubic Bravais lattice</p>
-<p>&lt;in need of documentation&gt;</p>
-
+    
+    
+  </dd>
+</div>
+<div id="PaddedDistributedSimpleCubicLattice">
+  <dt><pre><a href="simplecubiclattice.html#PaddedDistributedSimpleCubicLattice"><span class="Identifier">PaddedDistributedSimpleCubicLattice</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">SimpleCubicLatticeRoot</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="PaddedSimpleCubicLattice">
+  <dt><pre><a href="simplecubiclattice.html#PaddedSimpleCubicLattice"><span class="Identifier">PaddedSimpleCubicLattice</span></a> <span class="Other">=</span> <a href="../upcxx/globalptr.html#GlobalPointer"><span class="Identifier">GlobalPointer</span></a><span class="Other">[</span><a href="simplecubiclattice.html#PaddedDistributedSimpleCubicLattice"><span class="Identifier">PaddedDistributedSimpleCubicLattice</span></a><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="SimpleCubicLattice">
+  <dt><pre><a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a> <span class="Other">=</span> <a href="../upcxx/globalptr.html#GlobalPointer"><span class="Identifier">GlobalPointer</span></a><span class="Other">[</span><a href="simplecubiclattice.html#DistributedSimpleCubicLattice"><span class="Identifier">DistributedSimpleCubicLattice</span></a><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    
     
   </dd>
 </div>
@@ -159,78 +218,69 @@
 </div>
 
 </div>
-<div id="latticeCoordinate-procs-all">
-  <div id="latticeCoordinate,SimpleCubicLattice,int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#latticeCoordinate%2CSimpleCubicLattice%2Cint"><span class="Identifier">latticeCoordinate</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+<div id="newSimpleCubicLattice-procs-all">
+  <div id="newSimpleCubicLattice,openArray[SomeInteger],openArray[SomeInteger],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">(</span><span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">distributedMemoryPartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">quiet</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
   <dd>
     
-    <p>Gets lattice coordinate from flattened index</p>
-<p>&lt;in need of documentation&gt;</p>
+    <p><tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>TL;DR: next-to-simplest <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>The following attributes of <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> are inferred.</p>
+<ul class="simple"><li>Shared memory geometry inferred from shared memory rank number</li>
+<li>Vector lane geometry inferred from SIMD lane number</li>
+</ul>
+<p>Please refer to primary constructor method for further details.</p>
 
     
   </dd>
 </div>
-
-</div>
-<div id="newSimpleCubicLattice-procs-all">
-  <div id="newSimpleCubicLattice,openArray[SomeInteger],bool,bool,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2Cbool%2Cbool%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">(</span><span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
-                           <span class="Identifier">startWithLastDimensionInLocalPartition</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
-    <span class="Identifier">startWithLastDimensionInVectorPartition</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span>
-                           <span class="Identifier">printLatticeGeometrySummary</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
+<div id="newSimpleCubicLattice,openArray[SomeInteger],openArray[SomeInteger],openArray[SomeInteger],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2CopenArray%5BSomeInteger%5D%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">(</span><span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">distributedMemoryPartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">sharedMemoryPartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">quiet</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
   <dd>
     
-    <p>SimpleCubicLattice constructor</p>
-<p>TL;DR: Simplest SimpleCubicLattice constructor</p>
-<p>The following attributes of SimpleCubicLattice are inferred.</p>
+    <p><tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>TL;DR: next-to-next-to-simplest <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>The following attributes of <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> are inferred.</p>
+<ul class="simple"><li>Vector lane geometry inferred from SIMD lane number</li>
+</ul>
+<p>Please refer to primary constructor method for further details.</p>
+
+    
+  </dd>
+</div>
+<div id="newSimpleCubicLattice,openArray[SomeInteger],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BSomeInteger%5D%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">(</span><span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">;</span>
+                           <span class="Identifier">quiet</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
+  <dd>
+    
+    <p><tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>TL;DR: simplest <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>The following attributes of <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> are inferred.</p>
 <ul class="simple"><li>Distributed memory geometry inferred from rank number. Splitting of lattice dimensions into ranks starts with last dimension (conventional Euclidean time direction).</li>
 <li>Shared memory geometry inferred from shared memory rank number</li>
+<li>Vector lane geometry inferred from SIMD lane number</li>
 </ul>
 <p>Please refer to primary constructor method for further details.</p>
 
     
   </dd>
 </div>
-<div id="newSimpleCubicLattice,SimpleCubicLattice">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CSimpleCubicLattice"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">(</span><span class="Identifier">other</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+<div id="newSimpleCubicLattice,openArray[L],openArray[D],openArray[S],openArray[V],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2CopenArray%5BS%5D%2CopenArray%5BV%5D%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">[</span><span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">S</span><span class="Other">,</span> <span class="Identifier">V</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">L</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">distributedMemoryPartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span>
+    <span class="Identifier">sharedMemoryPartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">S</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">vectorLanePartition</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">V</span><span class="Other">]</span><span class="Other">;</span>
+    <span class="Identifier">quiet</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
   <dd>
     
-    <p>SimpleCubicLattice copy constructor</p>
-<p>Copy constructor for SimpleCubicLattice. &lt;in need of more documentation&gt;</p>
-
-    
-  </dd>
-</div>
-<div id="newSimpleCubicLattice,openArray[L],openArray[D],openArray[S],bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2CopenArray%5BS%5D%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">[</span><span class="Identifier">L</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">;</span> <span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">;</span> <span class="Identifier">S</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">(</span>
-    <span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">L</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">distMemoryGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span>
-    <span class="Identifier">sharedMemoryGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">S</span><span class="Other">]</span><span class="Other">;</span>
-    <span class="Identifier">printLatticeGeometrySummary</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
-  <dd>
-    
-    <p>SimpleCubicLattice constructor</p>
-<p>TL;DR: Base SimpleCubicLattice constructor</p>
-<p>Primary constructor for SimpleCubicLattice. All constructor variants attempt to infer any information that is not provided explicitly to this constructor. Plase see variants of SimpleCubicLattice constructor for details of what is inferred and how it is inferred.</p>
-<p>&lt;in need of more documentation&gt;</p>
-
-    
-  </dd>
-</div>
-<div id="newSimpleCubicLattice,openArray[L],openArray[D],bool,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newSimpleCubicLattice%2CopenArray%5BL%5D%2CopenArray%5BD%5D%2Cbool%2Cbool"><span class="Identifier">newSimpleCubicLattice</span></a><span class="Other">[</span><span class="Identifier">L</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">;</span> <span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">]</span><span class="Other">(</span>
-    <span class="Identifier">latticeGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">L</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">distMemoryGeometry</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span>
-    <span class="Identifier">startWithLastDimensionInVectorPartition</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span>
-    <span class="Identifier">printLatticeGeometrySummary</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
-  <dd>
-    
-    <p>SimpleCubicLattice constructor</p>
-<p>TL;DR: Next-to-simplest SimpleCubicLattice constructor</p>
-<p>The following attributes of SimpleCubicLattice are inferred.</p>
-<ul class="simple"><li>Shared memory geometry inferred from shared memory rank number</li>
-</ul>
-<p>Please refer to primary constructor method for further details.</p>
+    <p><tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor</p>
+<p>TL;DR: base <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt> constructor; called by all constructor variants</p>
+<p>Default constructor for <tt class="docutils literal"><span class="pre"><span class="Identifier">SimpleCubicLattice</span></span></tt>. Lattice indices are assigned hierarhically to ranks, threads, and vector lanes.</p>
+<p>NOTE: SHOULD INCLUDE DIAGRAM OF HIERARCHICAL PARTITIONING AND AFFINITIES</p>
 
     
   </dd>
@@ -243,9 +293,119 @@
 <div class="section" id="18">
   <h1><a class="toc-backref" href="#18">Templates</a></h1>
   <dl class="item">
-    <div id="sites-templates-all">
-  <div id="sites.t,SimpleCubicLattice,untyped,untyped">
-  <dt><pre><span class="Keyword">template</span> <a href="#sites.t%2CSimpleCubicLattice%2Cuntyped%2Cuntyped"><span class="Identifier">sites</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">;</span> <span class="Identifier">work</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+    <div id="distributedMemoryGeometry-templates-all">
+  <div id="distributedMemoryGeometry.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#distributedMemoryGeometry.t%2CSimpleCubicLattice"><span class="Identifier">distributedMemoryGeometry</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="distributedMemoryPartition-templates-all">
+  <div id="distributedMemoryPartition.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#distributedMemoryPartition.t%2CSimpleCubicLattice"><span class="Identifier">distributedMemoryPartition</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="globalGeometry-templates-all">
+  <div id="globalGeometry.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#globalGeometry.t%2CSimpleCubicLattice"><span class="Identifier">globalGeometry</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="numDistributedSites-templates-all">
+  <div id="numDistributedSites.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#numDistributedSites.t%2CSimpleCubicLattice"><span class="Identifier">numDistributedSites</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="numGlobalSites-templates-all">
+  <div id="numGlobalSites.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#numGlobalSites.t%2CSimpleCubicLattice"><span class="Identifier">numGlobalSites</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="numSharedSites-templates-all">
+  <div id="numSharedSites.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#numSharedSites.t%2CSimpleCubicLattice"><span class="Identifier">numSharedSites</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="numVectorLaneSites-templates-all">
+  <div id="numVectorLaneSites.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#numVectorLaneSites.t%2CSimpleCubicLattice"><span class="Identifier">numVectorLaneSites</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="sharedMemoryGeometry-templates-all">
+  <div id="sharedMemoryGeometry.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#sharedMemoryGeometry.t%2CSimpleCubicLattice"><span class="Identifier">sharedMemoryGeometry</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="sharedMemoryPartition-templates-all">
+  <div id="sharedMemoryPartition.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#sharedMemoryPartition.t%2CSimpleCubicLattice"><span class="Identifier">sharedMemoryPartition</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="vectorLaneGeometry-templates-all">
+  <div id="vectorLaneGeometry.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#vectorLaneGeometry.t%2CSimpleCubicLattice"><span class="Identifier">vectorLaneGeometry</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="vectorLanePartition-templates-all">
+  <div id="vectorLanePartition.t,SimpleCubicLattice">
+  <dt><pre><span class="Keyword">template</span> <a href="#vectorLanePartition.t%2CSimpleCubicLattice"><span class="Identifier">vectorLanePartition</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
   <dd>
     
     
@@ -264,7 +424,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-21 16:02:04 UTC</small>
       </div>
     </div>
   </div>

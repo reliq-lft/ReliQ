@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: build/flags.py
+  Contact: reliq-lft@proton.me
+
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -84,9 +86,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # set environment variables
+    XXX_NUM_THREADS: str = args.nthreads
+    OMP_PROC_BIND: str = args.OMP_PROC_BIND
+    OMP_PLACES: str = args.OMP_PLACES
     env_vars = {
-        "OMP_PROC_BIND": args.OMP_PROC_BIND,
-        "OMP_PLACES": args.OMP_PLACES
+        "KOKKOS_NUM_THREADS": XXX_NUM_THREADS,
+        "OMP_NUM_THREADS": XXX_NUM_THREADS,
+        "OMP_PROC_BIND": OMP_PROC_BIND,
+        "OMP_PLACES": OMP_PLACES
     }
     for var, value in env_vars.items(): os.environ[var] = value
 

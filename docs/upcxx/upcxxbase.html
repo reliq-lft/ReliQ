@@ -51,16 +51,16 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">myRank
+      <ul class="simple nested-toc-section">globalBarrier
+  <li><a class="reference" href="#globalBarrier" title="globalBarrier()">globalBarrier()</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">myRank
   <li><a class="reference" href="#myRank" title="myRank(): cint">myRank(): cint</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">numRanks
   <li><a class="reference" href="#numRanks" title="numRanks(): cint">numRanks(): cint</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">upcxxBarrier
-  <li><a class="reference" href="#upcxxBarrier" title="upcxxBarrier()">upcxxBarrier()</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">upcxxFinalize
@@ -99,7 +99,20 @@
     <div class="section" id="12">
   <h1><a class="toc-backref" href="#12">Procs</a></h1>
   <dl class="item">
-    <div id="myRank-procs-all">
+    <div id="globalBarrier-procs-all">
+  <div id="globalBarrier">
+  <dt><pre><span class="Keyword">proc</span> <a href="#globalBarrier"><span class="Identifier">globalBarrier</span></a><span class="Other">(</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;upcxx::barrier()&quot;</span><span class="Other">,</span>
+                       <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;upcxx/upcxx.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                       <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="myRank-procs-all">
   <div id="myRank">
   <dt><pre><span class="Keyword">proc</span> <a href="#myRank"><span class="Identifier">myRank</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">cint</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;upcxx::rank_me()&quot;</span><span class="Other">,</span>
                       <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;upcxx/upcxx.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
@@ -117,19 +130,6 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#numRanks"><span class="Identifier">numRanks</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">cint</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;upcxx::rank_n()&quot;</span><span class="Other">,</span>
                         <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;upcxx/upcxx.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
                         <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="upcxxBarrier-procs-all">
-  <div id="upcxxBarrier">
-  <dt><pre><span class="Keyword">proc</span> <a href="#upcxxBarrier"><span class="Identifier">upcxxBarrier</span></a><span class="Other">(</span><span class="Other">)</span> {.<span class="Identifier">importcpp</span><span class="Other">:</span> <span class="StringLit">&quot;upcxx::barrier()&quot;</span><span class="Other">,</span>
-                      <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;&lt;upcxx/upcxx.hpp&gt;&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-                      <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -191,7 +191,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-21 16:02:04 UTC</small>
       </div>
     </div>
   </div>

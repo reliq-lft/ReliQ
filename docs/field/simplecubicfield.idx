@@ -1,39 +1,11 @@
 nimTitle	simplecubicfield	field/simplecubicfield.html	module field/simplecubicfield		0
-nim	SimpleCubicField	field/simplecubicfield.html#SimpleCubicField	object SimpleCubicField		38
-nim	conformable	field/simplecubicfield.html#conformable,SimpleCubicField[T],SimpleCubicField[T]	proc conformable[T](fx, fy: SimpleCubicField[T])		72
-nim	newField	field/simplecubicfield.html#newField,SimpleCubicLattice,typedesc	proc newField(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T]		82
-nim	lattice	field/simplecubicfield.html#lattice,SimpleCubicField[T]	proc lattice[T](f: SimpleCubicField[T]): SimpleCubicLattice		94
-nim	sites	field/simplecubicfield.html#sites.t,SimpleCubicField[T],untyped,untyped	template sites[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped		102
-nim	`[]`	field/simplecubicfield.html#[],SimpleCubicField[T],SomeInteger	proc `[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]		108
-nim	`[]=`	field/simplecubicfield.html#[]=,SimpleCubicField[T],SomeInteger,SIMXVec[T]	proc `[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])		115
-nim	`=copy`	field/simplecubicfield.html#=copy,SimpleCubicField[T],SimpleCubicField[T]	proc `=copy`[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T])		126
-nim	`:=`	field/simplecubicfield.html#:=,SimpleCubicField[T],T	proc `:=`[T](f: var SimpleCubicField[T]; value: T)		137
-nim	defineBinaryOperations	field/simplecubicfield.html#defineBinaryOperations.t,untyped,untyped	template defineBinaryOperations(op: untyped; ope: untyped)		144
-nim	`+`	field/simplecubicfield.html#+,,	proc `+`[T](fx`gensym4, fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]		145
-nim	`+=`	field/simplecubicfield.html#+=,,	proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; fy`gensym4: SimpleCubicField[T])		150
-nim	`+`	field/simplecubicfield.html#+,,T	proc `+`[T](fx`gensym4: SimpleCubicField[T]; y`gensym4: T): SimpleCubicField[T]		153
-nim	`+`	field/simplecubicfield.html#+,T,	proc `+`[T](x`gensym4: T; fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]		157
-nim	`+=`	field/simplecubicfield.html#+=,,T	proc `+=`[T](fx`gensym4: var SimpleCubicField[T]; y`gensym4: T)		163
-nim	`-`	field/simplecubicfield.html#-,,	proc `-`[T](fx`gensym5, fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]		145
-nim	`-=`	field/simplecubicfield.html#-=,,	proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; fy`gensym5: SimpleCubicField[T])		150
-nim	`-`	field/simplecubicfield.html#-,,T	proc `-`[T](fx`gensym5: SimpleCubicField[T]; y`gensym5: T): SimpleCubicField[T]		153
-nim	`-`	field/simplecubicfield.html#-,T,	proc `-`[T](x`gensym5: T; fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]		157
-nim	`-=`	field/simplecubicfield.html#-=,,T	proc `-=`[T](fx`gensym5: var SimpleCubicField[T]; y`gensym5: T)		164
-nim	`*`	field/simplecubicfield.html#*,,	proc `*`[T](fx`gensym6, fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]		145
-nim	`*=`	field/simplecubicfield.html#*=,,	proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; fy`gensym6: SimpleCubicField[T])		150
-nim	`*`	field/simplecubicfield.html#*,,T	proc `*`[T](fx`gensym6: SimpleCubicField[T]; y`gensym6: T): SimpleCubicField[T]		153
-nim	`*`	field/simplecubicfield.html#*,T,	proc `*`[T](x`gensym6: T; fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]		157
-nim	`*=`	field/simplecubicfield.html#*=,,T	proc `*=`[T](fx`gensym6: var SimpleCubicField[T]; y`gensym6: T)		165
-nim	`/`	field/simplecubicfield.html#/,,	proc `/`[T](fx`gensym7, fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]		145
-nim	`/=`	field/simplecubicfield.html#/=,,	proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; fy`gensym7: SimpleCubicField[T])		150
-nim	`/`	field/simplecubicfield.html#/,,T	proc `/`[T](fx`gensym7: SimpleCubicField[T]; y`gensym7: T): SimpleCubicField[T]		153
-nim	`/`	field/simplecubicfield.html#/,T,	proc `/`[T](x`gensym7: T; fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]		157
-nim	`/=`	field/simplecubicfield.html#/=,,T	proc `/=`[T](fx`gensym7: var SimpleCubicField[T]; y`gensym7: T)		166
-nimgrp	+=	field/simplecubicfield.html#+=-procs-all	proc		163
-nimgrp	/	field/simplecubicfield.html#/-procs-all	proc		145
-nimgrp	*	field/simplecubicfield.html#*-procs-all	proc		145
-nimgrp	-	field/simplecubicfield.html#--procs-all	proc		145
-nimgrp	-=	field/simplecubicfield.html#-=-procs-all	proc		164
-nimgrp	/=	field/simplecubicfield.html#/=-procs-all	proc		166
-nimgrp	+	field/simplecubicfield.html#+-procs-all	proc		145
-nimgrp	*=	field/simplecubicfield.html#*=-procs-all	proc		165
+nim	SimpleCubicField	field/simplecubicfield.html#SimpleCubicField	type SimpleCubicField		45
+nim	newField	field/simplecubicfield.html#newField,SimpleCubicLattice,typedesc	proc newField(l: SimpleCubicLattice; T: typedesc): auto		56
+nim	threadStrides	field/simplecubicfield.html#threadStrides,SimpleCubicField[T]	proc threadStrides[T](f: SimpleCubicField[T]): int		81
+nim	vectorStrides	field/simplecubicfield.html#vectorStrides,SimpleCubicField[T]	proc vectorStrides[T](f: SimpleCubicField[T]): int		85
+nim	len	field/simplecubicfield.html#len,SimpleCubicField[T]	proc len[T](f: SimpleCubicField[T]): int		89
+nim	numSites	field/simplecubicfield.html#numSites,SimpleCubicField[T]	proc numSites[T](f: SimpleCubicField[T]): int		93
+nim	data	field/simplecubicfield.html#data,SimpleCubicField[T]	proc data[T](f: SimpleCubicField[T]): ptr UncheckedArray[T]		97
+nim	localField	field/simplecubicfield.html#localField,SimpleCubicField[T]	proc localField[T](f: SimpleCubicField[T]): StaticView[T]		103
+nim	`[]`	field/simplecubicfield.html#[],SimpleCubicField[T],SomeInteger	proc `[]`[T](f: SimpleCubicField[T]; n: SomeInteger): T		109
+nim	`:=`	field/simplecubicfield.html#:=.m,SimpleCubicField[T],untyped	macro `:=`[T](f: var SimpleCubicField[T]; expression: untyped): untyped		115

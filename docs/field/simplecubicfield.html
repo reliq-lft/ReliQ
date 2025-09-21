@@ -54,7 +54,7 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#SimpleCubicField" title="SimpleCubicField[T] = object">SimpleCubicField</a></li>
+      <li><a class="reference" href="#SimpleCubicField" title="SimpleCubicField[T] = GlobalPointer[DistributedFieldData[T]]">SimpleCubicField</a></li>
 
     </ul>
   </details>
@@ -63,76 +63,36 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">*
-  <li><a class="reference" href="#%2A%2C%2C" title="`*`[T](fx`gensym6, fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]">`*`[T](fx`gensym6, fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2A%2C%2CT" title="`*`[T](fx`gensym6: SimpleCubicField[T]; y`gensym6: T): SimpleCubicField[T]">`*`[T](fx`gensym6: SimpleCubicField[T]; y`gensym6: T): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2A%2CT%2C" title="`*`[T](x`gensym6: T; fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]">`*`[T](x`gensym6: T; fy`gensym6: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+      <ul class="simple nested-toc-section">[]
+  <li><a class="reference" href="#%5B%5D%2CSimpleCubicField%5BT%5D%2CSomeInteger" title="`[]`[T](f: SimpleCubicField[T]; n: SomeInteger): T">`[]`[T](f: SimpleCubicField[T]; n: SomeInteger): T</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">*=
-  <li><a class="reference" href="#%2A%3D%2C%2C" title="`*=`[T](fx`gensym6: var SimpleCubicField[T]; fy`gensym6: SimpleCubicField[T])">`*=`[T](fx`gensym6: var SimpleCubicField[T]; fy`gensym6: SimpleCubicField[T])</a></li>
-<li><a class="reference" href="#%2A%3D%2C%2CT" title="`*=`[T](fx`gensym6: var SimpleCubicField[T]; y`gensym6: T)">`*=`[T](fx`gensym6: var SimpleCubicField[T]; y`gensym6: T)</a></li>
+<ul class="simple nested-toc-section">data
+  <li><a class="reference" href="#data%2CSimpleCubicField%5BT%5D" title="data[T](f: SimpleCubicField[T]): ptr UncheckedArray[T]">data[T](f: SimpleCubicField[T]): ptr UncheckedArray[T]</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">+
-  <li><a class="reference" href="#%2B%2C%2C" title="`+`[T](fx`gensym4, fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]">`+`[T](fx`gensym4, fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2B%2C%2CT" title="`+`[T](fx`gensym4: SimpleCubicField[T]; y`gensym4: T): SimpleCubicField[T]">`+`[T](fx`gensym4: SimpleCubicField[T]; y`gensym4: T): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2B%2CT%2C" title="`+`[T](x`gensym4: T; fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]">`+`[T](x`gensym4: T; fy`gensym4: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
+<ul class="simple nested-toc-section">len
+  <li><a class="reference" href="#len%2CSimpleCubicField%5BT%5D" title="len[T](f: SimpleCubicField[T]): int">len[T](f: SimpleCubicField[T]): int</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">+=
-  <li><a class="reference" href="#%2B%3D%2C%2C" title="`+=`[T](fx`gensym4: var SimpleCubicField[T]; fy`gensym4: SimpleCubicField[T])">`+=`[T](fx`gensym4: var SimpleCubicField[T]; fy`gensym4: SimpleCubicField[T])</a></li>
-<li><a class="reference" href="#%2B%3D%2C%2CT" title="`+=`[T](fx`gensym4: var SimpleCubicField[T]; y`gensym4: T)">`+=`[T](fx`gensym4: var SimpleCubicField[T]; y`gensym4: T)</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">-
-  <li><a class="reference" href="#-%2C%2C" title="`-`[T](fx`gensym5, fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]">`-`[T](fx`gensym5, fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#-%2C%2CT" title="`-`[T](fx`gensym5: SimpleCubicField[T]; y`gensym5: T): SimpleCubicField[T]">`-`[T](fx`gensym5: SimpleCubicField[T]; y`gensym5: T): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#-%2CT%2C" title="`-`[T](x`gensym5: T; fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]">`-`[T](x`gensym5: T; fy`gensym5: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">-=
-  <li><a class="reference" href="#-%3D%2C%2C" title="`-=`[T](fx`gensym5: var SimpleCubicField[T]; fy`gensym5: SimpleCubicField[T])">`-=`[T](fx`gensym5: var SimpleCubicField[T]; fy`gensym5: SimpleCubicField[T])</a></li>
-<li><a class="reference" href="#-%3D%2C%2CT" title="`-=`[T](fx`gensym5: var SimpleCubicField[T]; y`gensym5: T)">`-=`[T](fx`gensym5: var SimpleCubicField[T]; y`gensym5: T)</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">/
-  <li><a class="reference" href="#%2F%2C%2C" title="`/`[T](fx`gensym7, fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]">`/`[T](fx`gensym7, fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2F%2C%2CT" title="`/`[T](fx`gensym7: SimpleCubicField[T]; y`gensym7: T): SimpleCubicField[T]">`/`[T](fx`gensym7: SimpleCubicField[T]; y`gensym7: T): SimpleCubicField[T]</a></li>
-<li><a class="reference" href="#%2F%2CT%2C" title="`/`[T](x`gensym7: T; fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]">`/`[T](x`gensym7: T; fy`gensym7: SimpleCubicField[T]): SimpleCubicField[T]</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">/=
-  <li><a class="reference" href="#%2F%3D%2C%2C" title="`/=`[T](fx`gensym7: var SimpleCubicField[T]; fy`gensym7: SimpleCubicField[T])">`/=`[T](fx`gensym7: var SimpleCubicField[T]; fy`gensym7: SimpleCubicField[T])</a></li>
-<li><a class="reference" href="#%2F%3D%2C%2CT" title="`/=`[T](fx`gensym7: var SimpleCubicField[T]; y`gensym7: T)">`/=`[T](fx`gensym7: var SimpleCubicField[T]; y`gensym7: T)</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">:=
-  <li><a class="reference" href="#%3A%3D%2CSimpleCubicField%5BT%5D%2CT" title="`:=`[T](f: var SimpleCubicField[T]; value: T)">`:=`[T](f: var SimpleCubicField[T]; value: T)</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">=copy
-  <li><a class="reference" href="#%3Dcopy%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D" title="`=copy`[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T])">`=copy`[T](fx: var SimpleCubicField[T]; fy: SimpleCubicField[T])</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">[]
-  <li><a class="reference" href="#%5B%5D%2CSimpleCubicField%5BT%5D%2CSomeInteger" title="`[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]">`[]`[T](f: SimpleCubicField[T]; n: SomeInteger): SIMXVec[T]</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">[]=
-  <li><a class="reference" href="#%5B%5D%3D%2CSimpleCubicField%5BT%5D%2CSomeInteger%2CSIMXVec%5BT%5D" title="`[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])">`[]=`[T](f: var SimpleCubicField[T]; n: SomeInteger; value: SIMXVec[T])</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">conformable
-  <li><a class="reference" href="#conformable%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D" title="conformable[T](fx, fy: SimpleCubicField[T])">conformable[T](fx, fy: SimpleCubicField[T])</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">lattice
-  <li><a class="reference" href="#lattice%2CSimpleCubicField%5BT%5D" title="lattice[T](f: SimpleCubicField[T]): SimpleCubicLattice">lattice[T](f: SimpleCubicField[T]): SimpleCubicLattice</a></li>
+<ul class="simple nested-toc-section">localField
+  <li><a class="reference" href="#localField%2CSimpleCubicField%5BT%5D" title="localField[T](f: SimpleCubicField[T]): StaticView[T]">localField[T](f: SimpleCubicField[T]): StaticView[T]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newField
-  <li><a class="reference" href="#newField%2CSimpleCubicLattice%2Ctypedesc" title="newField(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T]">newField(lattice: SimpleCubicLattice; T: typedesc): SimpleCubicField[T]</a></li>
+  <li><a class="reference" href="#newField%2CSimpleCubicLattice%2Ctypedesc" title="newField(l: SimpleCubicLattice; T: typedesc): auto">newField(l: SimpleCubicLattice; T: typedesc): auto</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">numSites
+  <li><a class="reference" href="#numSites%2CSimpleCubicField%5BT%5D" title="numSites[T](f: SimpleCubicField[T]): int">numSites[T](f: SimpleCubicField[T]): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">threadStrides
+  <li><a class="reference" href="#threadStrides%2CSimpleCubicField%5BT%5D" title="threadStrides[T](f: SimpleCubicField[T]): int">threadStrides[T](f: SimpleCubicField[T]): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">vectorStrides
+  <li><a class="reference" href="#vectorStrides%2CSimpleCubicField%5BT%5D" title="vectorStrides[T](f: SimpleCubicField[T]): int">vectorStrides[T](f: SimpleCubicField[T]): int</a></li>
 
 </ul>
 
@@ -141,14 +101,10 @@
 </li>
 <li>
   <details open>
-    <summary><a class="reference reference-toplevel" href="#18" id="68">Templates</a></summary>
+    <summary><a class="reference reference-toplevel" href="#17" id="67">Macros</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">defineBinaryOperations
-  <li><a class="reference" href="#defineBinaryOperations.t%2Cuntyped%2Cuntyped" title="defineBinaryOperations(op: untyped; ope: untyped)">defineBinaryOperations(op: untyped; ope: untyped)</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">sites
-  <li><a class="reference" href="#sites.t%2CSimpleCubicField%5BT%5D%2Cuntyped%2Cuntyped" title="sites[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped">sites[T](f: SimpleCubicField[T]; n: untyped; work: untyped): untyped</a></li>
+      <ul class="simple nested-toc-section">:=
+  <li><a class="reference" href="#%3A%3D.m%2CSimpleCubicField%5BT%5D%2Cuntyped" title="`:=`[T](f: var SimpleCubicField[T]; expression: untyped): untyped">`:=`[T](f: var SimpleCubicField[T]; expression: untyped): untyped</a></li>
 
 </ul>
 
@@ -167,19 +123,17 @@
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="../backend.html">../backend</a>, <a class="reference external" href="../utils.html">../utils</a>, <a class="reference external" href="../lattice/simplecubiclattice.html">../lattice/simplecubiclattice</a>
+    <a class="reference external" href="../backend.html">../backend</a>, <a class="reference external" href="../lattice/simplecubiclattice.html">../lattice/simplecubiclattice</a>
   </dl>
 </div>
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
     <div id="SimpleCubicField">
-  <dt><pre><a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> <span class="Other">=</span> <span class="Keyword">object</span></pre></dt>
+  <dt><pre><a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> <span class="Other">=</span> <a href="../upcxx/globalptr.html#GlobalPointer"><span class="Identifier">GlobalPointer</span></a><span class="Other">[</span><span class="Identifier">DistributedFieldData</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Field on simple cubic Bravais lattice</p>
-<p>&lt;in need of documentation&gt;</p>
-
+    
     
   </dd>
 </div>
@@ -189,280 +143,45 @@
 <div class="section" id="12">
   <h1><a class="toc-backref" href="#12">Procs</a></h1>
   <dl class="item">
-    <div id="*-procs-all">
-  <div id="*,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%2C%2C"><span class="Identifier">`*`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym6</span><span class="Other">,</span> <span class="Identifier">fy`gensym6</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="*,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%2C%2CT"><span class="Identifier">`*`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym6</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym6</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="*,T,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%2CT%2C"><span class="Identifier">`*`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x`gensym6</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">;</span> <span class="Identifier">fy`gensym6</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="*=-procs-all">
-  <div id="*=,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%3D%2C%2C"><span class="Identifier">`*=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym6</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
-             <span class="Identifier">fy`gensym6</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="*=,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2A%3D%2C%2CT"><span class="Identifier">`*=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym6</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym6</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="+-procs-all">
-  <div id="+,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%2C%2C"><span class="Identifier">`+`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym4</span><span class="Other">,</span> <span class="Identifier">fy`gensym4</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="+,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%2C%2CT"><span class="Identifier">`+`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym4</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym4</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="+,T,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%2CT%2C"><span class="Identifier">`+`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x`gensym4</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">;</span> <span class="Identifier">fy`gensym4</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="+=-procs-all">
-  <div id="+=,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%3D%2C%2C"><span class="Identifier">`+=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym4</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
-             <span class="Identifier">fy`gensym4</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="+=,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2B%3D%2C%2CT"><span class="Identifier">`+=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym4</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym4</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="--procs-all">
-  <div id="-,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%2C%2C"><span class="Identifier">`-`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym5</span><span class="Other">,</span> <span class="Identifier">fy`gensym5</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="-,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%2C%2CT"><span class="Identifier">`-`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym5</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym5</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="-,T,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%2CT%2C"><span class="Identifier">`-`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x`gensym5</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">;</span> <span class="Identifier">fy`gensym5</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="-=-procs-all">
-  <div id="-=,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%3D%2C%2C"><span class="Identifier">`-=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym5</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
-             <span class="Identifier">fy`gensym5</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="-=,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#-%3D%2C%2CT"><span class="Identifier">`-=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym5</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym5</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="/-procs-all">
-  <div id="/,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%2C%2C"><span class="Identifier">`/`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym7</span><span class="Other">,</span> <span class="Identifier">fy`gensym7</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="/,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%2C%2CT"><span class="Identifier">`/`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym7</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym7</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="/,T,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%2CT%2C"><span class="Identifier">`/`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">x`gensym7</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">;</span> <span class="Identifier">fy`gensym7</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id="/=-procs-all">
-  <div id="/=,,">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%3D%2C%2C"><span class="Identifier">`/=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym7</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
-             <span class="Identifier">fy`gensym7</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="/=,,T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%2F%3D%2C%2CT"><span class="Identifier">`/=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx`gensym7</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">y`gensym7</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
-<div id=":=-procs-all">
-  <div id=":=,SimpleCubicField[T],T">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%3A%3D%2CSimpleCubicField%5BT%5D%2CT"><span class="Identifier">`:=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">T</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    <p>Set all field values to given scalar value</p>
-<p>&lt;in need of documentation&gt;</p>
-
-    
-  </dd>
-</div>
-
-</div>
-<div id="=copy-procs-all">
-  <div id="=copy,SimpleCubicField[T],SimpleCubicField[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%3Dcopy%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D"><span class="Identifier">`=copy`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">fy</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span class="Identifier">inline</span>.}</pre></dt>
-  <dd>
-    
-    <p>Copy all field values from another field</p>
-<p>&lt;in need of documentation&gt;</p>
-
-    
-  </dd>
-</div>
-
-</div>
-<div id="[]-procs-all">
+    <div id="[]-procs-all">
   <div id="[],SimpleCubicField[T],SomeInteger">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CSimpleCubicField%5BT%5D%2CSomeInteger"><span class="Identifier">`[]`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">)</span><span class="Other">:</span> <a href="../kokkos/simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span> {.<span class="Identifier">inline</span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CSimpleCubicField%5BT%5D%2CSomeInteger"><span class="Identifier">`[]`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">T</span></pre></dt>
   <dd>
     
-    <p>Access field value at given local site</p>
-<p>This is for testing; it is most certainly not optimal or efficient &lt;in need of documentation&gt;</p>
-
+    Access field element at local index n; cannot mutate
     
   </dd>
 </div>
 
 </div>
-<div id="[]=-procs-all">
-  <div id="[]=,SimpleCubicField[T],SomeInteger,SIMXVec[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%3D%2CSimpleCubicField%5BT%5D%2CSomeInteger%2CSIMXVec%5BT%5D"><span class="Identifier">`[]=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">SomeInteger</span><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <a href="../kokkos/simd.html#SIMXVec"><span class="Identifier">SIMXVec</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.
-    <span class="Identifier">inline</span>.}</pre></dt>
+<div id="data-procs-all">
+  <div id="data,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#data%2CSimpleCubicField%5BT%5D"><span class="Identifier">data</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Set field value at given local site</p>
-<p>This is for testing; it is most certainly not optimal or efficient &lt;in need of documentation&gt;</p>
-
+    Downcast global pointer to local field data pointer
     
   </dd>
 </div>
 
 </div>
-<div id="conformable-procs-all">
-  <div id="conformable,SimpleCubicField[T],SimpleCubicField[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#conformable%2CSimpleCubicField%5BT%5D%2CSimpleCubicField%5BT%5D"><span class="Identifier">conformable</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">fx</span><span class="Other">,</span> <span class="Identifier">fy</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+<div id="len-procs-all">
+  <div id="len,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#len%2CSimpleCubicField%5BT%5D"><span class="Identifier">len</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    <p>Check if two fields are conformable (i.e., defined on the same lattice)</p>
-<p>&lt;in need of documentation&gt;</p>
-
+    Gets number of local lattice sites
     
   </dd>
 </div>
 
 </div>
-<div id="lattice-procs-all">
-  <div id="lattice,SimpleCubicField[T]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#lattice%2CSimpleCubicField%5BT%5D"><span class="Identifier">lattice</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="../lattice/simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a></pre></dt>
+<div id="localField-procs-all">
+  <div id="localField,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#localField%2CSimpleCubicField%5BT%5D"><span class="Identifier">localField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="../kokkos/staticview.html#StaticView"><span class="Identifier">StaticView</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Return lattice associated with field</p>
-<p>&lt;in need of documentation&gt;</p>
-
+    Downcast global pointer to local field data wrapped with Kokkos view
     
   </dd>
 </div>
@@ -470,7 +189,7 @@
 </div>
 <div id="newField-procs-all">
   <div id="newField,SimpleCubicLattice,typedesc">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newField%2CSimpleCubicLattice%2Ctypedesc"><span class="Identifier">newField</span></a><span class="Other">(</span><span class="Identifier">lattice</span><span class="Other">:</span> <a href="../lattice/simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">)</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#newField%2CSimpleCubicLattice%2Ctypedesc"><span class="Identifier">newField</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="../lattice/simplecubiclattice.html#SimpleCubicLattice"><span class="Identifier">SimpleCubicLattice</span></a><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">:</span> <span class="Identifier">typedesc</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">auto</span></pre></dt>
   <dd>
     
     <p>Create new field on simple cubic Bravais lattice</p>
@@ -481,31 +200,51 @@
 </div>
 
 </div>
-
-  </dl>
-</div>
-<div class="section" id="18">
-  <h1><a class="toc-backref" href="#18">Templates</a></h1>
-  <dl class="item">
-    <div id="defineBinaryOperations-templates-all">
-  <div id="defineBinaryOperations.t,untyped,untyped">
-  <dt><pre><span class="Keyword">template</span> <a href="#defineBinaryOperations.t%2Cuntyped%2Cuntyped"><span class="Identifier">defineBinaryOperations</span></a><span class="Other">(</span><span class="Identifier">op</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">;</span> <span class="Identifier">ope</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
+<div id="numSites-procs-all">
+  <div id="numSites,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#numSites%2CSimpleCubicField%5BT%5D"><span class="Identifier">numSites</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    
+    Gets number of local lattice sites
     
   </dd>
 </div>
 
 </div>
-<div id="sites-templates-all">
-  <div id="sites.t,SimpleCubicField[T],untyped,untyped">
-  <dt><pre><span class="Keyword">template</span> <a href="#sites.t%2CSimpleCubicField%5BT%5D%2Cuntyped%2Cuntyped"><span class="Identifier">sites</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">;</span> <span class="Identifier">work</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+<div id="threadStrides-procs-all">
+  <div id="threadStrides,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#threadStrides%2CSimpleCubicField%5BT%5D"><span class="Identifier">threadStrides</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    <p>Iterate over all local sites of field</p>
-<p>&lt;in need of documentation&gt;</p>
+    Gets number strides across threads
+    
+  </dd>
+</div>
 
+</div>
+<div id="vectorStrides-procs-all">
+  <div id="vectorStrides,SimpleCubicField[T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#vectorStrides%2CSimpleCubicField%5BT%5D"><span class="Identifier">vectorStrides</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    Gets number strides across SIMD lanes
+    
+  </dd>
+</div>
+
+</div>
+
+  </dl>
+</div>
+<div class="section" id="17">
+  <h1><a class="toc-backref" href="#17">Macros</a></h1>
+  <dl class="item">
+    <div id=":=-macros-all">
+  <div id=":=.m,SimpleCubicField[T],untyped">
+  <dt><pre><span class="Keyword">macro</span> <a href="#%3A%3D.m%2CSimpleCubicField%5BT%5D%2Cuntyped"><span class="Identifier">`:=`</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">f</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="simplecubicfield.html#SimpleCubicField"><span class="Identifier">SimpleCubicField</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">expression</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">untyped</span></pre></dt>
+  <dd>
+    
+    
     
   </dd>
 </div>
@@ -521,7 +260,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-09 14:15:12 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-21 16:02:04 UTC</small>
       </div>
     </div>
   </div>

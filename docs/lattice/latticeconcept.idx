@@ -1,4 +1,4 @@
 nimTitle	latticeconcept	lattice/latticeconcept.html	module lattice/latticeconcept		0
-nim	GeometryType	lattice/latticeconcept.html#GeometryType	type GeometryType		29
-nim	CoordinateType	lattice/latticeconcept.html#CoordinateType	type CoordinateType		30
-nim	Lattice	lattice/latticeconcept.html#Lattice	type Lattice		33
+nim	GeometryType	lattice/latticeconcept.html#GeometryType	type GeometryType		31
+nim	CoordinateType	lattice/latticeconcept.html#CoordinateType	type CoordinateType		32
+nim	Lattice	lattice/latticeconcept.html#Lattice	type Lattice		35

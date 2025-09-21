@@ -1,10 +1,22 @@
 nimTitle	simplecubiclattice	lattice/simplecubiclattice.html	module lattice/simplecubiclattice		0
-nim	SimpleCubicLattice	lattice/simplecubiclattice.html#SimpleCubicLattice	object SimpleCubicLattice		54
-nim	`$`	lattice/simplecubiclattice.html#$,SimpleCubicLattice	proc `$`(l: SimpleCubicLattice): string		172
-nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,SimpleCubicLattice	proc newSimpleCubicLattice(other: SimpleCubicLattice): SimpleCubicLattice		186
-nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[L],openArray[D],openArray[S],bool	proc newSimpleCubicLattice[L: SomeInteger; D: SomeInteger; S: SomeInteger](\n    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];\n    sharedMemoryGeometry: openArray[S];\n    printLatticeGeometrySummary: bool = false): SimpleCubicLattice		243
-nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[L],openArray[D],bool,bool	proc newSimpleCubicLattice[L: SomeInteger; D: SomeInteger](\n    latticeGeometry: openArray[L]; distMemoryGeometry: openArray[D];\n    startWithLastDimensionInVectorPartition: bool = false;\n    printLatticeGeometrySummary: bool = true): SimpleCubicLattice		313
-nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[SomeInteger],bool,bool,bool	proc newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];\n                      startWithLastDimensionInLocalPartition: bool = true;\n                      startWithLastDimensionInVectorPartition: bool = false;\n                      printLatticeGeometrySummary: bool = true): SimpleCubicLattice		335
-nim	latticeCoordinate	lattice/simplecubiclattice.html#latticeCoordinate,SimpleCubicLattice,int	proc latticeCoordinate(l: SimpleCubicLattice; n: int): seq[int]		363
-nim	sites	lattice/simplecubiclattice.html#sites.t,SimpleCubicLattice,untyped,untyped	template sites(l: SimpleCubicLattice; n: untyped; work: untyped): untyped		378
-nimgrp	newsimplecubiclattice	lattice/simplecubiclattice.html#newSimpleCubicLattice-procs-all	proc		186
+nim	DistributedSimpleCubicLattice	lattice/simplecubiclattice.html#DistributedSimpleCubicLattice	object DistributedSimpleCubicLattice		59
+nim	PaddedDistributedSimpleCubicLattice	lattice/simplecubiclattice.html#PaddedDistributedSimpleCubicLattice	object PaddedDistributedSimpleCubicLattice		65
+nim	SimpleCubicLattice	lattice/simplecubiclattice.html#SimpleCubicLattice	type SimpleCubicLattice		70
+nim	PaddedSimpleCubicLattice	lattice/simplecubiclattice.html#PaddedSimpleCubicLattice	type PaddedSimpleCubicLattice		71
+nim	numGlobalSites	lattice/simplecubiclattice.html#numGlobalSites.t,SimpleCubicLattice	template numGlobalSites(l: SimpleCubicLattice): untyped		212
+nim	numDistributedSites	lattice/simplecubiclattice.html#numDistributedSites.t,SimpleCubicLattice	template numDistributedSites(l: SimpleCubicLattice): untyped		214
+nim	numSharedSites	lattice/simplecubiclattice.html#numSharedSites.t,SimpleCubicLattice	template numSharedSites(l: SimpleCubicLattice): untyped		216
+nim	numVectorLaneSites	lattice/simplecubiclattice.html#numVectorLaneSites.t,SimpleCubicLattice	template numVectorLaneSites(l: SimpleCubicLattice): untyped		218
+nim	distributedMemoryPartition	lattice/simplecubiclattice.html#distributedMemoryPartition.t,SimpleCubicLattice	template distributedMemoryPartition(l: SimpleCubicLattice): untyped		222
+nim	sharedMemoryPartition	lattice/simplecubiclattice.html#sharedMemoryPartition.t,SimpleCubicLattice	template sharedMemoryPartition(l: SimpleCubicLattice): untyped		224
+nim	vectorLanePartition	lattice/simplecubiclattice.html#vectorLanePartition.t,SimpleCubicLattice	template vectorLanePartition(l: SimpleCubicLattice): untyped		226
+nim	globalGeometry	lattice/simplecubiclattice.html#globalGeometry.t,SimpleCubicLattice	template globalGeometry(l: SimpleCubicLattice): untyped		230
+nim	distributedMemoryGeometry	lattice/simplecubiclattice.html#distributedMemoryGeometry.t,SimpleCubicLattice	template distributedMemoryGeometry(l: SimpleCubicLattice): untyped		232
+nim	sharedMemoryGeometry	lattice/simplecubiclattice.html#sharedMemoryGeometry.t,SimpleCubicLattice	template sharedMemoryGeometry(l: SimpleCubicLattice): untyped		234
+nim	vectorLaneGeometry	lattice/simplecubiclattice.html#vectorLaneGeometry.t,SimpleCubicLattice	template vectorLaneGeometry(l: SimpleCubicLattice): untyped		236
+nim	`$`	lattice/simplecubiclattice.html#$,SimpleCubicLattice	proc `$`(l: SimpleCubicLattice): string		239
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[L],openArray[D],openArray[S],openArray[V],bool	proc newSimpleCubicLattice[L, D, S, V: SomeInteger](latticeGeometry: openArray[L];\n    distributedMemoryPartition: openArray[D];\n    sharedMemoryPartition: openArray[S]; vectorLanePartition: openArray[V];\n    quiet: bool = false): SimpleCubicLattice		285
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[SomeInteger],bool	proc newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];\n                      quiet: bool = false): SimpleCubicLattice		325
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[SomeInteger],openArray[SomeInteger],bool	proc newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];\n                      distributedMemoryPartition: openArray[SomeInteger];\n                      quiet: bool = false): SimpleCubicLattice		350
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,openArray[SomeInteger],openArray[SomeInteger],openArray[SomeInteger],bool	proc newSimpleCubicLattice(latticeGeometry: openArray[SomeInteger];\n                      distributedMemoryPartition: openArray[SomeInteger];\n                      sharedMemoryPartition: openArray[SomeInteger];\n                      quiet: bool = false): SimpleCubicLattice		373
+nimgrp	newsimplecubiclattice	lattice/simplecubiclattice.html#newSimpleCubicLattice-procs-all	proc		285

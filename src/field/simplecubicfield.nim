@@ -1,6 +1,8 @@
 #[ 
-  ReliQ lattice field theory framework: github.com/ctpeterson/ReliQ
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: src/field/simplecubicfield.nim
+  Contact: reliq-lft@proton.me
+
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
@@ -108,6 +110,13 @@ proc `[]`*[T](f: SimpleCubicField[T]; n: SomeInteger): T =
   ## Access field element at local index n; cannot mutate
   return f.data[][n]
 
+#[ frontend: Chapel-like promotion/fusion of elementary arithematic operations ]#
+
+macro `:=`*[T](f: var SimpleCubicField[T]; expression: untyped): untyped =
+  result = quote do:
+    let fv = f.localField()
+
+#[ ### vvvvvvvvvvvvvvv------ will be replaced by promotion macro
 #[ frontend: setters ]#
 
 template `<-`*[T](f: var SimpleCubicField[T]; value: T): untyped =
@@ -119,8 +128,7 @@ template `<-`*[T](f: var SimpleCubicField[T]; value: T): untyped =
   forall(0, f.numSites() div strides, n): arr.store(addr fdata[][n*strides])
 
 #[ frontend: Chapel-like promotion/fusion of elementary arithematic operations ]#
-
-#macro `:=`*(f: var SimpleCubicField[T]; exp: untyped): untyped =
+]#
 
 #[
 macro `:=`*[T](f: var SimpleCubicField[T]; exp: untyped): untyped =

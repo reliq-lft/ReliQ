@@ -1,0 +1,3 @@
+nimTitle	distobject	upcxx/distobject.html	module upcxx/distobject		0
+nim	DistributedObject	upcxx/distobject.html#DistributedObject	object DistributedObject		37
+nim	newDistributedObject	upcxx/distobject.html#newDistributedObject,T	proc newDistributedObject[T](data: T): DistributedObject[T]		40
