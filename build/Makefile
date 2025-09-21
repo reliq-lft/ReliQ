@@ -1,12 +1,12 @@
 # ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ                 \
   Source file: build/config.nims                                                    \
-  Contact: reliq-lft@proton.me
-
+  Contact: reliq-lft@proton.me                                                      \
+                                                                                    \
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>               \
                                                                                     \
   MIT License                                                                       \
                                                                                     \
-  Copyright (c) 2025 reliq-lft                                         \
+  Copyright (c) 2025 reliq-lft                                                      \
                                                                                     \
                                                                                     \
   Permission is hereby granted, free of charge, to any person obtaining a copy      \

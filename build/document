@@ -33,7 +33,7 @@ CWD="$(pwd)"
 SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
 DOCS="${SWD}/docs"
 SRC="${SWD}/src"
-MAIN="${SRC}/reliq.nim"
+MAIN="${SRC}/index.md"
 
 mkdir -p ${DOCS}
 rm -rf ${DOCS}/*
@@ -41,8 +41,8 @@ rm -rf ${DOCS}/*
 echo "Docs from source path: ${MAIN}"
 echo "Generating docs in: ${DOCS}"
 
-CMD="$NIM doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
+CMD="$NIM md2html --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
 echo "Running command: ${CMD}"
 eval $CMD
 
-cp ${SWD}/build/index.html ${SWD}/docs/index.html
+#cp ${SWD}/build/index.html ${SWD}/docs/index.html
