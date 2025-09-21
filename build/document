@@ -45,4 +45,4 @@ CMD="$NIM doc --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${
 echo "Running command: ${CMD}"
 eval $CMD
 
-#cp ${SWD}/build/index.html ${SWD}/docs/index.html
+cp ${SWD}/build/index.html ${SWD}/docs/index.html
