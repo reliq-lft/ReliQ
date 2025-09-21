@@ -27,62 +27,40 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -->
 
-# ReliQ Lattice Field Theory Framework
+====================================
+ReliQ Lattice Field Theory Framework
+====================================
 
-> "Documentation is a love letter that you write to your future self." — Damian Conway
+:Authors: Curtis Taylor Peterson
+:Version: 0.0.1
 
-**Authors:** Curtis Taylor Peterson  
-**Version:** 0.0.1
+> "Documentation is a love letter that you write to your future self." - Damian Conway
 
----
+TL;DR
+=====
 
-## TL;DR
+`ReliQ` is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind. 
 
-`ReliQ` is an experimental lattice field theory framework written with user-friendliness, performance, reliability, and portability across heterogeneous architectures in mind.
+* `ReliQ` is written in the elegant [Nim](https://nim-lang.org/) programming language 
+* `ReliQ` uses [Unified Parallel C++ (UPC++)](https://upcxx.lbl.gov/docs/html/guide.html) to implement its distributed memory model
+* `ReliQ` uses [Kokkos](https://kokkos.org/) to implement its shared memory model
 
-- Written in [Nim](https://nim-lang.org/)
-- Distributed memory via [UPC++](https://upcxx.lbl.gov/docs/html/guide.html)
-- Shared memory via [Kokkos](https://kokkos.org/)
+That's nice, but why another LFT codebase?
+==========================================
 
----
+There is a gap in the landscape of lattice field theory codebases/frameworks that aims to address both the issue of user-friendliness and performance. There are plenty of codebases/frameworks that are user-friendly, but fail to deliver on performance for certain architectures. There are also plenty of code bases that deliver incredible performance, but push an equally incredible burden of knowledge on their users before they are able to utilize or modify said code bases in any meaningful way. There are even more code bases that strive to satisfy the needs of specific collaborations, hence disregarding general user-friendliness and performance in scenarios where either does not fit the needs of said collaboration.
 
-## Quick Start
+`ReliQ` strives to be a lattice field theory framework that fits the needs of a variety of lattice field theory practitioners and architectural targets. It is written for you now and into the future. That does *not* mean that `ReliQ` strives to be to most general lattice field theory framework out there, as decades of work on lattice field theory has taught us that such a goal is nearly impossible to achieve in practice. Rather, `ReliQ` strives to be a productive *framework* for which applications targeting their own levels of specificity are written. What that entails in practice is providing baseline parallel data structures and algorithms, nothing more, nothing less. 
 
-```nim
-import reliq
-let lat = initLattice([4,4,4,4])
-```
+> Continue... add code samples, et cetera...
 
----
-
-## Navigation
-
-- [API Reference](reliq.html)
-- [Examples](examples.html)
-- [GitHub Repository](https://github.com/reliq-lft/ReliQ)
-
----
-
-## Why Another LFT Codebase?
-
-There’s a gap in the lattice field theory code landscape regarding user-friendliness versus performance. Many frameworks sacrifice one for the other, or are highly specialized.
-
-`ReliQ` aims to be a productive *framework* with baseline parallel data structures and algorithms, leaving specific applications to layer on top.
-
----
-
-## FAQ
+Frequently asked questions
+==========================
 
 <!--- 
-<details>
-<summary>I've never heard of Nim. Why should I invest my time in it?</summary>
-
-You shouldn't *have* to! ReliQ is designed so that users can learn Nim by using ReliQ, not the other way around. Feedback on achieving this goal is very welcome.
-</details>
+Q: I've never heard of Nim. Why should I have to invest my time into learning a language that's not Fortran, C/C++, or Rust?
+A: You shouldn't. And you almost certainly won't be spending most of your time with ReliQ navigating the programmatic quirks of Nim. We have built `ReliQ` with the goal of having the average user learn Nim through using `ReliQ`, rather than the other way around. We would love any feedback that users could provide on practically realizing this goal. 
 --->
 
----
+> ...
 
-## More
-
-> Continue... add code samples, further explanations, and more FAQ entries as your documentation grows.

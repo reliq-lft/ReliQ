@@ -27,6 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+## include:: ./index.md
+
 #[ ReliQ utilities and runtime environment ]#
 
 import utils
