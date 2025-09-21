@@ -5,7 +5,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>index</title>
+<title>ReliQ Lattice Field Theory Framework</title>
 
 <!-- Favicon -->
 <link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAAUAAAAF////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAAIAAABbAAAAlQAAAKIAAACbAAAAmwAAAKIAAACVAAAAWwAAAAL///8A////AP///wD///8A////AAAAABQAAADAAAAAYwAAAA3///8A////AP///wD///8AAAAADQAAAGMAAADAAAAAFP///wD///8A////AP///wAAAACdAAAAOv///wD///8A////AP///wD///8A////AP///wD///8AAAAAOgAAAJ3///8A////AP///wAAAAAnAAAAcP///wAAAAAoAAAASv///wD///8A////AP///wAAAABKAAAAKP///wAAAABwAAAAJ////wD///8AAAAAgQAAABwAAACIAAAAkAAAAJMAAACtAAAAFQAAABUAAACtAAAAkwAAAJAAAACIAAAAHAAAAIH///8A////AAAAAKQAAACrAAAAaP///wD///8AAAAARQAAANIAAADSAAAARf///wD///8AAAAAaAAAAKsAAACk////AAAAADMAAACcAAAAnQAAABj///8A////AP///wAAAAAYAAAAGP///wD///8A////AAAAABgAAACdAAAAnAAAADMAAAB1AAAAwwAAAP8AAADpAAAAsQAAAE4AAAAb////AP///wAAAAAbAAAATgAAALEAAADpAAAA/wAAAMMAAAB1AAAAtwAAAOkAAAD/AAAA/wAAAP8AAADvAAAA3gAAAN4AAADeAAAA3gAAAO8AAAD/AAAA/wAAAP8AAADpAAAAtwAAAGUAAAA/AAAA3wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAADfAAAAPwAAAGX///8A////AAAAAEgAAADtAAAAvwAAAL0AAADGAAAA7wAAAO8AAADGAAAAvQAAAL8AAADtAAAASP///wD///8A////AP///wD///8AAAAAO////wD///8A////AAAAAIcAAACH////AP///wD///8AAAAAO////wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A//8AAP//AAD4HwAA7/cAAN/7AAD//wAAoYUAAJ55AACf+QAAh+EAAAAAAADAAwAA4AcAAP5/AAD//wAA//8AAA=="/>
@@ -20,37 +20,29 @@
 <body>
   <div class="document" id="documentId">
     <div class="container">
-      <h1 class="title">index</h1>
-      <p>&lt;!-- ReliQ lattice field theory framework: <a class="reference external" href="https://github.com/reliq-lft/ReliQ">https://github.com/reliq-lft/ReliQ</a> Source file: src/index.md Contact: reliq-lft@proton.me</p>
-<p>Author: Curtis Taylor Peterson &lt;curtistaylorpetersonwork@gmail.com&gt;</p>
-<p>MIT License</p>
-<p>Copyright (c) 2025 reliq-lft</p>
-<p>Permission is hereby granted, free of chadge, to any person obtaining a copy of this software and associated documentation files (the &quot;Software&quot;), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, medge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
-<p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
-<p>THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
-<p>--&gt;</p>
-<h1 id="reliq-lattice-field-theory-framework"><center>ReliQ Lattice Field Theory Framework</center></h1><table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td>Curtis Taylor Peterson</td></tr>
+      <h1 class="title">ReliQ Lattice Field Theory Framework</h1>
+      <table class="docinfo" frame="void" rules="none"><col class="docinfo-name" /><col class="docinfo-content" /><tbody valign="top"><tr><th class="docinfo-name">Authors:</th><td>Curtis Taylor Peterson</td></tr>
 <tr><th class="docinfo-name">Version:</th><td>0.0.1</td></tr>
 </tbody></table><blockquote class="markdown-quote"><p>&quot;Documentation is a love letter that you write to your future self.&quot; - Damian Conway</p></blockquote>
 
-<h2 id="tl-dr">TL;DR</h2><p><tt class="docutils literal"><span class="pre">ReliQ</span></tt> is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind.</p>
+<h1 id="tl-dr">TL;DR</h1><p><tt class="docutils literal"><span class="pre">ReliQ</span></tt> is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind.</p>
 <ul class="simple"><li><tt class="docutils literal"><span class="pre">ReliQ</span></tt> is written in the elegant <a class="reference external" href="https://nim-lang.org/">Nim</a> programming language</li>
 <li><tt class="docutils literal"><span class="pre">ReliQ</span></tt> uses <a class="reference external" href="https://upcxx.lbl.gov/docs/html/guide.html">Unified Parallel C++ (UPC++)</a> to implement its distributed memory model</li>
 <li><tt class="docutils literal"><span class="pre">ReliQ</span></tt> uses <a class="reference external" href="https://kokkos.org/">Kokkos</a> to implement its shared memory model</li>
 </ul>
 
-<h2 id="that-s-nice-but-why-another-lft-codebaseqmark">That's nice, but why another LFT codebase?</h2><p>There is a gap in the landscape of lattice field theory codebases/frameworks that aims to address both the issue of user-friendliness and performance. There are plenty of codebases/frameworks that are user-friendly, but fail to deliver on performance for certain architectures. There are also plenty of code bases that deliver incredible performance, but push an equally incredible burden of knowledge on their users before they are able to utilize or modify said code bases in any meaningful way. There are even more code bases that strive to satisfy the needs of specific collaborations, hence disregarding general user-friendliness and performance in scenarios where either does not fit the needs of said collaboration.</p>
+<h1 id="that-s-nice-but-why-another-lft-codebaseqmark">That's nice, but why another LFT codebase?</h1><p>There is a gap in the landscape of lattice field theory codebases/frameworks that aims to address both the issue of user-friendliness and performance. There are plenty of codebases/frameworks that are user-friendly, but fail to deliver on performance for certain architectures. There are also plenty of code bases that deliver incredible performance, but push an equally incredible burden of knowledge on their users before they are able to utilize or modify said code bases in any meaningful way. There are even more code bases that strive to satisfy the needs of specific collaborations, hence disregarding general user-friendliness and performance in scenarios where either does not fit the needs of said collaboration.</p>
 <p><tt class="docutils literal"><span class="pre">ReliQ</span></tt> strives to be a lattice field theory framework that fits the needs of a variety of lattice field theory practitioners and architectural targets. It is written for you now and into the future. That does <em>not</em> mean that <tt class="docutils literal"><span class="pre">ReliQ</span></tt> strives to be to most general lattice field theory framework out there, as decades of work on lattice field theory has taught us that such a goal is nearly impossible to achieve in practice. Rather, <tt class="docutils literal"><span class="pre">ReliQ</span></tt> strives to be a productive <em>framework</em> for which applications targeting their own levels of specificity are written. What that entails in practice is providing baseline parallel data structures and algorithms, nothing more, nothing less.</p>
 <blockquote class="markdown-quote"><p>Continue... add code samples, et cetera...</p></blockquote>
 
-<h2 id="frequently-asked-questions">Frequently asked questions</h2><blockquote class="markdown-quote"><p>...</p></blockquote>
+<h1 id="frequently-asked-questions">Frequently asked questions</h1><blockquote class="markdown-quote"><p>...</p></blockquote>
 
 
 
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-21 16:46:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-21 16:52:45 UTC</small>
       </div>
     </div>
   </div>
