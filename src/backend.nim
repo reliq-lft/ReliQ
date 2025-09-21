@@ -29,7 +29,7 @@
 
 import utils
 import upcxx/[upcxxbase, globalptr, distobject]
-import kokkos/[kokkosbase, kokkosthreads]
+import kokkos/[kokkosbase, kokkosdispatch]
 import kokkos/[simdarray, staticview]
 
 export utils
@@ -39,7 +39,7 @@ export globalptr
 export distobject
 
 export kokkosbase
-export kokkosthreads
+export kokkosdispatch
 export simdarray
 export staticview
 
