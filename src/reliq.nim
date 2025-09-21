@@ -1,32 +1,3 @@
-#[ 
-  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/reliq.nim
-  Contact: reliq-lft@proton.me
-
-  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  MIT License
-  
-  Copyright (c) 2025 reliq-lft
-  
-  Permission is hereby granted, free of chadge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-  
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
-  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
-
 ## ====================================
 ## ReliQ Lattice Field Theory Framework
 ## ====================================
@@ -61,6 +32,34 @@
 #Q: I've never heard of Nim. Why should I have to invest my time into learning a language that's not Fortran, C/C++, or Rust?
 #A: You shouldn't. And you almost certainly won't be spending most of your time with ReliQ navigating the programmatic quirks of Nim. We have built `ReliQ` with the goal of having the average user learn Nim through using `ReliQ`, rather than the other way around. We would love any feedback that users could provide on practically realizing this goal. 
 #--->
+#[ 
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
+  Source file: src/reliq.nim
+  Contact: reliq-lft@proton.me
+
+  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  MIT License
+  
+  Copyright (c) 2025 reliq-lft
+  
+  Permission is hereby granted, free of chadge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+]#
 
 #[ ReliQ utilities and runtime environment ]#
 
