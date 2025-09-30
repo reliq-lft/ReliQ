@@ -167,3 +167,4 @@ when isMainModule:
     print sqva
     print sqvb
     sqva = sqvb
+    #let str = SIMDStorage[float]()

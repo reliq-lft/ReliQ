@@ -40,13 +40,17 @@ const
   PARFOR = "Kokkos::parallel_for"
   TEAMFORALL = PARFOR & "(*#," + LAMBDA + "(const" + MEMBERTYPE +  "team) { #(team); })"
 const FORALL = PARFOR & "(*#," + LAMBDA + "(const int idx) { #(idx); })"
+const 
+  THREADVECTORRANGE = "Kokkos::ThreadVectorRange(#, #, #)"
+  FOREACH = PARFOR & "(" & THREADVECTORRANGE & ", [&] (int idx) { #(idx); })"
+
+# frontend: team member type
+type ThreadTeam* {.importcpp: "Kokkos::TeamPolicy<>::member_type", kokkos.} = object
 
 type # backend: range/team policy types
   RangePolicy {.importcpp: "Kokkos::RangePolicy<>", kokkos.} = object
   TeamPolicy {.importcpp: "Kokkos::TeamPolicy<>", kokkos.} = object
-
-# frontend: team member type
-type ThreadTeam* {.importcpp: "Kokkos::TeamPolicy<>::member_type", kokkos.} = object
+  ThreadVectorPolicy {.importcpp: "Kokkos::ThreadVectorRange", kokkos.} = object
 
 type # backend: Nim --> C++ procedure kernels
   NimRangeKernel = proc(idx: cint) {.cdecl.}
@@ -71,18 +75,27 @@ proc forall(policy: ptr TeamPolicy; body: NimTeamKernel)
   {.importcpp: TEAMFORALL, kokkos.}
 proc forall(policy: ptr RangePolicy; body: NimRangeKernel) 
   {.importcpp: FORALL, kokkos.}
+proc foreach(team: ThreadTeam; lower, upper: int; body: NimRangeKernel)
+  {.importcpp: FOREACH, kokkos.}
 
 # range for all
 proc rangeForAll(lower, upper: int; body: NimRangeKernel) {.inline.} =
   let policy = newRangePolicy(lower, upper)
-  policy.forall(body)
+  policy.forall: body
   deleteRangePolicy(policy)
 
 # team "parallel for" wrapper
 proc teamForAll(leagueSize, teamSize: int; body: NimTeamKernel) {.inline.} =
   let policy = newTeamPolicy(leagueSize, teamSize)
-  policy.forall(body)
+  policy.forall: body
   deleteTeamPolicy(policy)
+
+# range "hierarchical parallel for" wrapper
+proc threadForEach(
+  team: ThreadTeam; 
+  lower, upper: int; 
+  body: NimRangeKernel
+) {.inline.} = team.foreach(lower, upper): body
 
 #[ frontend: thread team methods ]#
 
@@ -129,7 +142,7 @@ template threads*(body: untyped): untyped =
       body
   localBarrier()
 
-template forall*(lower, upper: SomeInteger; n: untyped; body: untyped): untyped =
+template forall*(lower, upper: SomeInteger; n, body: untyped): untyped =
   ## `forall` construct
   ## 
   ## <in need of documentation>
@@ -139,13 +152,49 @@ template forall*(lower, upper: SomeInteger; n: untyped; body: untyped): untyped 
       body
   localBarrier()
 
-#template foreach*(
-#  team: ThreadTeam;
-#  lower, upper: SomeInteger; 
-#  n: untyped; 
-#  body: untyped
-#): untyped =
+template forall*(numIters: SomeInteger; n, body: untyped): untyped = 
+  ## `forall` construct
+  ## 
+  ## Equivalent to `forall` with lower = 0 and upper = numIters
+  forall(0, numIters, n, body)
 
+template foreach*(lower, upper: SomeInteger; n, body: untyped): untyped =
+  ## vectorized `foreach` construct
+  ## 
+  ## <in need of documentation>
+  team.threadForEach(lower, upper):
+    proc(idx: cint) {.cdecl.} =
+      let n = idx
+      body
+
+template foreach*(numIters: SomeInteger; n, body: untyped): untyped =
+  ## vectorized `foreach` construct
+  ##
+  ## Equivalent to `foreach` with lower = 0 and upper = numIters
+  foreach(0, numIters, n, body)
+
+template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
+  ## `forall` + `foreach` = `forevery` construct
+  ## 
+  ## Don't think about it too hard.
+  ## <in need of documentation>
+  let segment = (upper - lower) div numThreads()
+  teamForAll(numThreads(), 1):
+    proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
+      let
+        tlower = localTeamHandle.myRank()*segment
+        tupper = tlower + segment
+      localTeamHandle.threadForEach(tlower, tupper):
+        proc(idx: cint) {.cdecl.} =
+          let n = idx
+          body
+  localBarrier()
+
+template forevery*(numIters: SomeInteger; n, body: untyped): untyped =
+  ## `forall` + `foreach` = `forevery` construct
+  ## 
+  ## Equivalent to `forevery` with lower = 0 and upper = numIters
+  forevery(0, numIters, n, body)
 
 # lessons learned:
 # * nested procedures that are to be passed to a call expecting a specific 
@@ -157,23 +206,35 @@ template forall*(lower, upper: SomeInteger; n: untyped; body: untyped): untyped 
 #   tearDownForeignThreadGc()
 when isMainModule:
   import runtime
+  const verbosity = 1
   reliq:
     var testVar = 2.0
     print "testVar before threads:", testVar
     threadTeams(4, 4):
       let rank = team.leagueRank()
-      print "Hello from team member with league rank:", rank
+      if verbosity > 1: print "Hello from team member with league rank:", rank
       team.wait()
-      print "Goodbye from team member with league rank:", rank
-      #let teamRange = newTeamRange(0, 4, ThreadRange)
+      if verbosity > 1: print "Goodbye from team member with league rank:", rank
+      team.threadMain:
+        foreach(0, 4, i):
+          testVar += 1
     threads:
       let rank = thread.myRank()
-      print "Hello from team member with my rank:", rank
+      if verbosity > 1: print "Hello from team member with my rank:", rank
       thread.wait()
-      print "Goodbye from team member with my rank:", rank
+      if verbosity > 1: print "Goodbye from team member with my rank:", rank
       thread.wait()
       thread.threadMain:
         testVar += 1.0
-        print "main thread:", rank
+        if verbosity > 1: print "main thread:", rank
     print "testVar after threads:", testVar
-    forall(0, 10, i): print "Hello from forall with i =", i
+    forall(0, 10, i): 
+      if verbosity > 1: print "Hello from forall with i =", i
+    assert(testVar == 7.0)
+    let (lo, hi) = (0, numThreads()*10)
+    var testSeq = newSeq[float](hi)
+    print "seq before:", testSeq
+    forevery(lo, hi, i):
+      testSeq[i] += 1
+    print "seq after:", testSeq
+    for el in testSeq: assert(el == 1.0)

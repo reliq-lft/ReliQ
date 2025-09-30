@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/kokkos/staticview.nim
+  Source file: src/kokkos/kokkosview.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -29,6 +29,7 @@
 
 import utils
 import kokkosbase
+import kokkossimd
 
 # import backend header files
 kokkos: discard
@@ -68,18 +69,18 @@ proc `[]=`*[T](view: var StaticView[T]; n: SomeInteger; value: T)
 
 when isMainModule:
   import runtime
-  import kokkos/[simdarray]
+  import kokkos/[kokkossimd]
   reliq:
     var v = newStaticView(100, int)
     v[0] = 42
     print v[0]
     print v[1]
     print v[99]
-    #[
-    type T = SIMDArray[float]
+    
+    type T = SIMDStorage[SIMDArray[float]]
     let size = 100
     var ta = cast[ptr UncheckedArray[T]](alloc(size*sizeof(T)))
     var pta = addr ta[][0]
     var tav = pta.newStaticView(size)
     #discard tav[0]
-    ]#
+    

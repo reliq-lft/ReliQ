@@ -28,23 +28,79 @@
 ]#
 
 import utils
-import upcxx/[upcxxbase, globalptr, distobject]
-import kokkos/[kokkosbase, kokkosdispatch]
-import kokkos/[simdarray, staticview]
-
 export utils
 
-export upcxxbase
-export globalptr
-export distobject
+# UPC++ distributed memory backend
+template UnifiedParallelCXXBackend =
+  import upcxx/[upcxxbase, globalptr]
+  export upcxxbase
+  export globalptr
 
-export kokkosbase
-export kokkosdispatch
-export simdarray
-export staticview
+# Kokkos shared memory backend
+template KokkosBackend =
+  import kokkos/[kokkosbase, kokkosdispatch, kokkosview]
+  export kokkosbase
+  export kokkosdispatch
+  export kokkosview
 
-# template returning UPC++ and Kokkos pragmas including core headers
+# Kokkos SIMD backend
+template KokkosSIMDBackend =
+  import kokkos/[kokkossimd]
+  export kokkossimd
+
+# Native SIMD backend
+template NativeSIMDBackend =
+  import intrinsics/[intrin]
+  export intrin
+
+# distributed memory backend
+when defined(UnifiedParallelCXX): UnifiedParallelCXXBackend()
+else: UnifiedParallelCXXBackend() # default backend in UPC++
+
+# shared memory backend
+when defined(Kokkos): KokkosBackend()
+else: KokkosBackend() # defined backeend is Kokkos
+
+# SIMD backend
+when defined(KokkosSIMD) and defined(Kokkos): KokkosSIMDBackend()
+elif defined(NativeSIMD): NativeSIMDBackend()
+else: KokkosSIMDBackend() # default backend is Kokkos SIMD
+
+# template returning distributed and shared memory pragmas
 template backend*(pragmas: untyped): untyped =
-  kokkos: discard
-  upcxx: discard
+  # distributed memory pragams
+  when defined(UnifiedParallelCXX):
+    upcxx: discard
+  else:
+    upcxx: discard
+
+  # shared memory pragmas
+  when defined(Kokkos):
+    kokkos: discard
+  else:
+    kokkos: discard
+
+  # any additional pragmas provided by user
   pragmas
+
+when isMainModule:
+  import runtime
+  reliq:
+    backend: discard
+    when defined(UnifiedParallelCXX): 
+      print "Using Unified Parallel C++ (UPC++) distributed memory backend"
+    else:
+      print "Using default distributed memory backend (UPC++)"
+    discard numRanks()
+    when defined(Kokkos):
+      print "Using Kokkos shared memory backend"
+    else:
+      print "Using default shared memory backend (Kokkos)"
+    discard numThreads()
+    when defined(KokkosSIMD) and defined(Kokkos):
+      print "Using Kokkos SIMD backend"
+    elif defined(NativeSIMD):
+      print "Using Native SIMD backend"
+    else:
+      print "Using default SIMD backend (Kokkos SIMD)"
+    discard numLanes()
