@@ -122,6 +122,36 @@ proc wait*(team: ThreadTeam) {.importcpp: "#.team_barrier()", kokkos.}
 template threadMain*(thread: ThreadTeam; body: untyped): untyped =
   if thread.myRank() == 0: body
 
+#[ backend: thread/vector dispatch ]#
+
+template forall*(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # threaded `forall` construct
+  rangeForAll(lower, upper):
+    proc(idx: cint) {.cdecl.} = 
+      let n = idx
+      body
+  localBarrier()
+
+template foreach*(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # vectorized `foreach` construct
+  team.threadForEach(lower, upper):
+    proc(idx: cint) {.cdecl.} =
+      let n = idx
+      body
+
+template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # `forall` + `foreach` = `forevery` construct. Don't think about it too hard.
+  let segment = (upper - lower) div numThreads()
+  teamForAll(numThreads(), 1):
+    proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
+      let tlo = localTeamHandle.myRank()*segment
+      let thi = tlo + segment
+      localTeamHandle.threadForEach(tlo, thi):
+        proc(idx: cint) {.cdecl.} =
+          let n = idx
+          body
+  localBarrier()
+
 #[ frontend: threaded dispatch ]#
 
 template threadTeams*(leagueSize, teamSize: SomeInteger; body: untyped): untyped =
@@ -144,37 +174,6 @@ template threads*(body: untyped): untyped =
       body
   localBarrier()
 
-#[ backend: thread/vector dispatch ]#
-
-template forall(lower, upper: SomeInteger; n, body: untyped): untyped =
-  # threaded `forall` construct
-  rangeForAll(lower, upper):
-    proc(idx: cint) {.cdecl.} = 
-      let n = idx
-      body
-  localBarrier()
-
-template foreach(lower, upper: SomeInteger; n, body: untyped): untyped =
-  # vectorized `foreach` construct
-  team.threadForEach(lower, upper):
-    proc(idx: cint) {.cdecl.} =
-      let n = idx
-      body
-
-template forevery(lower, upper: SomeInteger; n, body: untyped): untyped =
-  # `forall` + `foreach` = `forevery` construct. Don't think about it too hard.
-  let segment = (upper - lower) div numThreads()
-  teamForAll(numThreads(), 1):
-    proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
-      let
-        tlower = localTeamHandle.myRank()*segment
-        tupper = tlower + segment
-      localTeamHandle.threadForEach(tlower, tupper):
-        proc(idx: cint) {.cdecl.} =
-          let n = idx
-          body
-  localBarrier()
-
 #[ frontend: thread/vector dispatch macros ]#
 
 macro all*(x: ForLoopStmt): untyped =
@@ -182,19 +181,13 @@ macro all*(x: ForLoopStmt): untyped =
   ## 
   ## Turns a `for` loop of the form:
   ## ```
-  ## for i in all(0..10):
-  ##   ...
+  ## for i in all 0..10: <body>
   ## ```
   ## into a threaded parallel loop.
-  let 
-    idnt = x[0]
-    call = x[1]
-    body = x[2]
-  let
-    itr = call[1]
-    rngExpr = itr[0]
+  let (idnt, call, body) = (x[0], x[1], x[2])
+  let (itr, rng) = (call[1], call[1][0])
   let (lo, hi) = (itr[1], itr[^1])
-  result = case $rngExpr:
+  result = case $rng:
     of "..": 
       quote do: forall(`lo`, `hi` + 1, `idnt`, `body`)
     of "..<":
@@ -207,19 +200,13 @@ macro each*(x: ForLoopStmt): untyped =
   ## 
   ## Turns a `for` loop of the form:
   ## ```
-  ## for i in each(0..10):
-  ##   ...
+  ## for i in each 0..10: <body>
   ## ```
   ## into a vectorized parallel loop.
-  let 
-    idnt = x[0]
-    call = x[1]
-    body = x[2]
-  let
-    itr = call[1]
-    rngExpr = itr[0]
+  let (idnt, call, body) = (x[0], x[1], x[2])
+  let (itr, rng) = (call[1], call[1][0])
   let (lo, hi) = (itr[1], itr[^1])
-  result = case $rngExpr:
+  result = case $rng:
     of "..": 
       quote do: foreach(`lo`, `hi` + 1, `idnt`, `body`)
     of "..<":
@@ -232,20 +219,14 @@ macro every*(x: ForLoopStmt): untyped =
   ## 
   ## Turns a `for` loop of the form:
   ## ```
-  ## for i in every(0..10):
-  ##   ...
+  ## for i in every 0..10: <body>
   ## ```
   ## into a threaded + vectorized parallel loop. Behaves like `Grid`'s
   ## `accelerator_for` construct. 
-  let 
-    idnt = x[0]
-    call = x[1]
-    body = x[2]
-  let
-    itr = call[1]
-    rngExpr = itr[0]
+  let (idnt, call, body) = (x[0], x[1], x[2])
+  let (itr, rng) = (call[1], call[1][0])
   let (lo, hi) = (itr[1], itr[^1])
-  result = case $rngExpr:
+  result = case $rng:
     of "..": 
       quote do: forevery(`lo`, `hi` + 1, `idnt`, `body`)
     of "..<":
@@ -272,8 +253,10 @@ when isMainModule:
       if verbosity > 1: print "Hello from team member with league rank:", rank
       team.wait()
       if verbosity > 1: print "Goodbye from team member with league rank:", rank
-      for i in each(0..3):
-        testVar += 1.0
+      team.threadMain:
+        if verbosity > 1: print "main thread:", rank
+        for i in each 0..3:
+          testVar += 1.0
     threads:
       let rank = thread.myRank()
       if verbosity > 1: print "Hello from team member with my rank:", rank
@@ -284,13 +267,13 @@ when isMainModule:
         testVar += 1.0
         if verbosity > 1: print "main thread:", rank
     print "testVar after threads:", testVar
-    for i in all(0..<10):
+    for i in all 0..<10:
       if verbosity > 1: print "Hello from forall with i =", i
     assert(testVar == 7.0)
     let (lo, hi) = (0, numThreads()*10)
     var testSeq = newSeq[float](hi)
     print "seq before:", testSeq
-    for i in every(lo..<hi):
+    for i in every lo..<hi:
       testSeq[i] += 1
     print "seq after:", testSeq
     for el in testSeq: assert(el == 1.0)

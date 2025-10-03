@@ -29,7 +29,6 @@
 
 import utils
 import kokkosbase
-import kokkossimd
 
 # import backend header files
 kokkos: discard
@@ -41,18 +40,18 @@ type # frontend: Kokkos dynamic rank view
 
 # backend: Kokkos static view constructor
 proc newStaticView[T](tag: cstring; n: csize_t): StaticView[T]
-  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, inline, kokkos.}
+  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, kokkos.}
 
 # backend: Kokkos static view constructor from pointer
 proc newStaticView[T](localPtr: ptr T; n: csize_t): StaticView[T] 
-  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, inline, kokkos.}
+  {.importcpp: "Kokkos::View<'*0*>(#, #)", constructor, kokkos.}
 
 # frontend: base Kokkos static view constructor
-proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] {.inline.} = 
+proc newStaticView*(n: SomeInteger; T: typedesc): StaticView[T] = 
   return newStaticView[T]("StaticView", csize_t(n))
 
 # frontend: Kokkos static view constructor from pointer
-proc newStaticView*[T](localPointer: ptr T; len: int): StaticView[T] {.inline.} = 
+proc newStaticView*[T](localPointer: ptr T; len: int): StaticView[T] = 
   return localPointer.newStaticView(csize_t(len))
 
 #[ frontend: static view methods ]#

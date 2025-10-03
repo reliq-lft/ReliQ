@@ -385,7 +385,7 @@ when isMainModule:
     fieldB := 5.0
     fieldC := 9.0 
     fieldA := fieldB + 2.0*fieldB - num*fieldC + 3.0*fieldB/fieldC + num*fieldC*fieldB
-    forall(0, fieldA.numSites, n):
+    for n in all 0..<fieldA.numSites:
       if fieldB[n] != 5.0: 
         print "fieldB[", n, "] = ", fieldB[n]
         assert(fieldB[n] == 5.0)
@@ -420,14 +420,11 @@ when isMainModule:
     fieldD /= num
     assert(fieldD[0] == ((((fav + 2.0 + num)*fav*2.0*num - fav - 2.0 - num)/fav)/2.0)/num)
     fieldD = fieldA
-    #`=move`(fieldC, fieldA)
-    #`=copy`(fieldB, fieldC)
-    #`=destroy`(fieldB)
 
-    #var 
-    #  tensorA = lattice.newField([3,3]): float
-    #  tensorB = lattice.newField([3,3]): float
-    #  tensorC = lattice.newField([3,3]): float
+    var 
+      tensorA = lattice.newField([3,3]): float
+      tensorB = lattice.newField([3,3]): float
+      tensorC = lattice.newField([3,3]): float
     #let 
     #  tensorAComp = tensorA[[1,2]]
     #  tensorACompView = tensorA([1,2])

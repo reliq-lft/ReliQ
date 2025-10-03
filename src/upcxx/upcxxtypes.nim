@@ -45,7 +45,6 @@ type
   ## UPC++ distributed object
   ## 
   ## Distributed object accessible to all ranks; contains a global pointer
-  DistributedArray*[T] = DistributedObject[GlobalPointer[T]]
 
 #[ frontend: global pointer methods and constructors ]#
 
@@ -73,14 +72,12 @@ proc local*[T](global_ptr: GlobalPointer[T]): ptr T {.importcpp: "#.local()", up
 #[ frontend: global pointer methods and constructors ]#
 
 ## UPC++ distributed object constructor
-proc newDistributedObject*[T](
-  data: GlobalPointer[T]
-): DistributedObject[GlobalPointer[T]] 
-  {.importcpp: "upcxx::dist_object<upcxx::global_ptr<'*0>>(#)", constructor, upcxx.}
+proc newDistributedObject*[T](data: T): DistributedObject[T] 
+  {.importcpp: "upcxx::dist_object<'*0>(#)", constructor, upcxx.}
 
-## Create distributed array
-proc newDistributedArray*(size: SomeInteger; T: typedesc): DistributedArray[T] =
-  return newGlobalPointerArray(size, T).newDistributedObject()
+# create distributed array 
+template newDistributedArray*(size: SomeInteger; T: typedesc): untyped =
+  newGlobalPointerArray(size, T).newDistributedObject()
 
 ## Downcasts distributed object to local pointer
 proc local*[T](dobj: DistributedObject[GlobalPointer[T]]): ptr T 
