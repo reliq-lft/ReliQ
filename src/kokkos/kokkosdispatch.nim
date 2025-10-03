@@ -27,6 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[macros]
+
 import kokkosbase
 import utils
 
@@ -142,42 +144,25 @@ template threads*(body: untyped): untyped =
       body
   localBarrier()
 
-template forall*(lower, upper: SomeInteger; n, body: untyped): untyped =
-  ## `forall` construct
-  ## 
-  ## <in need of documentation>
+#[ backend: thread/vector dispatch ]#
+
+template forall(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # threaded `forall` construct
   rangeForAll(lower, upper):
     proc(idx: cint) {.cdecl.} = 
       let n = idx
       body
   localBarrier()
 
-template forall*(numIters: SomeInteger; n, body: untyped): untyped = 
-  ## `forall` construct
-  ## 
-  ## Equivalent to `forall` with lower = 0 and upper = numIters
-  forall(0, numIters, n, body)
-
-template foreach*(lower, upper: SomeInteger; n, body: untyped): untyped =
-  ## vectorized `foreach` construct
-  ## 
-  ## <in need of documentation>
+template foreach(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # vectorized `foreach` construct
   team.threadForEach(lower, upper):
     proc(idx: cint) {.cdecl.} =
       let n = idx
       body
 
-template foreach*(numIters: SomeInteger; n, body: untyped): untyped =
-  ## vectorized `foreach` construct
-  ##
-  ## Equivalent to `foreach` with lower = 0 and upper = numIters
-  foreach(0, numIters, n, body)
-
-template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
-  ## `forall` + `foreach` = `forevery` construct
-  ## 
-  ## Don't think about it too hard.
-  ## <in need of documentation>
+template forevery(lower, upper: SomeInteger; n, body: untyped): untyped =
+  # `forall` + `foreach` = `forevery` construct. Don't think about it too hard.
   let segment = (upper - lower) div numThreads()
   teamForAll(numThreads(), 1):
     proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
@@ -190,11 +175,83 @@ template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
           body
   localBarrier()
 
-template forevery*(numIters: SomeInteger; n, body: untyped): untyped =
-  ## `forall` + `foreach` = `forevery` construct
+#[ frontend: thread/vector dispatch macros ]#
+
+macro all*(x: ForLoopStmt): untyped =
+  ## Threaded for loop consturct
   ## 
-  ## Equivalent to `forevery` with lower = 0 and upper = numIters
-  forevery(0, numIters, n, body)
+  ## Turns a `for` loop of the form:
+  ## ```
+  ## for i in all(0..10):
+  ##   ...
+  ## ```
+  ## into a threaded parallel loop.
+  let 
+    idnt = x[0]
+    call = x[1]
+    body = x[2]
+  let
+    itr = call[1]
+    rngExpr = itr[0]
+  let (lo, hi) = (itr[1], itr[^1])
+  result = case $rngExpr:
+    of "..": 
+      quote do: forall(`lo`, `hi` + 1, `idnt`, `body`)
+    of "..<":
+      quote do: forall(`lo`, `hi`, `idnt`, `body`)
+    else: 
+      quote do: discard
+
+macro each*(x: ForLoopStmt): untyped =
+  ## Vectorized for loop consturct
+  ## 
+  ## Turns a `for` loop of the form:
+  ## ```
+  ## for i in each(0..10):
+  ##   ...
+  ## ```
+  ## into a vectorized parallel loop.
+  let 
+    idnt = x[0]
+    call = x[1]
+    body = x[2]
+  let
+    itr = call[1]
+    rngExpr = itr[0]
+  let (lo, hi) = (itr[1], itr[^1])
+  result = case $rngExpr:
+    of "..": 
+      quote do: foreach(`lo`, `hi` + 1, `idnt`, `body`)
+    of "..<":
+      quote do: foreach(`lo`, `hi`, `idnt`, `body`)
+    else: 
+      quote do: discard
+
+macro every*(x: ForLoopStmt): untyped =
+  ## Threaded + vectorized for loop consturct
+  ## 
+  ## Turns a `for` loop of the form:
+  ## ```
+  ## for i in every(0..10):
+  ##   ...
+  ## ```
+  ## into a threaded + vectorized parallel loop. Behaves like `Grid`'s
+  ## `accelerator_for` construct. 
+  let 
+    idnt = x[0]
+    call = x[1]
+    body = x[2]
+  let
+    itr = call[1]
+    rngExpr = itr[0]
+  let (lo, hi) = (itr[1], itr[^1])
+  result = case $rngExpr:
+    of "..": 
+      quote do: forevery(`lo`, `hi` + 1, `idnt`, `body`)
+    of "..<":
+      quote do: forevery(`lo`, `hi`, `idnt`, `body`)
+    else: 
+      quote do: discard
 
 # lessons learned:
 # * nested procedures that are to be passed to a call expecting a specific 
@@ -215,9 +272,8 @@ when isMainModule:
       if verbosity > 1: print "Hello from team member with league rank:", rank
       team.wait()
       if verbosity > 1: print "Goodbye from team member with league rank:", rank
-      team.threadMain:
-        foreach(0, 4, i):
-          testVar += 1
+      for i in each(0..3):
+        testVar += 1.0
     threads:
       let rank = thread.myRank()
       if verbosity > 1: print "Hello from team member with my rank:", rank
@@ -228,13 +284,13 @@ when isMainModule:
         testVar += 1.0
         if verbosity > 1: print "main thread:", rank
     print "testVar after threads:", testVar
-    forall(0, 10, i): 
+    for i in all(0..<10):
       if verbosity > 1: print "Hello from forall with i =", i
     assert(testVar == 7.0)
     let (lo, hi) = (0, numThreads()*10)
     var testSeq = newSeq[float](hi)
     print "seq before:", testSeq
-    forevery(lo, hi, i):
+    for i in every(lo..<hi):
       testSeq[i] += 1
     print "seq after:", testSeq
     for el in testSeq: assert(el == 1.0)

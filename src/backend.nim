@@ -32,9 +32,9 @@ export utils
 
 # UPC++ distributed memory backend
 template UnifiedParallelCXXBackend =
-  import upcxx/[upcxxbase, globalptr]
+  import upcxx/[upcxxbase, upcxxtypes]
   export upcxxbase
-  export globalptr
+  export upcxxtypes
 
 # Kokkos shared memory backend
 template KokkosBackend =

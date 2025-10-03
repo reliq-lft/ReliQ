@@ -393,6 +393,16 @@ proc newSimpleCubicLattice*(
     vlp = vlg.partition(numLanes(), startWithLast = vlg[0] < vlg[^1])
   return g.newSimpleCubicLattice(dp, sp, vlp, quiet = quiet)
 
+#[ frontend: simple cubic lattice dispatch ]#
+
+template forevery*(l: SimpleCubicLattice; n, body: untyped): untyped =
+  ## Parallel loop over all local lattice sites
+  let 
+    vectorStrides = numLanes()
+    threadStrides = vectorStrides * l.numVectorLaneSites
+    numIters = threadStrides * numThreads()
+  forevery(0, numIters, n): body
+
 when isMainModule:
   reliq:
     let lattice = [8, 8, 8, 16].newSimpleCubicLattice() 

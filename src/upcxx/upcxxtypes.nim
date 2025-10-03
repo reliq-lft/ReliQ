@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/upcxx/globalptr.nim
+  Source file: src/upcxx/upcxxtypes.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -32,8 +32,22 @@ import upcxxbase
 # include upcxx headers
 upcxx: discard
 
-type # UPC++ global pointer: accessible to all ranks; downcasts to ordinary pointer
+#[ frontend: UPC++ types ]#
+
+type 
   GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx.} = object
+  ## UPC++ global pointer 
+  ## 
+  ## Global pointer accessible to all ranks; downcasts to ordinary pointer
+
+type
+  DistributedObject*[T] {.importcpp: "upcxx::dist_object", upcxx.} = object
+  ## UPC++ distributed object
+  ## 
+  ## Distributed object accessible to all ranks; contains a global pointer
+  DistributedArray*[T] = DistributedObject[GlobalPointer[T]]
+
+#[ frontend: global pointer methods and constructors ]#
 
 # upcxx::global_ptr constructor: single data type
 proc newGlobalPointer*[T](t: T): GlobalPointer[T] 
@@ -44,9 +58,9 @@ proc deleteGlobalPointer*[T](global_ptr: GlobalPointer[T])
   {.importcpp: "upcxx::delete_(#)", upcxx.}
 
 # return upcxx::global_ptr to new array
-proc newGlobalPointerArray[T](size: csize_t): GlobalPointer[T]
+proc newGlobalPointerArray[T](size: SomeInteger): GlobalPointer[T]
   {.importcpp: "upcxx::new_array<'*0>(#)", upcxx.}
-proc newGlobalPointerArray*(size: csize_t, T: typedesc): GlobalPointer[T] = 
+proc newGlobalPointerArray*(size: SomeInteger; T: typedesc): GlobalPointer[T] = 
   return newGlobalPointerArray[T](size)  
 
 # upcxx::global_ptr destructor: array of data type
@@ -56,19 +70,32 @@ proc deleteGlobalPointerArray*[T](global_ptr: GlobalPointer[T])
 # downcasts upcxx::global_ptr to ordinary pointer
 proc local*[T](global_ptr: GlobalPointer[T]): ptr T {.importcpp: "#.local()", upcxx.}
 
+#[ frontend: global pointer methods and constructors ]#
+
+## UPC++ distributed object constructor
+proc newDistributedObject*[T](
+  data: GlobalPointer[T]
+): DistributedObject[GlobalPointer[T]] 
+  {.importcpp: "upcxx::dist_object<upcxx::global_ptr<'*0>>(#)", constructor, upcxx.}
+
+## Create distributed array
+proc newDistributedArray*(size: SomeInteger; T: typedesc): DistributedArray[T] =
+  return newGlobalPointerArray(size, T).newDistributedObject()
+
+## Downcasts distributed object to local pointer
+proc local*[T](dobj: DistributedObject[GlobalPointer[T]]): ptr T 
+  {.importcpp: "#->local()", upcxx.}
+
+#[ tests ]#
+
 when isMainModule:
   upcxxInit()
   
-  let sq = newSeq[int](10)
-  var gptr = newGlobalPointer(sq)
-
-  var lptr = gptr.local()
-
-  gptr.deleteGlobalPointer()
-
-  let sz: csize_t = 10
-  var gptrArr = newGlobalPointerArray(sz, int)
-
-  gptrArr.deleteGlobalPointerArray()
+  let 
+    gp = newGlobalPointerArray(10): int
+    gpLocal = gp.local()
+  let 
+    dobj = gp.newDistributedObject()
+    dobjLocal = dobj.local()
   
   upcxxFinalize()

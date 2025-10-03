@@ -58,7 +58,7 @@ proc toStrides(shape: openArray[SomeInteger]): seq[int] =
   result = newSeq[int](shape.len)
   result[shape.len-1] = 1
   for i in countdown(shape.len - 2, 0):
-    result[i] = result[i+1] * shape[i+1]
+    result[i] = result[i + 1] * shape[i + 1]
 
 proc newFieldLattice[T](f: var FieldData[T]; l: SimpleCubicLattice) =
   new(f.lattice)
@@ -100,9 +100,9 @@ proc newField*(
     strides: shape.toStrides(),
     components: newSeq[SimpleCubicScalar[T]](shape.len)
   )
-  for i in 0 ..< shape.len: result.components[i] = l.newField(T)
+  for i in 0..<shape.len: result.components[i] = l.newField(T)
 
-#[ frontend: virtual attributes ]#
+#[ frontend: virtual scalar field attributes ]#
 
 proc threadStrides*[T](f: SimpleCubicScalar[T]): int =
   ## Gets number strides across threads
@@ -112,23 +112,25 @@ proc vectorStrides*[T](f: SimpleCubicScalar[T]): int =
   ## Gets number strides across SIMD lanes
   return f.local()[].vectorStrides
 
-proc len*[T](f: SimpleCubicScalar[T]): int =
-  ## Gets number of local lattice sites
-  return f.local()[].len
-
 proc numSites*[T](f: SimpleCubicScalar[T]): int =
   ## Gets number of local lattice sites
-  return f.threadStrides div f.vectorStrides
+  return f.local()[].len
 
 proc data*[T](f: SimpleCubicScalar[T]): ptr UncheckedArray[T] =
   ## Downcast global pointer to local field data pointer
   return f.local()[].data
 
+#[ frontend: virtual tensor field attributes ]#
+
+proc len*[T](f: SimpleCubicTensor[T]): int =
+  ## Gets number of tensor components
+  return f.components.len
+
 #[ frontend: downcasting ]#
 
 proc localField*[T](f: SimpleCubicScalar[T]): StaticView[T] =
   ## Downcast global pointer to local field data wrapped with Kokkos view
-  return (addr f.data[][0]).newStaticView(f.len)
+  return (addr f.data[][0]).newStaticView(f.numSites)
 
 #[ frontend: accessors ]#
 
@@ -239,7 +241,7 @@ macro promote(ident: untyped; lhs, rhs: untyped): untyped =
   result = quote do:
     `lhsViews`
     `rhsViews`
-    forevery(0, `lhs`.len, n): `newExpr`
+    forevery(0, `lhs`.numSites, n): `newExpr`
 
 #[ frontend: Chapel-like promotion/fusion of elementary arithematic operations ]#
 
@@ -336,6 +338,27 @@ template `/=`*(lhs, rhs: untyped) =
   ## ```
   block: `/=`.promote(lhs, rhs)
 
+#[ frontend: tensor methods ]#
+
+proc `⊗`*[T](tensorA, tensorB: SimpleCubicTensor[T]): SimpleCubicTensor[T] =
+  ## Tensor product of two tensor fields
+  ##
+  ## <in need of documentation>
+  #[
+  assert(tensorA.order > 0 and tensorB.order > 0, "tensor order must be positive")
+  result = SimpleCubicTensor[T](
+    order: tensorA.order + tensorB.order,
+    shape: tensorA.shape & tensorB.shape,
+    strides: tensorA.strides & tensorB.strides,
+    components: newSeq[SimpleCubicScalar[T]](tensorA.components.len * tensorB.components.len)
+  )
+  for i in 0..<tensorA.components.len:
+    for j in 0..<tensorB.components.len:
+      result.components[i*tensorB.components.len + j] = 
+        tensorA.components[i] * tensorB.components[j]
+  ]#
+  return tensorA
+
 #[ testing ]#
 
 # ideas:
@@ -362,7 +385,7 @@ when isMainModule:
     fieldB := 5.0
     fieldC := 9.0 
     fieldA := fieldB + 2.0*fieldB - num*fieldC + 3.0*fieldB/fieldC + num*fieldC*fieldB
-    forall(0, fieldA.len, n):
+    forall(0, fieldA.numSites, n):
       if fieldB[n] != 5.0: 
         print "fieldB[", n, "] = ", fieldB[n]
         assert(fieldB[n] == 5.0)
@@ -401,10 +424,10 @@ when isMainModule:
     #`=copy`(fieldB, fieldC)
     #`=destroy`(fieldB)
 
-    var 
-      tensorA = lattice.newField([3,3]): float
-      tensorB = lattice.newField([3,3]): float
-      tensorC = lattice.newField([3,3]): float
+    #var 
+    #  tensorA = lattice.newField([3,3]): float
+    #  tensorB = lattice.newField([3,3]): float
+    #  tensorC = lattice.newField([3,3]): float
     #let 
     #  tensorAComp = tensorA[[1,2]]
     #  tensorACompView = tensorA([1,2])
