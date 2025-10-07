@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/upcxx/upcxxtypes.nim
+  Source file: src/upcxx/upcxxglobalptr.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -32,21 +32,13 @@ import upcxxbase
 # include upcxx headers
 upcxx: discard
 
-#[ frontend: UPC++ types ]#
+#[ frontend: UPC++ global pointer type, constructors, and methods ]#
 
 type 
   GlobalPointer*[T] {.importcpp: "upcxx::global_ptr", upcxx.} = object
   ## UPC++ global pointer 
   ## 
   ## Global pointer accessible to all ranks; downcasts to ordinary pointer
-
-type
-  DistributedObject*[T] {.importcpp: "upcxx::dist_object", upcxx.} = object
-  ## UPC++ distributed object
-  ## 
-  ## Distributed object accessible to all ranks; contains a global pointer
-
-#[ frontend: global pointer methods and constructors ]#
 
 # upcxx::global_ptr constructor: single data type
 proc newGlobalPointer*[T](t: T): GlobalPointer[T] 
@@ -69,21 +61,9 @@ proc deleteGlobalPointerArray*[T](global_ptr: GlobalPointer[T])
 # downcasts upcxx::global_ptr to ordinary pointer
 proc local*[T](global_ptr: GlobalPointer[T]): ptr T {.importcpp: "#.local()", upcxx.}
 
-#[ frontend: global pointer methods and constructors ]#
-
-## UPC++ distributed object constructor
-proc newDistributedObject*[T](data: T): DistributedObject[T] 
-  {.importcpp: "upcxx::dist_object<'*0>(#)", constructor, upcxx.}
-
-# create distributed array 
-template newDistributedArray*(size: SomeInteger; T: typedesc): untyped =
-  newGlobalPointerArray(size, T).newDistributedObject()
-
-## Downcasts distributed object to local pointer
-proc local*[T](dobj: DistributedObject[GlobalPointer[T]]): ptr T 
-  {.importcpp: "#->local()", upcxx.}
-
 #[ tests ]#
+
+# DISTRIBUTED ARRAY: https://bitbucket.org/camaclean/upcxx-extras/src/paw21-kokkos/extensions/dist_array/
 
 when isMainModule:
   upcxxInit()
@@ -91,8 +71,5 @@ when isMainModule:
   let 
     gp = newGlobalPointerArray(10): int
     gpLocal = gp.local()
-  let 
-    dobj = gp.newDistributedObject()
-    dobjLocal = dobj.local()
   
   upcxxFinalize()

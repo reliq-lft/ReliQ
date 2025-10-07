@@ -57,7 +57,7 @@ proc toc*(timer: Timer) =
   reliqLog fmt"{timer.tag}: {cpuTime()-timer.t0:.3f} [s]"
 
 # frontend: reliq runtime initialization
-proc reliqInit*(printInitTiming: bool = true) {.inline.} =
+proc reliqInit(printInitTiming: bool = true) {.inline.} =
   ## Initializes ReliQ's runtime environment
   ## Author: Curtis Taylor Peterson
   ## 
@@ -74,7 +74,7 @@ proc reliqInit*(printInitTiming: bool = true) {.inline.} =
   if printInitTiming: timer.toc()
 
 # frontend: reliq runtime finalization
-proc reliqFinalize*(
+proc reliqFinalize(
   printRuntimeTiming: bool = true,
   printExecutionTiming: bool = true,
   printFinalizeTiming: bool = true
@@ -94,16 +94,23 @@ proc reliqFinalize*(
   if printFinalizeTiming: timer.toc()
   if printRuntimeTiming: runtimeTimer.toc()
 
-template reliq*(work: untyped): untyped =
-  ## Encapsulates ReliQ's runtime environment in workload block
-  ## Author: Curtis Taylor Peterson
-  reliqInit()
-  block: work
-  reliqFinalize()
-
 template barrier*: untyped =
+  ## Synchronizes barrier for all processes and threads. This barrier
+  ## should be used sparingly, as synchronization can have considerable
+  ## overhead associated with it. 
+  let timer = tic "Barrier synchronization"
   localBarrier()
-  globalBarrier()  
+  globalBarrier()
+  timer.toc()
+
+template reliq*(work: untyped): untyped =
+  ## Encapsulates ReliQ's runtime environment
+  proc ReliqMain() = 
+    reliqInit()
+    work
+    barrier()
+    reliqFinalize()
+  ReliqMain() 
 
 when isMainModule:
   import utils
@@ -114,11 +121,6 @@ when isMainModule:
     echo "Hello world from process" + $myRank() +
       "out of" + $numRanks() + "processes"
     print "I should only print once"
-
-  if not encapsulated:
-    reliqInit()
+  
+  reliq: 
     hello_world()
-    reliqFinalize()
-  else: 
-    reliq: 
-      hello_world()

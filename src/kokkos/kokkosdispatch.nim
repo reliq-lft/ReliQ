@@ -246,6 +246,12 @@ when isMainModule:
   import runtime
   const verbosity = 1
   reliq:
+    var 
+      testSeqA, testSeqB: seq[float] = newSeq[float](16)
+    proc funWork[T](team: T; seqA, seqB: var seq[float]) =
+      for i in 0..<seqA.len div numThreads():
+        seqA[team.myRank()] += 1.0
+        seqB[team.myRank()] += 2.0
     var testVar = 2.0
     print "testVar before threads:", testVar
     threadTeams(4, 4):
@@ -253,6 +259,8 @@ when isMainModule:
       if verbosity > 1: print "Hello from team member with league rank:", rank
       team.wait()
       if verbosity > 1: print "Goodbye from team member with league rank:", rank
+      team.funWork(testSeqA, testSeqB)
+      team.wait()
       team.threadMain:
         if verbosity > 1: print "main thread:", rank
         for i in each 0..3:

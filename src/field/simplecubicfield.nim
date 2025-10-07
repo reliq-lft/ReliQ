@@ -6,6 +6,8 @@
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
 
   MIT License
+
+  halo exchange example: https://bitbucket.org/berkeleylab/upcxx-extras/src/develop/examples/kokkos_3dhalo/upcxx_heat_conduction.cpp
   
   Copyright (c) 2025 reliq-lft
   
@@ -56,16 +58,9 @@ type
 proc toStrides(shape: openArray[SomeInteger]): seq[int] =
   ## Convert tensor shape to tensor strides
   result = newSeq[int](shape.len)
-  result[shape.len-1] = 1
+  result[shape.len - 1] = 1
   for i in countdown(shape.len - 2, 0):
     result[i] = result[i + 1] * shape[i + 1]
-
-proc newFieldLattice[T](f: var FieldData[T]; l: SimpleCubicLattice) =
-  new(f.lattice)
-  f.lattice[] = l.local()[]
-
-proc newFieldData[T](f: var FieldData[T]) =
-  f.data = cast[ptr UncheckedArray[T]](alloc(f.bytes))
 
 proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
   ## Create new field on simple cubic Bravais lattice
@@ -82,8 +77,9 @@ proc newField*(l: SimpleCubicLattice; T: typedesc): auto =
     len: len, 
     bytes: bytes
   )
-  field.newFieldLattice(l)
-  field.newFieldData()
+  new field.lattice
+  field.lattice[] = l.local()[]
+  field.data = cast[ptr UncheckedArray[T]](alloc(field.bytes))
   return field.newGlobalPointer()
 
 proc newField*(
