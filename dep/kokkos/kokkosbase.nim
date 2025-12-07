@@ -52,17 +52,17 @@ type KokkosViewError* = object of CatchableError
 #[ frontend: runtime initializers/finalizers ]#
 
 # initializes Kokkos runtime
-proc initKokkos*(argc: cint; argv: cstringArray)
+proc kokkosInit(argc: cint; argv: cstringArray)
   {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
-proc initKokkos* {.inline.} =
+proc kokkosInit* {.inline.} =
   let 
     argc = cargc()
     argv = cargv(argc)
-  initKokkos(argc, argv)
+  kokkosInit(argc, argv)
   deallocCStringArray(argv)
 
 # finalizes Kokkos runtime
-proc finalizeKokkos* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
+proc kokkosFinalize* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
 
 #[ misc. procedures ]#
 

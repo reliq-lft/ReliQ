@@ -1,52 +1,27 @@
-#[ 
-  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/reliq.nim
-  Contact: reliq-lft@proton.me
+import utils/[commandline]
+import communication/[mpi]
+import globalarrays/[gabase]
+import kokkos/[kokkosbase]
 
-  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+template main*(body: untyped): untyped =
+  block:
+    let argc {.inject.} = cargc()
+    let argv {.inject.} = cargv(argc)
+    
+    initMPI(addr argc, addr argv)
+    initKokkos(argc, argv)
+    initGlobalArrays()
 
-  MIT License
-  
-  Copyright (c) 2025 reliq-lft
-  
-  Permission is hereby granted, free of chadge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
+    deallocCStringArray(argv)
+    body
+    
+    finalizeGlobalArrays()
+    finalizeKokkos()
+    finalizeMPI()
 
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-  
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
-  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
+template test*(body: untyped): untyped =
+  when isMainModule:
+    main: body
 
-#[ ReliQ utilities and runtime environment ]#
-
-import utils
-import runtime
-
-export utils
-export runtime
-
-#[ ReliQ lattice types ]#
-
-import lattice/[latticeconcept]
-import lattice/[simplecubiclattice]
-
-export latticeconcept
-export simplecubiclattice
-
-#[ ReliQ field types ]#
-
-import field/[fieldconcept]
-import field/[simplecubicfield]
-
-export fieldconcept
-export simplecubicfield
+test:
+  echo "Testing ReliQ initialization"
