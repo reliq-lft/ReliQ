@@ -27,6 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import argparse
+
 import pathlib
 import subprocess
 
@@ -36,12 +38,14 @@ import tools
 ### install ###
 
 def install(
+    options: argparse.Namespace,
     spack: pathlib.Path, 
     path: pathlib.Path,
     version: str
 ) -> pathlib.Path:
     if path == constants.DEFAULT_STANDIN_PATH: 
         spack_bin = spack / 'bin' / 'spack'
+        jobs = '-j ' + str(options.jobs)
         nim = 'nim@' + version
         try: 
             tools.exec(spack_bin, 'find', nim, **{'capture_output': True})
@@ -49,7 +53,7 @@ def install(
         except subprocess.CalledProcessError:
             specs = []
             tools.exec(spack_bin, '-e reliq add', nim, *specs)
-            tools.exec(spack_bin, '-e reliq install', nim, *specs)
+            tools.exec(spack_bin, '-e reliq install', jobs, nim, *specs)
     else: # if path specified, check that we can compile a Nim program
         nim_bin = path / 'bin' / 'nim'
         if not nim_bin.exists():
@@ -65,3 +69,4 @@ def link(path: pathlib.Path, install_path: pathlib.Path) -> None:
     if path != constants.DEFAULT_STANDIN_PATH:
         tools.exec('ln -sf', path / 'bin' / '/*', install_path / 'bin')
         tools.exec('ln -sf', path / 'include' / '/*', install_path / 'include')
+        tools.exec('ln -sf', path / 'lib' / '/*', install_path / 'lib')

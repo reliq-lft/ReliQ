@@ -35,13 +35,12 @@ import json
 import constants
 import tools
 
-import cpu
-import gpu
+#import cpu
+#import gpu
 
 import spack
-import cmake
 import nim
-import upcxx
+import globalarrays
 import kokkos
 
 ### execute installation script ###
@@ -49,10 +48,10 @@ import kokkos
 if __name__ == '__main__':
     tools.install_python_packages()
 
-    cpus = cpu.CentralProcessingUnits()
-    gpus = gpu.GraphicsProcessingUnits()
+    #cpus = cpu.CentralProcessingUnits()
+    #gpus = gpu.GraphicsProcessingUnits()
 
-    args = tools.args(cpus, gpus)
+    args = tools.args() #cpus, gpus)
 
     install_path = pathlib.Path(args.prefix)
     if not install_path.is_dir(): install_path.mkdir()
@@ -62,18 +61,18 @@ if __name__ == '__main__':
 
     #cmakev = versions['cmake']
     nimv = versions['nim']
-    upcxxv = versions['upcxx']
+    globalarraysv = versions['globalarrays']
     kokkosv = versions['kokkos']
 
     spack_path = spack.install(install_path, pathlib.Path(args.spack))
     spack.create_env(spack_path)
 
     #cmake.install(spack_path, cmakev)
-    nim_path = nim.install(spack_path, pathlib.Path(args.nim), nimv)
-    upcxx_path = upcxx.install(args, spack_path, pathlib.Path(args.upcxx), upcxxv)
+    nim_path = nim.install(args, spack_path, pathlib.Path(args.nim), nimv)
+    globalarrays_path = globalarrays.install(args, spack_path, pathlib.Path(args.globalarrays), globalarraysv)
     kokkos_path = kokkos.install(args, spack_path, pathlib.Path(args.kokkos), kokkosv)
 
     spack.link(spack_path, install_path)
     nim.link(nim_path, install_path)
-    upcxx.link(upcxx_path, install_path)
+    globalarrays.link(globalarrays_path, install_path)
     kokkos.link(kokkos_path, install_path)

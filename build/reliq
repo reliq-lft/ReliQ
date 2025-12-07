@@ -98,8 +98,7 @@ if __name__ == '__main__':
     for var, value in env_vars.items(): os.environ[var] = value
 
     # execute ReliQ program
-    cmd = str(SWD / 'external' / 'bin' / 'upcxx-run')
-    cmd += ' -n ' + args.ntasks
-    cmd += ' -localhost ' if args.local else ' '
-    cmd += str(SWD / 'bin' / args.executable)
+    cmd = str(SWD / 'external' / 'bin' / 'mpirun')
+    cmd += ' -np ' + args.ntasks
+    cmd += ' ' + str(SWD / 'bin' / args.executable)
     subprocess.run(cmd, shell = True, check = True)

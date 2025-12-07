@@ -44,6 +44,7 @@ def install(
 ) -> pathlib.Path:
     if path == constants.DEFAULT_STANDIN_PATH: 
         spack_bin = spack / 'bin' / 'spack'
+        jobs = '-j ' + str(options.jobs)
         kokkos = 'kokkos@' + version
         try: 
             tools.exec(spack_bin, 'find', kokkos, **{'capture_output': True})
@@ -56,7 +57,7 @@ def install(
             #    'rocm=' + options.rocm, -- not ready yet
             ]
             tools.exec(spack_bin, '-e reliq add', kokkos, *specs)
-            try: tools.exec(spack_bin, '-e reliq install', kokkos, *specs)
+            try: tools.exec(spack_bin, '-e reliq install', jobs, kokkos, *specs)
             except subprocess.CalledProcessError as err:
                 tools.exec(spack_bin, '-e reliq remove', kokkos, *specs)
                 raise err
@@ -71,3 +72,4 @@ def link(path: pathlib.Path, install_path: pathlib.Path) -> None:
     if path != constants.DEFAULT_STANDIN_PATH:
         tools.exec('ln -sf', path / 'bin' / '/*', install_path / 'bin')
         tools.exec('ln -sf', path / 'include' / '/*', install_path / 'include')
+        tools.exec('ln -sf', path / 'lib' / '/*', install_path / 'lib')

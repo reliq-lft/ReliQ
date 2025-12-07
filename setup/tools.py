@@ -43,6 +43,7 @@ PYTHON: str = sys.executable
 
 SPACK_URL: str = 'spack.io'
 NIM_URL: str = 'nim-lang.org'
+GLOBALARRAYS_URL: str = 'hpc.pnl.gov/globalarrays'
 UPCXX_URL: str = 'docs.nersc.gov/development/programming-models/upcxx'
 KOKKOS_URL: str = 'kokkos.org'
 
@@ -79,8 +80,8 @@ def lspci_info(device: str) -> dict[str, any]:
 
 # gets command line arguments
 def args(
-    cpus: cpu.CentralProcessingUnits,
-    gpus: gpu.GraphicsProcessingUnits
+    #cpus: cpu.CentralProcessingUnits,
+    #gpus: gpu.GraphicsProcessingUnits
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description = constants.DESCRIPTION,
@@ -94,6 +95,15 @@ def args(
         help = 'ReliQ installation path',
         type = str,
         default = constants.CWD / 'external'
+    )
+
+    # number of CPUs over which to distribute build
+    parser.add_argument(
+        '-j', 
+        '--jobs', 
+        help = 'Number of parallel build jobs',
+        type = int,
+        default = 1
     )
 
     # Spack package manager
@@ -121,6 +131,17 @@ def args(
     )
 
     # UPC++ partitioned global address space
+    globalarrays = parser.add_argument_group(
+        'GlobalArrays (' + GLOBALARRAYS_URL + ')', 
+        'Backend for ReliQ\'s partitioned global address space'
+    )
+    globalarrays.add_argument(
+        '--globalarrays',
+        help = 'Path to GlobalArrays; if PREFIX, then installed by Spack',
+        type = str,
+        default = constants.DEFAULT_STANDIN_PATH
+    )
+    """
     upcxx = parser.add_argument_group(
         'Unified Parallel C++ (' + UPCXX_URL + ')', 
         'Backend for ReliQ\'s partitioned global address space'
@@ -147,6 +168,7 @@ def args(
     upcxx_options = [upcxx_flags, upcxx_helpers, upcxx_choices, upcxx_defaults]
     for (f, h, c, d) in zip(*upcxx_options):
         upcxx.add_argument(f, help = h, choices = c, default = d, type = str)
+    """
 
     # Kokkos shared memory parallelism
     kokkos = parser.add_argument_group(
@@ -180,6 +202,7 @@ def args(
         kokkos.add_argument(f, help = h, choices = c, default = d, type = str)
 
     # UPC++ + Kokkos
+    """
     reliq = parser.add_argument_group(
         'Kokkos and Unified Parallel C++', 
         'Options that apply to both Kokkos and Unified Parallel C++ installation'
@@ -202,7 +225,8 @@ def args(
     ]
     for (f, h, c, d) in zip(flags, helpers, choices, defaults):
         reliq.add_argument(f, help = h, choices = c, default = d, type = str)
-
+    """
+        
     # return parsed command line arguments
     return parser.parse_args()
 

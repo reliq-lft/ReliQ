@@ -48,15 +48,26 @@ const cxxLinks = [""]
 const externalDir = cwd / "external"
 
 const 
-  metaUPCXX = externalDir / "bin" / "upcxx-meta"
+  metaGA = externalDir / "bin" / "ga-config"
   metaKokkos = externalDir / "bin" / "kokkos-meta"
 
 const
-  passCXX_UPCXX = staticExec(metaUPCXX + "CXXFLAGS")
-  passCPP_UPCXX = staticExec(metaUPCXX + "CPPFLAGS")
-const passL_UPCXX = staticExec(metaUPCXX + "LIBFLAGS")
+  passC_GA = staticExec(metaGA + "--cflags") + 
+             staticExec(metaGA + "--cppflags") +
+             staticExec(metaGA + "--network_cppflags")
+const 
+  passL_GA = staticExec(metaGA + "--ldflags") + 
+             staticExec(metaGA + "--network_ldflags") + 
+             staticExec(metaGA + "--libs") +
+             staticExec(metaGA + "--network_libs")
+const
+  passC_reliq = ""
+  # Add rpath and library path to ensure we use Spack's MPI library (not system's Intel MPI)
+  # This prevents linking against multiple MPI libraries simultaneously
+  passL_reliq = "-Wl,-rpath," & externalDir / "lib" & 
+                " -L" & externalDir / "lib" & " -lmpi"
 
-const passCXX_Kokkos = staticExec(metaKokkos + "CXXFLAGS")
+const passC_Kokkos = staticExec(metaKokkos + "CXXFLAGS")
 const passL_Kokkos = staticExec(metaKokkos + "LIBFLAGS")
 
 ### execute compilation ###
@@ -72,8 +83,8 @@ task clean, "cleaning files":
 
 task build, "building file":
   var 
-    passC = "-Ofast" + passCXX_UPCXX + passCPP_UPCXX + passCXX_Kokkos
-    passL = passL_UPCXX + passL_Kokkos
+    passC = "-Ofast" + passC_GA + passC_Kokkos + passC_reliq
+    passL = passL_GA + passL_Kokkos + passL_reliq
   var args = newSeq[string](paramCount() - 2)
   var cmpl: string 
 
@@ -93,3 +104,8 @@ task build, "building file":
 
   echo "BUILD:" + cmpl
   exec cmpl
+
+#[
+Summary of fixed issue 12/07/2025: see docs/GLOBALARRAYS_SETUP.md
+
+]#
