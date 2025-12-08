@@ -1,6 +1,5 @@
 import reliq
-import gabase
-import gatypes
+import globalarrays/[gabase, gatypes]
 
 GlobalArrays: discard
 
@@ -253,6 +252,20 @@ proc isInitialized*[D: static[int], T](ga: GlobalArray[D, T]): bool =
   ## Returns:
   ## `true` if the GlobalArray is initialized, `false` otherwise.
   return ga.handle != 0
+
+#[ LD accessors ]#
+
+proc getHandle*[D: static[int], T](local: LocalData[D, T]): cint =
+  ## Accessor for the GA handle in LocalData
+  ##
+  ## Returns the GA handle associated with the LocalData.
+  ##
+  ## Parameters:
+  ## - `local`: The LocalData instance.
+  ##
+  ## Returns:
+  ## The GA handle as a `cint`.
+  return local.ga_handle
 
 #[ downcasting to local data ]#
 

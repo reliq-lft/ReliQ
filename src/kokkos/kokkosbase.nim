@@ -36,10 +36,10 @@
 import utils/[nimutils]
 
 # template returning Kokkos_Core include through pragma
-template kokkos*(pragmas: untyped): untyped = 
+template Kokkos*(pragmas: untyped): untyped = 
   {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
   pragmas
-kokkos: discard
+Kokkos: discard
 
 # enumerate possible errors that a user may run into
 type KokkosViewErrors* = enum 

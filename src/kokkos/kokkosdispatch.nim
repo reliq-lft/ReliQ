@@ -33,9 +33,9 @@ import kokkosbase
 import utils
 
 # import backend header files
-kokkos: discard
+Kokkos: discard
 
-# backend: constants for Kokkos parallel_for wrapping
+# constants for Kokkos parallel_for wrapping
 const LAMBDA = "KOKKOS_LAMBDA" 
 const 
   MEMBERTYPE = "Kokkos::TeamPolicy<>::member_type&"
@@ -46,19 +46,19 @@ const
   THREADVECTORRANGE = "Kokkos::ThreadVectorRange(#, #, #)"
   FOREACH = PARFOR & "(" & THREADVECTORRANGE & ", [&] (int idx) { #(idx); })"
 
-# frontend: team member type
+# team member type
 type ThreadTeam* {.importcpp: "Kokkos::TeamPolicy<>::member_type", kokkos.} = object
 
-type # backend: range/team policy types
+type # range/team policy types
   RangePolicy {.importcpp: "Kokkos::RangePolicy<>", kokkos.} = object
   TeamPolicy {.importcpp: "Kokkos::TeamPolicy<>", kokkos.} = object
   ThreadVectorPolicy {.importcpp: "Kokkos::ThreadVectorRange", kokkos.} = object
 
-type # backend: Nim --> C++ procedure kernels
+type # Nim --> C++ procedure kernels
   NimRangeKernel = proc(idx: cint) {.cdecl.}
   NimTeamKernel = proc(team: ThreadTeam) {.cdecl.}
 
-#[ backend: parallel dispatch policy wrappers ]#
+#[ parallel dispatch policy wrappers ]#
 
 # C++ new/delete bindings for RangePolicy
 proc newRangePolicy(lower, upper: int): ptr RangePolicy 
@@ -70,7 +70,7 @@ proc newTeamPolicy(leagueSize, teamSize: int): ptr TeamPolicy
   {.importcpp: "new Kokkos::TeamPolicy<>(#, #)", constructor, kokkos.}
 proc deleteTeamPolicy(policy: ptr TeamPolicy) {.importcpp: "delete #", kokkos.}
 
-#[ backend: parallel dispatch wrappers ]#
+#[ parallel dispatch wrappers ]#
 
 # parallel for wrappers
 proc forall(policy: ptr TeamPolicy; body: NimTeamKernel) 
@@ -99,30 +99,30 @@ proc threadForEach(
   body: NimRangeKernel
 ) {.inline.} = team.foreach(lower, upper): body
 
-#[ frontend: thread team methods ]#
+#[ thread team methods ]#
 
-## frontend: gets team size
+## gets team size
 proc teamSize*(team: ThreadTeam): int {.importcpp: "#.team_size()", inline, kokkos.}
 
-## frontend: gets league rank of team member
+## gets league rank of team member
 proc leagueRank*(team: ThreadTeam): int 
   {.importcpp: "#.league_rank()", inline, kokkos.}
 
-## frontend: gets league rank of team member
+## gets league rank of team member
 proc teamRank*(team: ThreadTeam): int {.importcpp: "#.team_rank()", inline, kokkos.}
 
-## frontend: gets league rank of team member
+## gets league rank of team member
 proc myRank*(team: ThreadTeam): int = 
   team.teamRank() + team.leagueRank() * team.teamSize()
 
-## frontend: setups up team barrier
+## setups up team barrier
 proc wait*(team: ThreadTeam) {.importcpp: "#.team_barrier()", kokkos.}
 
-## frontend: ensures that only main thread executes
+## ensures that only main thread executes
 template threadMain*(thread: ThreadTeam; body: untyped): untyped =
   if thread.myRank() == 0: body
 
-#[ backend: thread/vector dispatch ]#
+#[ thread/vector dispatch ]#
 
 template forall*(lower, upper: SomeInteger; n, body: untyped): untyped =
   # threaded `forall` construct
@@ -152,7 +152,7 @@ template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
           body
   localBarrier()
 
-#[ frontend: threaded dispatch ]#
+#[ threaded dispatch ]#
 
 template threadTeams*(leagueSize, teamSize: SomeInteger; body: untyped): untyped =
   ## thread teams construct
@@ -174,7 +174,7 @@ template threads*(body: untyped): untyped =
       body
   localBarrier()
 
-#[ frontend: thread/vector dispatch macros ]#
+#[ thread/vector dispatch macros ]#
 
 macro all*(x: ForLoopStmt): untyped =
   ## Threaded for loop consturct
