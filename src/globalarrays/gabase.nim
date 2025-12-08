@@ -5,11 +5,20 @@ template GlobalArrays*(body: untyped): untyped =
 
 GlobalArrays: discard
 
-# Global Arrays initialization
+#[ Global Arrays initialization ]#
+
 proc initGlobalArrays*() {.importc: "GA_Initialize", ga.}
+
 proc initGlobalArraysArgs*(argc: ptr cint, argv: ptr cstringArray) 
   {.importc: "GA_Initialize_args", ga.}
+
 proc finalizeGlobalArrays*() {.importc: "GA_Terminate", ga.}
+
+#[ process information ]#
+
+proc GA_Nodeid*(): cint {.importc: "GA_Nodeid", ga.}
+
+proc GA_Nnodes*(): cint {.importc: "GA_Nnodes", ga.}
 
 when isMainModule:
   import utils/[commandline]

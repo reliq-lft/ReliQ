@@ -11,5 +11,4 @@ proc toGAType*(t: typedesc[char]): cint = C_CHAR
 proc toGAType*(t: typedesc[int]): cint = C_INT
 proc toGAType*(t: typedesc[float32]): cint = C_FLOAT
 proc toGAType*(t: typedesc[float64]): cint = C_DBL
-#proc toGAType*(t: typedesc[float]): cint = C_DBL
 
