@@ -47,6 +47,7 @@ type LocalView*[D: static[int], T] = object
   ## that provides efficient access for computations.
   handle: KokkosHandle
   rank: int
+  dims: array[D, int]
 
 #[ C++ helpers for dealing with Kokkos semantics ]#
 
@@ -65,39 +66,27 @@ void* create_kokkos_view(T* data, size_t rank, const size_t* dims) {
       return static_cast<void*>(view);
     }
     case 2: {
-      auto* view = new Kokkos::View<T**, Layout, Memory, Traits>(
-        data, dims[0], dims[1]
-      );
+      auto* view = new Kokkos::View<T**, Layout, Memory, Traits>(data, dims[0], dims[1]);
       return static_cast<void*>(view);
     }
     case 3: {
-      auto* view = new Kokkos::View<T***, Layout, Memory, Traits>(
-        data, dims[0], dims[1], dims[2]
-      );
+      auto* view = new Kokkos::View<T***, Layout, Memory, Traits>(data, dims[0], dims[1], dims[2]);
       return static_cast<void*>(view);
     }
     case 4: {
-      auto* view = new Kokkos::View<T****, Layout, Memory, Traits>(
-        data, dims[0], dims[1], dims[2], dims[3]
-      );
+      auto* view = new Kokkos::View<T****, Layout, Memory, Traits>(data, dims[0], dims[1], dims[2], dims[3]);
       return static_cast<void*>(view);
     }
     case 5: {
-      auto* view = new Kokkos::View<T*****, Layout, Memory, Traits>(
-        data, dims[0], dims[1], dims[2], dims[3], dims[4]
-      );
+      auto* view = new Kokkos::View<T*****, Layout, Memory, Traits>(data, dims[0], dims[1], dims[2], dims[3], dims[4]);
       return static_cast<void*>(view);
     }
     case 6: {
-      auto* view = new Kokkos::View<T******, Layout, Memory, Traits>(
-        data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5]
-      );
+      auto* view = new Kokkos::View<T******, Layout, Memory, Traits>(data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5]);
       return static_cast<void*>(view);
     }
     case 7: {
-      auto* view = new Kokkos::View<T*******, Layout, Memory, Traits>(
-        data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5], dims[6]
-      );
+      auto* view = new Kokkos::View<T*******, Layout, Memory, Traits>(data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5], dims[6]);
       return static_cast<void*>(view);
     }
     default: return nullptr;
@@ -110,27 +99,13 @@ void destroy_kokkos_view(void* handle, size_t rank) {
   using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
   
   switch(rank) {
-    case 1: 
-      delete static_cast<Kokkos::View<T*, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 2: 
-      delete static_cast<Kokkos::View<T**, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 3: 
-      delete static_cast<Kokkos::View<T***, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 4: 
-      delete static_cast<Kokkos::View<T****, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 5: 
-      delete static_cast<Kokkos::View<T*****, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 6: 
-      delete static_cast<Kokkos::View<T******, Layout, Memory, Traits>*>(handle); 
-      break;
-    case 7: 
-      delete static_cast<Kokkos::View<T*******, Layout, Memory, Traits>*>(handle); 
-      break;
+    case 1: delete static_cast<Kokkos::View<T*, Layout, Memory, Traits>*>(handle); break;
+    case 2: delete static_cast<Kokkos::View<T**, Layout, Memory, Traits>*>(handle); break;
+    case 3: delete static_cast<Kokkos::View<T***, Layout, Memory, Traits>*>(handle); break;
+    case 4: delete static_cast<Kokkos::View<T****, Layout, Memory, Traits>*>(handle); break;
+    case 5: delete static_cast<Kokkos::View<T*****, Layout, Memory, Traits>*>(handle); break;
+    case 6: delete static_cast<Kokkos::View<T******, Layout, Memory, Traits>*>(handle); break;
+    case 7: delete static_cast<Kokkos::View<T*******, Layout, Memory, Traits>*>(handle); break;
     default: break;
 } }
 """.}
@@ -155,7 +130,7 @@ proc destroyKokkosViewDouble(handle: pointer, rank: csize_t)
 
 #[ local view constructor, destructor, copy assignment ]#
 
-proc newLocalView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
+proc localView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
   ## Create a LocalView wrapping a LocalData with a Kokkos View
   ##
   ## Parameters:
@@ -167,11 +142,14 @@ proc newLocalView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
   ## Example:
   ## ```nim
   ## let localData = downcast(globalArray)
-  ## let localView = newLocalView(localData)
+  ## let localView = localView(localData)
   ## ```
   var dims: array[D, csize_t]
+  var storedDims: array[D, int]
   
-  for i in 0..<D: dims[i] = csize_t(local.hi[i] - local.lo[i] + 1)
+  for i in 0..<D:
+    storedDims[i] = local.hi[i] - local.lo[i] + 1
+    dims[i] = csize_t(storedDims[i])
 
   let pdata = cast[pointer](local.data)
   let pdims = addr dims[0]
@@ -182,9 +160,9 @@ proc newLocalView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
   elif T is float64:
     let handle = createKokkosViewDouble(pdata, csize_t(D), pdims)
   
-  return LocalView[D, T](handle: handle, rank: D)
+  return LocalView[D, T](handle: handle, rank: D, dims: storedDims)
 
-proc newLocalView*[D: static[int], T](ga: GlobalArray[D, T]): LocalView[D, T] =
+proc localView*[D: static[int], T](ga: GlobalArray[D, T]): LocalView[D, T] =
   ## Create a LocalView directly from a GlobalArray
   ##
   ## This convenience function downcasts the GlobalArray to LocalData
@@ -198,10 +176,10 @@ proc newLocalView*[D: static[int], T](ga: GlobalArray[D, T]): LocalView[D, T] =
   ## 
   ## Example:
   ## ```nim
-  ## let localView = newLocalView(globalArray)
+  ## let localView = localView(globalArray)
   ## ```
   let local = downcast(ga)
-  return newLocalView(local)
+  return localView(local)
 
 proc `=destroy`*[D: static[int], T](view: LocalView[D, T]) =
   ## Destructor - cleans up Kokkos View handle
@@ -212,6 +190,182 @@ proc `=destroy`*[D: static[int], T](view: LocalView[D, T]) =
 
 proc `=copy`*[D: static[int], T](dest: var LocalView[D, T], src: LocalView[D, T]) {.error.}
   ## Prevent copying of LocalView
+
+#[ accessors ]#
+
+{.emit: """
+template<typename T>
+T view_get(void* handle, size_t rank, const size_t* indices) {
+  using Layout = Kokkos::LayoutLeft;
+  using Memory = Kokkos::HostSpace;
+  using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
+  
+  switch(rank) {
+    case 1: return (*static_cast<Kokkos::View<T*, Layout, Memory, Traits>*>(handle))(indices[0]);
+    case 2: return (*static_cast<Kokkos::View<T**, Layout, Memory, Traits>*>(handle))(indices[0], indices[1]);
+    case 3: return (*static_cast<Kokkos::View<T***, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2]);
+    case 4: return (*static_cast<Kokkos::View<T****, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3]);
+    case 5: return (*static_cast<Kokkos::View<T*****, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4]);
+    case 6: return (*static_cast<Kokkos::View<T******, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4], indices[5]);
+    case 7: return (*static_cast<Kokkos::View<T*******, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4], indices[5], indices[6]);
+    default: return T{};
+} }
+
+template<typename T>
+void view_set(void* handle, size_t rank, const size_t* indices, T value) {
+  using Layout = Kokkos::LayoutLeft;
+  using Memory = Kokkos::HostSpace;
+  using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
+  
+  switch(rank) {
+    case 1: (*static_cast<Kokkos::View<T*, Layout, Memory, Traits>*>(handle))(indices[0]) = value; break;
+    case 2: (*static_cast<Kokkos::View<T**, Layout, Memory, Traits>*>(handle))(indices[0], indices[1]) = value; break;
+    case 3: (*static_cast<Kokkos::View<T***, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2]) = value; break;
+    case 4: (*static_cast<Kokkos::View<T****, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3]) = value; break;
+    case 5: (*static_cast<Kokkos::View<T*****, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4]) = value; break;
+    case 6: (*static_cast<Kokkos::View<T******, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4], indices[5]) = value; break;
+    case 7: (*static_cast<Kokkos::View<T*******, Layout, Memory, Traits>*>(handle))(indices[0], indices[1], indices[2], indices[3], indices[4], indices[5], indices[6]) = value; break;
+} }
+""".}
+
+proc viewGetInt(handle: pointer, rank: csize_t, indices: ptr csize_t): cint 
+  {.importc: "view_get<int>", nodecl.}
+
+proc viewGetFloat(handle: pointer, rank: csize_t, indices: ptr csize_t): cfloat 
+  {.importc: "view_get<float>", nodecl.}
+
+proc viewGetDouble(handle: pointer, rank: csize_t, indices: ptr csize_t): cdouble 
+  {.importc: "view_get<double>", nodecl.}
+
+proc viewSetInt(handle: pointer, rank: csize_t, indices: ptr csize_t, value: cint) 
+  {.importc: "view_set<int>", nodecl.}
+
+proc viewSetFloat(handle: pointer, rank: csize_t, indices: ptr csize_t, value: cfloat) 
+  {.importc: "view_set<float>", nodecl.}
+
+proc viewSetDouble(handle: pointer, rank: csize_t, indices: ptr csize_t, value: cdouble) 
+  {.importc: "view_set<double>", nodecl.}
+
+proc `[]`*[D: static[int], T](view: LocalView[D, T], indices: array[D, int]): T =
+  ## Access element in the LocalView
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView to access
+  ## - `indices`: Array of indices for each dimension
+  ##
+  ## Returns:
+  ## The value at the specified location
+  var idx: array[D, csize_t]
+  for i in 0..<D:
+    idx[i] = csize_t(indices[i])
+  
+  when T is int:
+    return T(viewGetInt(view.handle, csize_t(D), addr idx[0]))
+  elif T is float32:
+    return T(viewGetFloat(view.handle, csize_t(D), addr idx[0]))
+  elif T is float64:
+    return T(viewGetDouble(view.handle, csize_t(D), addr idx[0]))
+
+proc `[]=`*[D: static[int], T](view: var LocalView[D, T], indices: array[D, int], value: T) =
+  ## Set element in the LocalView
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView to modify
+  ## - `indices`: Array of indices for each dimension
+  ## - `value`: The value to set
+  var idx: array[D, csize_t]
+  for i in 0..<D:
+    idx[i] = csize_t(indices[i])
+  
+  when T is int:
+    viewSetInt(view.handle, csize_t(D), addr idx[0], cint(value))
+  elif T is float32:
+    viewSetFloat(view.handle, csize_t(D), addr idx[0], cfloat(value))
+  elif T is float64:
+    viewSetDouble(view.handle, csize_t(D), addr idx[0], cdouble(value))
+
+proc linearToIndices[D: static[int]](linear: int, dims: array[D, int]): array[D, int] =
+  ## Convert linear index to multi-dimensional indices (row-major/C order)
+  ##
+  ## Parameters:
+  ## - `linear`: Linear index
+  ## - `dims`: Dimensions of the array
+  ##
+  ## Returns:
+  ## Multi-dimensional indices
+  var idx = linear
+  for i in countdown(D-1, 0):
+    result[i] = idx mod int(dims[i])
+    idx = idx div int(dims[i])
+
+proc indicesToLinear*[D: static[int]](indices: array[D, int], dims: array[D, int]): int =
+  ## Convert multi-dimensional indices to linear index (row-major/C order)
+  ##
+  ## Parameters:
+  ## - `indices`: Multi-dimensional indices
+  ## - `dims`: Dimensions of the array
+  ##
+  ## Returns:
+  ## Linear index
+  result = 0
+  var stride = 1
+  for i in countdown(D-1, 0):
+    result += indices[i] * stride
+    stride *= dims[i]
+
+proc `[]`*[D: static[int], T](view: LocalView[D, T], index: SomeInteger): T =
+  ## Access element in the LocalView using linear index
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView to access
+  ## - `index`: Linear index (row-major order)
+  ##
+  ## Returns:
+  ## The value at the specified location
+  var idx: array[D, csize_t]
+  
+  let indices = linearToIndices(int(index), view.dims)
+  for i in 0..<D:
+    idx[i] = csize_t(indices[i])
+  
+  when T is int:
+    return T(viewGetInt(view.handle, csize_t(D), addr idx[0]))
+  elif T is float32:
+    return T(viewGetFloat(view.handle, csize_t(D), addr idx[0]))
+  elif T is float64:
+    return T(viewGetDouble(view.handle, csize_t(D), addr idx[0]))
+
+proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, value: T) =
+  ## Set element in the LocalView using linear index
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView to modify
+  ## - `index`: Linear index (row-major order)
+  ## - `value`: The value to set
+  var idx: array[D, csize_t]
+  
+  let indices = linearToIndices(int(index), view.dims)
+  for i in 0..<D:
+    idx[i] = csize_t(indices[i])
+  
+  when T is int:
+    viewSetInt(view.handle, csize_t(D), addr idx[0], cint(value))
+  elif T is float32:
+    viewSetFloat(view.handle, csize_t(D), addr idx[0], cfloat(value))
+  elif T is float64:
+    viewSetDouble(view.handle, csize_t(D), addr idx[0], cdouble(value))
+
+proc numSites*[D: static[int], T](view: LocalView[D, T]): int =
+  ## Get the total number of sites in the LocalView
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView instance
+  ##
+  ## Returns:
+  ## The total number of sites
+  result = 1
+  for i in 0..<D:
+    result *= view.dims[i]
 
 #[ unit tests ]#
 
@@ -226,11 +380,11 @@ test:
   
   assert(testGA.isInitialized(), "GlobalArray initialization failed")
   
-  let local = downcast(testGA)
+  var local = downcast(testGA)
   
   assert(local.getHandle() == testGA.getHandle(), "LocalData handle mismatch")
   
-  let view = newLocalView(local)
+  var view = localView(local)
   
   assert(view.handle != nil, "Kokkos View handle is null")
   assert(view.rank == 4, "View rank mismatch")
@@ -243,9 +397,23 @@ test:
 
   assert(testGA2.isInitialized(), "GlobalArray initialization failed")
 
-  let view2 = newLocalView(testGA2)
+  var view2 = localView(testGA2)
 
   assert(view2.handle != nil, "Kokkos View handle is null")
   assert(view2.rank == 4, "View rank mismatch")
 
   echo "LocalView test passed: created ", view2.rank, "D view with handle ", cast[uint](view2.handle)
+
+  # accessors test
+
+  for i in 0..<view.dims[0]:
+    for j in 0..<view.dims[1]:
+      for k in 0..<view.dims[2]:
+        for l in 0..<view.dims[3]:
+          let idx = [i, j, k, l]
+          view[idx] = float(i + j + k + l)
+          let val = view[idx]
+          assert(val == float(i + j + k + l), "Accessor mismatch at index " & $idx)
+          var n = indicesToLinear(idx, view.dims)
+          assert(idx == linearToIndices(n, view.dims), "Index conversion mismatch at index " & $n)
+          assert(view[n] == float(i + j + k + l), "Linear accessor mismatch at index " & $n)

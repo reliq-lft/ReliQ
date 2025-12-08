@@ -359,6 +359,28 @@ proc `$`*[D:static[int], T](local: LocalData[D, T]): string =
     if i < D-1: result.add(", ")
   result.add("])")
 
+proc numSites*[D: static[int], T](ga: GlobalArray[D, T]): int =
+  ## Calculate the total number of local sites in the GlobalArray
+  ##
+  ## This procedure computes the product of the local dimensions
+  ## on the current process.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## The total number of local sites as an integer
+  ##
+  ## Example:
+  ## ```nim
+  ## let myGA = newGlobalArray(lattice, mpigrid, ghostgrid, float)
+  ## let localSites = myGA.numSites()
+  ## ```
+  let local = ga.downcast()
+  result = 1
+  for i in 0..<D:
+    result *= (local.hi[i] - local.lo[i] + 1)
+
 #[ unit tests ]#
 
 test:

@@ -30,7 +30,7 @@
 import std/[macros]
 
 import kokkosbase
-import utils
+import utils/[nimutils]
 
 # import backend header files
 Kokkos: discard
