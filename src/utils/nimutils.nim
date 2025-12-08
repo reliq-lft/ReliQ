@@ -112,26 +112,3 @@ proc `$`*(sq: seq[SomeInteger]): string = "[" & sq.join(", ") & "]"
 
 # remove "@" in sequence printout for cleaner output
 proc `$`*(sq: seq[SomeNumber]): string = "[" & sq.join(", ") & "]"
-
-# gets C argv
-proc cargc*: cint = cint(paramCount())
-
-proc cargv*(argc: cint): cstringArray =
-  # gets C argv
-  var argv = newSeq[string](argc)
-  for idx in argv.dimensions: argv[idx] = paramStr(idx + 1)
-  return allocCStringArray(argv)
-
-template main*(body: untyped): untyped =
-  ## Encapsulates body of main program.
-  ## Example usage:
-  ## ```nim
-  ## main:
-  ##   echo "Hello, world!"
-  ## ```
-  block:
-    let
-      argc {.inject.} = cargc()
-      argv {.inject.} = cargv(argc)
-    body
-    deallocCStringArray(argv)

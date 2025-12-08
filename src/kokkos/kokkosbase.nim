@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/kokkos/kokkosdefs.nim
+  Source file: src/kokkos/kokkosbase.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -33,7 +33,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[nimutils]
+import utils/[commandline]
 
 # template returning Kokkos_Core include through pragma
 template Kokkos*(pragmas: untyped): untyped = 
