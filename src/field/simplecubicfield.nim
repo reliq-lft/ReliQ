@@ -1,7 +1,7 @@
 import reliq
 import arrays
 
-import std/[macros, tables]
+import std/[macros, tables, strutils]
 
 import utils/[nimutils]
 import lattice/[simplecubiclattice]
@@ -31,7 +31,7 @@ proc newSimpleCubicField*[D: static[int]](
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
-  ## let field = newSimpleCubicField[int](lattice)
+  ## let field = lattice.newSimpleCubicField(): real
   ## ```
   let dimensions = lattice.dimensions
   let mpiGrid = lattice.mpiGrid
@@ -65,21 +65,29 @@ proc localField*[D: static[int], T](field: SimpleCubicField[D, T]): LocalView[D,
   ## A LocalView representing the local portion of the field
   field.field.localView()
 
-proc localField(x: SomeInteger | SomeFloat): auto = x
+proc localField*(x: SomeInteger | SomeFloat): auto = x
 
-proc `[]`(x: SomeInteger | SomeFloat; n: SomeInteger): auto = x
+proc `[]`*(x: SomeInteger | SomeFloat; n: SomeInteger): auto = x
 
 # collects identifiers from syntax tree and transforms them into view declarations
 proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: NimNode) =
+  when defined(MACRO_DEBUG): echo node.repr, " -> ", node.kind
   case node.kind:
-    of nnkIdent: # if ident, declare view if not already done
-      let (identStr, newIdentStr) = ($node, $node & "View")
+    of nnkIdent, nnkSym, nnkBracketExpr, nnkDotExpr, nnkCall: # treat whole expr as identifier
+      let identStr = node.repr
+      let newIdentStrA = node.repr.replace(".", "_") # dot
+      let newIdentStrB = newIdentStrA.replace("[", "").replace("]", "") # bracket
+      let newIdentStrC = newIdentStrB.replace(",", "_").replace(" ", "") # comma/space
+      let newIdentStrD = newIdentStrC.replace("(", "_").replace(")", "") # paren
+      let newIdentViewStr = newIdentStrD & "View"
       if not repls.hasKey(identStr):
-        assn.add newVarStmt(
-          newIdentNode(newIdentStr),
-          newCall(newIdentNode("localField"), newIdentNode(identStr)) 
-        ) # compiles to "var nodev = localField(node)"
-        repls[identStr] = newIdentStr # store new name to make sure no repeats
+        let ident = newIdentNode(newIdentViewStr)
+        let local = newCall(newIdentNode("localField"), node) 
+        assn.add newVarStmt(ident, local) # compiles to "var nodev = localField(node)"
+        repls[identStr] = newIdentViewStr # store new name to make sure no repeats
+    of nnkHiddenDeref:
+      # Unwrap hidden dereference and process the inner node
+      assn.declViews(repls, node[0])
     of nnkInfix: # if infix, recurse
       assn.declViews(repls, node[1]) 
       assn.declViews(repls, node[2])
@@ -88,10 +96,14 @@ proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: N
 # transform rhs AST into indexed access of views
 proc promoteAST(repls: Table[string, string]; node: NimNode): NimNode =
   result = case node.kind
-    of nnkIdent:
-      if repls.hasKey($node): 
-        newTree(nnkBracketExpr, newIdentNode(repls[$node]), newIdentNode("n"))
+    of nnkIdent, nnkSym, nnkBracketExpr, nnkDotExpr, nnkCall:
+      let key = node.repr  # Use same repr format as declViews
+      if repls.hasKey(key): 
+        newTree(nnkBracketExpr, newIdentNode(repls[key]), newIdentNode("n"))
       else: node
+    of nnkHiddenDeref:
+      # Unwrap hidden dereference and promote the inner node
+      promoteAST(repls, node[0])
     of nnkInfix:
       let (lhs, rhs) = (promoteAST(repls, node[1]), promoteAST(repls, node[2]))
       newTree(nnkInfix, node[0], lhs, rhs)
@@ -119,18 +131,19 @@ macro promote(ident: untyped; lhs, rhs: untyped): untyped =
   
   # For assignment operators, generate proper []= call instead of infix =
   if $ident == "=":
-    # newLHS is view[n], extract view and n to create `[]=`(view, n, rhs)
-    let viewNode = newLHS[0]  # The view identifier
-    let indexNode = newLHS[1]  # The n identifier
-    newExpr = newCall(ident"[]=", viewNode, indexNode, newRHS)
-  else:
-    newExpr = newTree(nnkInfix, newIdentNode($ident), newLHS, newRHS)
+    # newLHS should be view[n], extract view and n to create `[]=`(view, n, rhs)
+    if newLHS.kind == nnkBracketExpr and newLHS.len == 2:
+      let viewNode = newLHS[0]  # The view identifier
+      let indexNode = newLHS[1]  # The n identifier
+      newExpr = newCall(ident"[]=", viewNode, indexNode, newRHS)
+    else: error("Assignment failed: LHS did not promote to view[n] pattern. Got: " & newLHS.repr, lhs)
+  else: newExpr = newTree(nnkInfix, newIdentNode($ident), newLHS, newRHS)
 
   # combine steps 1 & 2 into concrete AST
   result = quote do:
     `lhsViews`
     `rhsViews`
-    forevery(0, `lhs`.numSites, n): `newExpr`
+    forevery(0, `lhs`.numSites(), n): `newExpr`
 
 template `:=`*(lhs, rhs: untyped) =
   ## Fused assignment to arbitrary arithematic operation of fields/scalars
@@ -285,3 +298,10 @@ test:
     assert(abs(view2[i] - 3.0) < 1e-10, "Compound -= failed")
   
   echo "Process ", myRank(), "/", numRanks(), ": All SimpleCubicField tests passed!"
+
+  # test promotion on arrays of fields
+  var fieldArray: array[4, SimpleCubicField[4, float]]
+  for i in 0..<4:
+    fieldArray[i] = newSimpleCubicField(lattice): float
+    fieldArray[i] := float(i + 1)
+  fieldArray[0] := 1.0

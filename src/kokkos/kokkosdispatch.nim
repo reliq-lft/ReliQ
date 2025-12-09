@@ -141,9 +141,9 @@ template foreach*(lower, upper: SomeInteger; n, body: untyped): untyped =
 
 template forevery*(lower, upper: SomeInteger; n, body: untyped): untyped =
   # `forall` + `foreach` = `forevery` construct. Don't think about it too hard.
-  let segment = (upper - lower) div numThreads()
   teamForAll(numThreads(), 1):
     proc(localTeamHandle: ThreadTeam) {.cdecl.} = 
+      let segment = (upper - lower) div numThreads()
       let tlo = localTeamHandle.myRank()*segment
       let thi = tlo + segment
       localTeamHandle.threadForEach(tlo, thi):
