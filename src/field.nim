@@ -1,7 +1,8 @@
 import lattice
-import field/[simplecubicfield]
+import field/[scalarfield, tensorfield]
 
-export simplecubicfield
+export scalarfield
+export tensorfield
 
 type Field* = concept x
   ## Concept interface for field types

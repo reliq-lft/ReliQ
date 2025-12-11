@@ -49,6 +49,11 @@ type LocalView*[D: static[int], T] = object
   rank: int
   dims: array[D, int]
 
+type ComplexLocalView*[D: static[int], F] = object
+  ## Wrapper for complex field views - stores real and imaginary parts separately
+  re*: LocalView[D, F]
+  im*: LocalView[D, F]
+
 #[ C++ helpers for dealing with Kokkos semantics ]#
 
 {.emit: """
