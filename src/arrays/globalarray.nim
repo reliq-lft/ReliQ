@@ -96,6 +96,15 @@ proc NGA_Access(g_a: cint, lo: ptr cint, hi: ptr cint, p: ptr pointer, ld: ptr c
 proc NGA_Release(g_a: cint, lo: ptr cint, hi: ptr cint) 
   {.importc: "NGA_Release", ga.}
 
+proc GA_Update_ghosts(g_a: cint) {.importc: "GA_Update_ghosts", ga.}
+
+proc GA_Update_ghost_dir(
+  g_a: cint, 
+  dir: cint, 
+  side: cint,
+  update_corners: cint
+) {.importc: "GA_Update_ghost_dir", ga.}
+
 #[ GA constructor, destructor, copy assignment ]#
 
 proc newGlobalArray*[D: static[int]](
@@ -336,6 +345,43 @@ proc downcast*[D: static[int], T](ga: GlobalArray[D, T]): LocalData[D, T] =
   for i in 0..<(D-1): local.ld[i] = int(ld_c[i])
   
   return local
+
+#[ GA halo exchange ]#
+
+proc updateGhosts*[D: static[int], T](ga: GlobalArray[D, T]) =
+  ## Update the ghost cells of the GlobalArray
+  ##
+  ## This procedure triggers a ghost cell update for the GlobalArray,
+  ## ensuring that the ghost cells contain up-to-date data from neighboring
+  ## processes.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance.
+  ga.handle.GA_Update_ghosts()
+
+proc updateGhostDir*[D: static[int], T](
+  ga: GlobalArray[D, T],
+  dir: int,
+  side: int,
+  update_corners: bool = true
+) =
+  ## Update ghost cells in a specific direction and side
+  ##
+  ## This procedure updates the ghost cells of the GlobalArray
+  ## in a specified direction and side (lower or upper). It can also
+  ## optionally update corner ghost cells.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance.
+  ## - `dir`: The direction index for the ghost cell update.
+  ## - `side`: The side index (0 for lower, 1 for upper).
+  ## - `update_corners`: Whether to update corner ghost cells (default: true).
+  let update_corners_c = (if update_corners: cint(1) else: cint(0))
+  ga.handle.GA_Update_ghost_dir(
+    cint(dir), 
+    cint(side), 
+    update_corners_c
+  )
 
 #[ LD misc ]#
 

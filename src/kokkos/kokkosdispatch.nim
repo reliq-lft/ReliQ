@@ -52,7 +52,7 @@ type ThreadTeam* {.importcpp: "Kokkos::TeamPolicy<>::member_type", kokkos.} = ob
 type # range/team policy types
   RangePolicy {.importcpp: "Kokkos::RangePolicy<>", kokkos.} = object
   TeamPolicy {.importcpp: "Kokkos::TeamPolicy<>", kokkos.} = object
-  ThreadVectorPolicy {.importcpp: "Kokkos::ThreadVectorRange", kokkos.} = object
+#  ThreadVectorPolicy {.importcpp: "Kokkos::ThreadVectorRange", kokkos.} = object
 
 type # Nim --> C++ procedure kernels
   NimRangeKernel = proc(idx: cint) {.cdecl.}

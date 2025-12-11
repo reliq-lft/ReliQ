@@ -19,6 +19,8 @@ type Tensor*[D: static[int], T] = object
   shape*: seq[int]
   components*: seq[Field[D, T]]
 
+type GaugeTensor*[D: static[int], T] = array[D, Tensor[D, T]]
+
 #[ helpers ]#
 
 proc product(shape: seq[int]): int =
@@ -70,6 +72,27 @@ proc newTensor*[D: static[int]](
   lattice: SimpleCubicLattice[D],
   T: typedesc
 ): Tensor[D, T] = newTensor(lattice, @[1], T)
+
+proc newGaugeTensor*[D: static[int]](
+  lattice: SimpleCubicLattice[D],
+  shape: seq[int],
+  T: typedesc
+): GaugeTensor[D, T] =
+  ## Create a new GaugeTensor
+  ##
+  ## Parameters:
+  ## - `lattice`: SimpleCubicLattice on which the gauge tensor is defined
+  ## - `shape`: Shape of the tensor components
+  ##
+  ## Returns:
+  ## A new GaugeTensor instance
+  ##
+  ## Example:
+  ## ```nim
+  ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
+  ## let gaugeTensor = newGaugeTensor(lattice, @[3, 3], float)
+  ## ```
+  for i in 0..<D: result[i] = newTensor(lattice, shape, T)
 
 #[ accessors ]#
 
@@ -222,12 +245,16 @@ template complexTranspose*[D: static[int], T](tensor: Tensor[D, T]): Tensor[D, T
       r[[j, i]] := conj
   r
 
-template matmul*[D: static[int], T](a, b: Tensor[D, T]): Tensor[D, T] =
-  ## Matrix multiplication for rank-2 tensors
+template matmul*[D: static[int], T](a, b: Tensor[D, T]): auto =
+  ## Generalized matrix multiplication
+  ## - Matrix × Matrix: (m×k) × (k×n) -> (m×n) tensor
+  ## - Matrix × Vector: (m×k) × (k×1) -> (m×1) tensor
+  ## - Vector × Matrix: (1×k) × (k×n) -> (1×n) tensor
   ##
   ## Example:
   ## ```nim
-  ## let C = matmul(A, B)  # C = A * B
+  ## let C = matmul(A, B)  # Matrix-matrix
+  ## let v = matmul(A, x)  # Matrix-vector
   ## ```
   assert a.rank == 2 and b.rank == 2, "Matrix multiplication requires rank-2 tensors"
   assert a.shape[1] == b.shape[0], "Inner dimensions must match"
@@ -245,9 +272,40 @@ template matmul*[D: static[int], T](a, b: Tensor[D, T]): Tensor[D, T] =
 
   result
 
-template trace*[D: static[int], T](
-  tensor: Tensor[D, T]
-): Field[D, T] =
+template outerProduct*[D: static[int], T](a, b: Tensor[D, T]): Tensor[D, T] =
+  ## Outer product (tensor product) of two vectors
+  ## Takes two rank-1 tensors (vectors) and produces a rank-2 tensor (matrix)
+  ## For vectors u (m×1) and v (n×1), returns matrix M (m×n) where M[i,j] = u[i] * v[j]
+  ##
+  ## Example:
+  ## ```nim
+  ## let u = newTensor(lattice, @[3, 1]): float  # 3D vector
+  ## let v = newTensor(lattice, @[4, 1]): float  # 4D vector
+  ## let M = outerProduct(u, v)  # 3×4 matrix
+  ## ```
+  assert a.rank == 2 and b.rank == 2, "Outer product requires rank-2 tensors (vectors as nx1)"
+  assert a.shape[1] == 1 and b.shape[1] == 1, "Outer product requires column vectors (shape [n,1])"
+  
+  let m = a.shape[0]
+  let n = b.shape[0]
+  
+  var result = newTensor(a.lattice, @[m, n]): T
+  
+  for i in 0..<m:
+    for j in 0..<n: result[[i, j]] := a[[i, 0]] * b[[j, 0]]
+  
+  result
+
+template `*`*[D: static[int], T](a, b: Tensor[D, T]): Tensor[D, T] =
+  ## Element-wise tensor multiplication
+  ## 
+  ## Example:
+  ## ```nim
+  ## let C = A * B  # Element-wise multiplication
+  ## ```
+  matmul(a, b)
+
+template trace*[D: static[int], T](tensor: Tensor[D, T]): Field[D, T] =
   ## Compute trace of a rank-2 tensor (matrix)
   ##
   ## Example:
@@ -524,6 +582,9 @@ test:
   # Test scalar operations
   var C = A * 2.0
   var D = A + B
+
+  # matrix-matrix multiplication
+  discard C*D
   
   # Test transpose
   var At = A.transpose()
@@ -607,10 +668,6 @@ test:
   let adj3 = Madj3.adjugate()
   let adj3_00_view = adj3[[0,0]].localField()
   let adj3_02_view = adj3[[0,2]].localField()
-  # Debug: print actual values
-  if myRank() == 0:
-    echo "adj3[0,0] = ", adj3_00_view[0]
-    echo "adj3[0,2] = ", adj3_02_view[0]
   for i in 0..<adj3[[0,0]].numSites():
     # For matrix [[1,2,3],[0,1,4],[5,6,0]]:
     # Cofactor C[0,0] = +(1*0 - 4*6) = -24
@@ -720,6 +777,61 @@ test:
     assert(abs(id4_12_view[i]) < 1e-9, "Inverse 4x4: M*M^(-1) [1,2] != 0")
   
   echo "Process ", myRank(), "/", numRanks(), ": All adjugate and inverse tests passed!"
+  
+  # Test matrix-vector multiplication
+  var Mmv = newTensor(lattice, @[3, 3]): float
+  Mmv[[0, 0]] := 1.0
+  Mmv[[0, 1]] := 2.0
+  Mmv[[0, 2]] := 3.0
+  Mmv[[1, 0]] := 4.0
+  Mmv[[1, 1]] := 5.0
+  Mmv[[1, 2]] := 6.0
+  Mmv[[2, 0]] := 7.0
+  Mmv[[2, 1]] := 8.0
+  Mmv[[2, 2]] := 9.0
+  
+  var vmv = newTensor(lattice, @[3, 1]): float
+  vmv[[0, 0]] := 1.0
+  vmv[[1, 0]] := 2.0
+  vmv[[2, 0]] := 3.0
+  
+  let result_mv = matmul(Mmv, vmv)
+  assert(result_mv.shape == @[3, 1], "Matrix-vector result shape should be [3,1]")
+  let mv0_view = result_mv[[0,0]].localField()
+  let mv1_view = result_mv[[1,0]].localField()
+  let mv2_view = result_mv[[2,0]].localField()
+  for i in 0..<result_mv[[0,0]].numSites():
+    # [1,2,3] · [1,2,3] = 1*1 + 2*2 + 3*3 = 14
+    # [4,5,6] · [1,2,3] = 4*1 + 5*2 + 6*3 = 32
+    # [7,8,9] · [1,2,3] = 7*1 + 8*2 + 9*3 = 50
+    assert(abs(mv0_view[i] - 14.0) < 1e-10, "Matrix-vector [0] failed")
+    assert(abs(mv1_view[i] - 32.0) < 1e-10, "Matrix-vector [1] failed")
+    assert(abs(mv2_view[i] - 50.0) < 1e-10, "Matrix-vector [2] failed")
+  
+  # Test outer product
+  var u = newTensor(lattice, @[3, 1]): float
+  u[[0, 0]] := 1.0
+  u[[1, 0]] := 2.0
+  u[[2, 0]] := 3.0
+  
+  var v = newTensor(lattice, @[2, 1]): float
+  v[[0, 0]] := 4.0
+  v[[1, 0]] := 5.0
+  
+  let outer = outerProduct(u, v)
+  assert(outer.shape == @[3, 2], "Outer product shape should be [3,2]")
+  let o00_view = outer[[0,0]].localField()
+  let o01_view = outer[[0,1]].localField()
+  let o10_view = outer[[1,0]].localField()
+  let o21_view = outer[[2,1]].localField()
+  for i in 0..<outer[[0,0]].numSites():
+    # u ⊗ v = [[1*4, 1*5], [2*4, 2*5], [3*4, 3*5]]
+    assert(abs(o00_view[i] - 4.0) < 1e-10, "Outer product [0,0] failed")
+    assert(abs(o01_view[i] - 5.0) < 1e-10, "Outer product [0,1] failed")
+    assert(abs(o10_view[i] - 8.0) < 1e-10, "Outer product [1,0] failed")
+    assert(abs(o21_view[i] - 15.0) < 1e-10, "Outer product [2,1] failed")
+  
+  echo "Process ", myRank(), "/", numRanks(), ": All matrix-vector and outer product tests passed!"
   
   # Test compound operations
   A += B

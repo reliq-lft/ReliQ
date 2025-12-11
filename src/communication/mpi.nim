@@ -27,8 +27,6 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[commandline]
-
 template MPI(body: untyped): untyped =
   {.pragma: mpi, header: "mpi.h".}
 
