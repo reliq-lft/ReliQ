@@ -103,7 +103,19 @@ proc GA_Update_ghost_dir(
   dir: cint, 
   side: cint,
   update_corners: cint
-) {.importc: "GA_Update_ghost_dir", ga.}
+) {.importc: "NGA_Update_ghost_dir", ga.}
+
+#[
+proc NGA_Get(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint)
+  {.importc: "NGA_Get", ga.}
+
+proc NGA_Put(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint)
+  {.importc: "NGA_Put", ga.}
+
+proc NGA_Copy_patch(trans: char, g_a: cint, alo: ptr cint, ahi: ptr cint,
+                    g_b: cint, blo: ptr cint, bhi: ptr cint)
+  {.importc: "NGA_Copy_patch", ga.}
+]#
 
 #[ GA constructor, destructor, copy assignment ]#
 
@@ -359,7 +371,7 @@ proc updateGhosts*[D: static[int], T](ga: GlobalArray[D, T]) =
   ## - `ga`: The GlobalArray instance.
   ga.handle.GA_Update_ghosts()
 
-proc updateGhostDir*[D: static[int], T](
+proc updateGhostDirection*[D: static[int], T](
   ga: GlobalArray[D, T],
   dir: int,
   side: int,
@@ -382,6 +394,96 @@ proc updateGhostDir*[D: static[int], T](
     cint(side), 
     update_corners_c
   )
+
+#[
+proc get*[D: static[int], T](
+  ga: GlobalArray[D, T],
+  coords: array[D, int]
+): T =
+  ## Get a single element from the GlobalArray at the specified coordinates
+  ##
+  ## This uses NGA_Get to fetch data from potentially remote ranks.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance.
+  ## - `coords`: The global coordinates of the element to retrieve.
+  ##
+  ## Returns:
+  ## The value at the specified coordinates.
+  var lo_c, hi_c: array[D, cint]
+  var ld_c: array[D-1, cint]
+  var result: T
+  
+  for i in 0..<D:
+    lo_c[i] = cint(coords[i])
+    hi_c[i] = cint(coords[i])
+  for i in 0..<(D-1):
+    ld_c[i] = cint(1)
+  
+  NGA_Get(ga.handle, addr lo_c[0], addr hi_c[0], addr result, addr ld_c[0])
+  return result
+
+proc put*[D: static[int], T](
+  ga: GlobalArray[D, T],
+  coords: array[D, int],
+  value: T
+) =
+  ## Put a single element into the GlobalArray at the specified coordinates
+  ##
+  ## This uses NGA_Put to write data to potentially remote ranks.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance.
+  ## - `coords`: The global coordinates where the value should be written.
+  ## - `value`: The value to write.
+  var lo_c, hi_c: array[D, cint]
+  var ld_c: array[D-1, cint]
+  var val = value  # Need mutable copy for passing to C
+  
+  for i in 0..<D:
+    lo_c[i] = cint(coords[i])
+    hi_c[i] = cint(coords[i])
+  for i in 0..<(D-1):
+    ld_c[i] = cint(1)
+  
+  NGA_Put(ga.handle, addr lo_c[0], addr hi_c[0], addr val, addr ld_c[0])
+
+proc copyPatch*[D: static[int], T](
+  src: GlobalArray[D, T],
+  srcLo: array[D, int],
+  srcHi: array[D, int],
+  dest: GlobalArray[D, T],
+  destLo: array[D, int],
+  destHi: array[D, int],
+  transpose: bool = false
+) =
+  ## Copy a patch (rectangular region) from one GlobalArray to another
+  ##
+  ## This uses NGA_Copy_patch to efficiently copy data between arrays,
+  ## potentially with transposition. The source and destination patches
+  ## must have compatible dimensions.
+  ##
+  ## Parameters:
+  ## - `src`: The source GlobalArray.
+  ## - `srcLo`: Lower bounds of the source patch (inclusive).
+  ## - `srcHi`: Upper bounds of the source patch (inclusive).
+  ## - `dest`: The destination GlobalArray.
+  ## - `destLo`: Lower bounds of the destination patch (inclusive).
+  ## - `destHi`: Upper bounds of the destination patch (inclusive).
+  ## - `transpose`: Whether to transpose the data during copy (default: false).
+  var srcLo_c, srcHi_c: array[D, cint]
+  var destLo_c, destHi_c: array[D, cint]
+  
+  for i in 0..<D:
+    srcLo_c[i] = cint(srcLo[i])
+    srcHi_c[i] = cint(srcHi[i])
+    destLo_c[i] = cint(destLo[i])
+    destHi_c[i] = cint(destHi[i])
+  
+  let trans = if transpose: 'T' else: 'N'
+  NGA_Copy_patch(trans, src.handle, addr srcLo_c[0], addr srcHi_c[0],
+                 dest.handle, addr destLo_c[0], addr destHi_c[0])
+]#
 
 #[ LD misc ]#
 
@@ -468,4 +570,3 @@ test:
     assert(testLD1.lo[i] >= 0 and testLD1.hi[i] < lattice[i], "LocalData bounds out of range.")
     assert(testLD2.lo[i] >= 0 and testLD2.hi[i] < lattice[i], "LocalData bounds out of range.")
   
-
