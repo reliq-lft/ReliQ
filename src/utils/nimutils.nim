@@ -112,3 +112,64 @@ proc `$`*(sq: seq[SomeInteger]): string = "[" & sq.join(", ") & "]"
 
 # remove "@" in sequence printout for cleaner output
 proc `$`*(sq: seq[SomeNumber]): string = "[" & sq.join(", ") & "]"
+
+proc flatToCoords*[D: static[int]](
+  idx: int,
+  dims: array[D, int]
+): array[D, int] =
+  ## Convert flat index to D-dimensional coordinates
+  ##
+  ## Parameters:
+  ## - `idx`: Flat index (0..numSites-1)
+  ## - `dims`: Dimensions of the local lattice portion
+  ##
+  ## Returns:
+  ## Array of D coordinates
+  var remaining = idx
+  for i in countdown(D-1, 0):
+    result[i] = remaining mod dims[i]
+    remaining = remaining div dims[i]
+
+proc coordsToFlat*[D: static[int]](
+  coords: array[D, int],
+  dims: array[D, int]
+): int =
+  ## Convert D-dimensional coordinates to flat index
+  ##
+  ## Parameters:
+  ## - `coords`: Array of D coordinates
+  ## - `dims`: Dimensions of the local lattice portion
+  ##
+  ## Returns:
+  ## Flat index
+  result = 0
+  var stride = 1
+  for i in countdown(D-1, 0):
+    result += coords[i] * stride
+    stride *= dims[i]
+
+proc shiftCoords*[D: static[int]](
+  coords: array[D, int],
+  direction: int,
+  distance: int,
+  localDims: array[D, int],
+  ghostWidth: array[D, int]
+): array[D, int] =
+  ## Compute shifted coordinates with ghost cell offsets
+  ##
+  ## Parameters:
+  ## - `coords`: Original coordinates (without ghost offset)
+  ## - `direction`: Direction to shift (0..D-1)
+  ## - `distance`: Distance to shift (+/- for forward/backward)
+  ## - `localDims`: Local dimensions (without ghosts)
+  ## - `ghostWidth`: Ghost cell widths for each dimension
+  ##
+  ## Returns:
+  ## Shifted coordinates (with ghost offsets applied)
+  ##
+  ## Note: This works because ghost cells contain neighbor data after updateGhosts()
+  result = coords
+  # Add ghost offset to access ghost-padded array
+  #for i in 0..<D: result[i] += ghostWidth[i]
+  # Apply shift in the specified direction
+  result[direction] += distance

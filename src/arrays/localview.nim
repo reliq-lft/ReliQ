@@ -27,6 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[complex]
+
 import reliq
 
 import globalarrays/[gabase]
@@ -48,6 +50,7 @@ type LocalView*[D: static[int], T] = object
   handle: KokkosHandle
   rank: int
   dims: array[D, int]
+  ghostGrid*: array[D, int]
 
 type ComplexLocalView*[D: static[int], F] = object
   ## Wrapper for complex field views - stores real and imaginary parts separately
@@ -149,12 +152,13 @@ proc localView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
   ## let localData = downcast(globalArray)
   ## let localView = localView(localData)
   ## ```
+  let ghostGrid = local.ghostGrid
   var dims: array[D, csize_t]
   var storedDims: array[D, int]
   
   for i in 0..<D:
     storedDims[i] = local.hi[i] - local.lo[i] + 1
-    dims[i] = csize_t(storedDims[i])
+    dims[i] = csize_t(storedDims[i] + 2*ghostGrid[i]) # ghost offset
 
   let pdata = cast[pointer](local.data)
   let pdims = addr dims[0]
@@ -165,7 +169,12 @@ proc localView*[D: static[int], T](local: LocalData[D, T]): LocalView[D, T] =
   elif T is float64:
     let handle = createKokkosViewDouble(pdata, csize_t(D), pdims)
   
-  return LocalView[D, T](handle: handle, rank: D, dims: storedDims)
+  return LocalView[D, T](
+    handle: handle, 
+    rank: D, 
+    dims: storedDims,
+    ghostGrid: ghostGrid
+  )
 
 proc localView*[D: static[int], T](ga: GlobalArray[D, T]): LocalView[D, T] =
   ## Create a LocalView directly from a GlobalArray
@@ -261,8 +270,7 @@ proc `[]`*[D: static[int], T](view: LocalView[D, T], indices: array[D, int]): T 
   ## Returns:
   ## The value at the specified location
   var idx: array[D, csize_t]
-  for i in 0..<D:
-    idx[i] = csize_t(indices[i])
+  for i in 0..<D: idx[i] = csize_t(indices[i] + view.ghostGrid[i])
   
   when T is int:
     return T(viewGetInt(view.handle, csize_t(D), addr idx[0]))
@@ -280,7 +288,7 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], indices: array[D, int]
   ## - `value`: The value to set
   var idx: array[D, csize_t]
   for i in 0..<D:
-    idx[i] = csize_t(indices[i])
+    idx[i] = csize_t(indices[i] + view.ghostGrid[i])
   
   when T is int:
     viewSetInt(view.handle, csize_t(D), addr idx[0], cint(value))
@@ -288,35 +296,6 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], indices: array[D, int]
     viewSetFloat(view.handle, csize_t(D), addr idx[0], cfloat(value))
   elif T is float64:
     viewSetDouble(view.handle, csize_t(D), addr idx[0], cdouble(value))
-
-proc linearToIndices[D: static[int]](linear: int, dims: array[D, int]): array[D, int] =
-  ## Convert linear index to multi-dimensional indices (row-major/C order)
-  ##
-  ## Parameters:
-  ## - `linear`: Linear index
-  ## - `dims`: Dimensions of the array
-  ##
-  ## Returns:
-  ## Multi-dimensional indices
-  var idx = linear
-  for i in countdown(D-1, 0):
-    result[i] = idx mod int(dims[i])
-    idx = idx div int(dims[i])
-
-proc indicesToLinear*[D: static[int]](indices: array[D, int], dims: array[D, int]): int =
-  ## Convert multi-dimensional indices to linear index (row-major/C order)
-  ##
-  ## Parameters:
-  ## - `indices`: Multi-dimensional indices
-  ## - `dims`: Dimensions of the array
-  ##
-  ## Returns:
-  ## Linear index
-  result = 0
-  var stride = 1
-  for i in countdown(D-1, 0):
-    result += indices[i] * stride
-    stride *= dims[i]
 
 proc `[]`*[D: static[int], T](view: LocalView[D, T], index: SomeInteger): T =
   ## Access element in the LocalView using linear index
@@ -329,9 +308,11 @@ proc `[]`*[D: static[int], T](view: LocalView[D, T], index: SomeInteger): T =
   ## The value at the specified location
   var idx: array[D, csize_t]
   
-  let indices = linearToIndices(int(index), view.dims)
+  let indices = flatToCoords(int(index), view.dims)
+  #echo "before: " & $indices
   for i in 0..<D:
-    idx[i] = csize_t(indices[i])
+    idx[i] = csize_t(indices[i]) # + view.ghostGrid[i])
+  #echo "after: " & $idx
   
   when T is int:
     return T(viewGetInt(view.handle, csize_t(D), addr idx[0]))
@@ -349,9 +330,9 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, va
   ## - `value`: The value to set
   var idx: array[D, csize_t]
   
-  let indices = linearToIndices(int(index), view.dims)
+  let indices = flatToCoords(int(index), view.dims)
   for i in 0..<D:
-    idx[i] = csize_t(indices[i])
+    idx[i] = csize_t(indices[i]) #+ view.ghostGrid[i])
   
   when T is int:
     viewSetInt(view.handle, csize_t(D), addr idx[0], cint(value))
@@ -359,6 +340,22 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, va
     viewSetFloat(view.handle, csize_t(D), addr idx[0], cfloat(value))
   elif T is float64:
     viewSetDouble(view.handle, csize_t(D), addr idx[0], cdouble(value))
+
+proc `[]`*[D: static[int], F](view: ComplexLocalView[D, F], idx: int): Complex[F] =
+  ## Access complex value at index
+  complex(view.re[idx], view.im[idx])
+
+proc `[]=`*[D: static[int], F](view: var ComplexLocalView[D, F], idx: int, val: Complex[F]) =
+  ## Set complex value at index
+  view.re[idx] = val.re
+  view.im[idx] = val.im
+
+proc `[]=`*[D: static[int], F](view: var ComplexLocalView[D, F], idx: int, val: SomeNumber) =
+  ## Set complex value at index from a real number (imaginary part = 0)
+  view.re[idx] = F(val)
+  view.im[idx] = F(0)
+
+#[ misc ]#
 
 proc numSites*[D: static[int], T](view: LocalView[D, T]): int =
   ## Get the total number of sites in the LocalView
@@ -419,6 +416,6 @@ test:
           view[idx] = float(i + j + k + l)
           let val = view[idx]
           assert(val == float(i + j + k + l), "Accessor mismatch at index " & $idx)
-          var n = indicesToLinear(idx, view.dims)
-          assert(idx == linearToIndices(n, view.dims), "Index conversion mismatch at index " & $n)
+          var n = coordsToFlat(idx, view.dims)
+          assert(idx == flatToCoords(n, view.dims), "Index conversion mismatch at index " & $n)
           assert(view[n] == float(i + j + k + l), "Linear accessor mismatch at index " & $n)

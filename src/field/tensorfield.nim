@@ -7,8 +7,7 @@ import scalarfield
 import lattice/[simplecubiclattice]
 import kokkos/[kokkosdispatch]
 
-when isMainModule: # when running unit tests
-  import std/[math, complex]
+import std/[math, complex]
 
 type Tensor*[D: static[int], T] = object
   ## Simple cubic tensor implementation
@@ -554,6 +553,54 @@ proc tensorRemove*[D: static[int], T](tensor: Tensor[D, T]): Field[D, T] =
   assert tensor.shape == @[1], "tensorRemove only implemented for rank-1 tensors"
   return tensor.components[0]
 
+template toPaddedTensor*[D: static[int], T](
+  tightTensor: Tensor[D, T], 
+  ghostGrid: array[D, int]
+): Tensor[D, T] =
+  ## Convert a tensor field to a padded tensor field with ghost zones
+  ##
+  ## Example:
+  ## ```nim
+  ## let paddedTensor = tensor.toPaddedTensor(@[1,1,1,1])  # Add 1 layer of ghost zones in all directions
+  ## ```
+  let paddedLattice = newSimpleCubicLattice(
+    tightTensor.lattice.dimensions,
+    tightTensor.lattice.mpiGrid,
+    ghostGrid
+  )
+  var paddedTensor = paddedLattice.newTensor(tightTensor.shape): T
+  
+  for ijk in 0..<tightTensor.numComponents():
+    paddedTensor.components[ijk] := tightTensor.components[ijk]
+
+    # halo exchange
+    when isComplexType(T):
+      paddedTensor.components[ijk].fieldRe.updateGhosts()
+      paddedTensor.components[ijk].fieldIm.updateGhosts()
+    else: paddedTensor.components[ijk].field.updateGhosts()
+  
+  paddedTensor
+
+template toTightTensor*[D: static[int], T](
+  paddedTensor: Tensor[D, T]
+): Tensor[D, T] =
+  ## Convert a padded tensor field with ghost zones to a tight tensor field
+  ##
+  ## Example:
+  ## ```nim
+  ## let tightTensor = paddedTensor.toTightTensor()
+  ## ```
+  let tightLattice = newSimpleCubicLattice(
+    paddedTensor.lattice.dimensions,
+    paddedTensor.lattice.mpiGrid
+  )
+  var tightTensor = tightLattice.newTensor(paddedTensor.shape): T
+  
+  for ijk in 0..<paddedTensor.numComponents():
+    tightTensor.components[ijk] := paddedTensor.components[ijk]
+  
+  tightTensor
+
 #[ unit tests ]#
 
 test:
@@ -904,3 +951,15 @@ test:
     let expected = 4.0
     assert(abs(ctnormView[i] - expected) < 1e-10, "Complex trace norm failed")
   echo "Process ", myRank(), "/", numRanks(), ": All norm tests passed!"
+
+  # Test tensor padding conversion
+  let ghostGrid = [1, 1, 1, 1]
+  let paddedTensor = A.toPaddedTensor(ghostGrid)
+  assert paddedTensor.lattice.ghostGrid == ghostGrid, "Padded tensor ghost grid mismatch"
+  let tightTensor = paddedTensor.toTightTensor()
+  for i in 0..<A.numComponents():
+    let aView = A.components[i].localField()
+    let tView = tightTensor.components[i].localField()
+    for j in 0..<A.components[i].numSites():
+      assert abs(aView[j] - tView[j]) < 1e-10, "Tight tensor component mismatch after padding conversion"
+  echo "Process ", myRank(), "/", numRanks(), ": Tensor padding conversion tests passed!"

@@ -63,6 +63,7 @@ type LocalData*[D: static[int], T] = object
   lo*: array[D, int]
   hi*: array[D, int]
   ld*: array[D-1, int]  # Leading dimensions for multidimensional access
+  ghostGrid*: array[D, int]
 
 #[ GA wrappers ]#
 
@@ -355,21 +356,11 @@ proc downcast*[D: static[int], T](ga: GlobalArray[D, T]): LocalData[D, T] =
     local.lo[i] = int(lo_c[i])
     local.hi[i] = int(hi_c[i])
   for i in 0..<(D-1): local.ld[i] = int(ld_c[i])
+  local.ghostGrid = ga.ghostGrid
   
   return local
 
 #[ GA halo exchange ]#
-
-proc updateGhosts*[D: static[int], T](ga: GlobalArray[D, T]) =
-  ## Update the ghost cells of the GlobalArray
-  ##
-  ## This procedure triggers a ghost cell update for the GlobalArray,
-  ## ensuring that the ghost cells contain up-to-date data from neighboring
-  ## processes.
-  ##
-  ## Parameters:
-  ## - `ga`: The GlobalArray instance.
-  ga.handle.GA_Update_ghosts()
 
 proc updateGhostDirection*[D: static[int], T](
   ga: GlobalArray[D, T],
@@ -394,6 +385,23 @@ proc updateGhostDirection*[D: static[int], T](
     cint(side), 
     update_corners_c
   )
+
+
+proc updateGhosts*[D: static[int], T](
+  ga: GlobalArray[D, T]; 
+  update_corners: bool = true
+) =
+  ## Update the ghost cells of the GlobalArray
+  ##
+  ## This procedure triggers a ghost cell update for the GlobalArray,
+  ## ensuring that the ghost cells contain up-to-date data from neighboring
+  ## processes.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance.
+  for mu in 0..<D:
+    ga.updateGhostDirection(mu, 1, update_corners = update_corners)
+    ga.updateGhostDirection(mu, -1, update_corners = update_corners)
 
 #[
 proc get*[D: static[int], T](

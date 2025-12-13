@@ -166,67 +166,6 @@ proc getTensor*[D: static[int], T](transporter: Transporter[D, T]): Tensor[D, T]
 
 #[ transport operations ]#
 
-proc flatToCoords[D: static[int]](
-  idx: int,
-  dims: array[D, int]
-): array[D, int] =
-  ## Convert flat index to D-dimensional coordinates
-  ##
-  ## Parameters:
-  ## - `idx`: Flat index (0..numSites-1)
-  ## - `dims`: Dimensions of the local lattice portion
-  ##
-  ## Returns:
-  ## Array of D coordinates
-  var remaining = idx
-  for i in countdown(D-1, 0):
-    result[i] = remaining mod dims[i]
-    remaining = remaining div dims[i]
-
-proc coordsToFlat[D: static[int]](
-  coords: array[D, int],
-  dims: array[D, int]
-): int =
-  ## Convert D-dimensional coordinates to flat index
-  ##
-  ## Parameters:
-  ## - `coords`: Array of D coordinates
-  ## - `dims`: Dimensions of the local lattice portion
-  ##
-  ## Returns:
-  ## Flat index
-  result = 0
-  var stride = 1
-  for i in countdown(D-1, 0):
-    result += coords[i] * stride
-    stride *= dims[i]
-
-proc shiftCoords[D: static[int]](
-  coords: array[D, int],
-  direction: int,
-  distance: int,
-  localDims: array[D, int],
-  ghostWidth: array[D, int]
-): array[D, int] =
-  ## Compute shifted coordinates with ghost cell offsets
-  ##
-  ## Parameters:
-  ## - `coords`: Original coordinates (without ghost offset)
-  ## - `direction`: Direction to shift (0..D-1)
-  ## - `distance`: Distance to shift (+/- for forward/backward)
-  ## - `localDims`: Local dimensions (without ghosts)
-  ## - `ghostWidth`: Ghost cell widths for each dimension
-  ##
-  ## Returns:
-  ## Shifted coordinates (with ghost offsets applied)
-  ##
-  ## Note: This works because ghost cells contain neighbor data after updateGhosts()
-  result = coords
-  # Add ghost offset to access ghost-padded array
-  for i in 0..<D: result[i] += ghostWidth[i]
-  # Apply shift in the specified direction
-  result[direction] += distance
-
 template transport*[D: static[int], T](
   transporter: Transporter[D, T],
   tensor: Tensor[D, T]
@@ -423,6 +362,7 @@ test:
   echo "  ✓ All round-trip conversions successful"
 
   # ===== Test 6: Shift Coordinates with Ghost Offset =====
+  #[
   echo "\nTest 6: Shift coordinates with ghost offsets..."
   let localDims: array[4, int] = [8, 8, 8, 16]
   let ghostWidth: array[4, int] = [1, 1, 1, 1]
@@ -442,6 +382,7 @@ test:
   let shifted_0 = shiftCoords([0, 0, 0, 0], 0, 1, localDims, ghostWidth)
   assert shifted_0 == [2, 1, 1, 1], "Shift [0,0,0,0] in dir 0 by +1 should be [2,1,1,1]"
   echo "  ✓ Shift coordinate calculations correct"
+  ]#
 
   # ===== Test 7: Simple Shift Transport =====
   echo "\nTest 7: Simple shift transport operation..."

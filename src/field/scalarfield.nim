@@ -10,7 +10,7 @@ import utils/[nimutils]
 import lattice/[simplecubiclattice]
 import kokkos/[kokkosdispatch]
 
-template isComplexType(T: typedesc): bool =
+template isComplexType*(T: typedesc): bool =
   ## Check if a type is a complex number type
   T is Complex64 or T is Complex32
 
@@ -22,10 +22,10 @@ type Field*[D: static[int], T] = object
   ## For real fields (T = SomeFloat), stores directly as a single GlobalArray.
   lattice*: SimpleCubicLattice[D]
   when isComplexType(T):
-    fieldRe: GlobalArray[D, float64]  # Real part (Complex64 only for now)
-    fieldIm: GlobalArray[D, float64]  # Imaginary part
+    fieldRe*: GlobalArray[D, float64]  # Real part (Complex64 only for now)
+    fieldIm*: GlobalArray[D, float64]  # Imaginary part
   else:
-    field: GlobalArray[D, T]
+    field*: GlobalArray[D, T]
 
 #[ field constructor ]#
 
@@ -164,20 +164,6 @@ template abs*[D: static[int]](field: Field[D, Complex64]): Field[D, float] =
   result
 
 #[ Chapel-like arithmetic promotion ]#
-
-proc `[]`*[D: static[int], F](view: ComplexLocalView[D, F], idx: int): Complex[F] =
-  ## Access complex value at index
-  complex(view.re[idx], view.im[idx])
-
-proc `[]=`*[D: static[int], F](view: var ComplexLocalView[D, F], idx: int, val: Complex[F]) =
-  ## Set complex value at index
-  view.re[idx] = val.re
-  view.im[idx] = val.im
-
-proc `[]=`*[D: static[int], F](view: var ComplexLocalView[D, F], idx: int, val: SomeNumber) =
-  ## Set complex value at index from a real number (imaginary part = 0)
-  view.re[idx] = F(val)
-  view.im[idx] = F(0)
 
 proc localField*[D: static[int], T](field: Field[D, T]): auto =
   ## Get the local view of the field
@@ -540,6 +526,56 @@ template `^`*[D: static[int], T](base: Field[D, T], exponent: Field[D, T]): Fiel
   let ev = exponent.localField()
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], ev[n])
   r
+
+#[ lattice padding conversion ]#
+
+template toPaddedField*[D: static[int], T](
+  tightField: Field[D, T],
+  ghostGrid: array[D, int]
+): Field[D, T] =
+  ## Convert a field to its padded version according to its lattice's ghost grid
+  ##
+  ## Parameters:
+  ## - `field`: Field instance
+  ##
+  ## Returns:
+  ## A new Field with dimensions padded according to the lattice's ghost grid
+  let paddedLattice = newSimpleCubicLattice(
+    tightField.lattice.dimensions,
+    tightField.lattice.mpiGrid,
+    ghostGrid
+  )
+  var paddedField = newField(paddedLattice): T
+
+  paddedField := tightField
+
+  # halo exchange
+  when isComplexType(T):
+    paddedField.fieldRe.updateGhosts()
+    paddedField.fieldIm.updateGhosts()
+  else: paddedField.field.updateGhosts()
+
+  paddedField
+
+template toTightField*[D: static[int], T](
+  paddedField: Field[D, T]
+): Field[D, T] =
+  ## Convert a padded field to its tight version by removing ghost zones
+  ##
+  ## Parameters:
+  ## - `field`: Field instance
+  ##
+  ## Returns:
+  ## A new Field with dimensions tightened by removing ghost zones
+  let tightLattice = newSimpleCubicLattice(
+    paddedField.lattice.dimensions,
+    paddedField.lattice.mpiGrid
+  )
+  var tightField = newField(tightLattice): T
+
+  tightField := paddedField
+
+  tightField
 
 #[ unit tests ]#
 
@@ -917,3 +953,16 @@ test:
     assert(abs(val.re - 7.0) < 1e-10, "Converted field sum real part should be 7.0")
     assert(abs(val.im - 0.0) < 1e-10, "Converted field sum imag part should be 0.0")
   echo "Process ", myRank(), "/", numRanks(), ": All complex/real conversion tests passed!"
+
+  # Test toPaddedField conversion
+  let ghostGrid = [1, 1, 1, 1]
+  var paddedField = field1.toPaddedField(ghostGrid)
+  var tightField = paddedField.toTightField()
+  var paddedView = paddedField.localField()
+  var originalView = field1.localField()
+  var tightView = tightField.localField()
+  for i in 0..<field1.numSites():
+    let errMsg = "Padded field value should match original field value at site "
+    assert abs(paddedView[i] - originalView[i]) < 1e-10, errMsg & $i
+    assert abs(tightView[i] - originalView[i]) < 1e-10, errMsg & $i
+  echo "Process ", myRank(), "/", numRanks(), ": All padded field tests passed!"
