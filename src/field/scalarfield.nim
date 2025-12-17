@@ -1,18 +1,40 @@
+#[ 
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
+  Source file: src/field/scalarfield.nim
+  Contact: reliq-lft@proton.me
+
+  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  MIT License
+  
+  Copyright (c) 2025 reliq-lft
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+]#
+
 import reliq
-import arrays
 
 import std/[macros]
 import std/[tables]
 import std/[strutils]
-import std/[math, complex]
+import std/[math]
 
-import utils/[nimutils]
-import lattice/[simplecubiclattice]
-import kokkos/[kokkosdispatch]
-
-template isComplexType*(T: typedesc): bool =
-  ## Check if a type is a complex number type
-  T is Complex64 or T is Complex32
+import utils/[complex]
 
 type Field*[D: static[int], T] = object
   ## Simple cubic field implementation
@@ -21,13 +43,14 @@ type Field*[D: static[int], T] = object
   ## For complex fields (T = Complex[F]), stores real and imaginary parts as separate GlobalArrays.
   ## For real fields (T = SomeFloat), stores directly as a single GlobalArray.
   lattice*: SimpleCubicLattice[D]
-  when isComplexType(T):
-    fieldRe*: GlobalArray[D, float64]  # Real part (Complex64 only for now)
-    fieldIm*: GlobalArray[D, float64]  # Imaginary part
+  when isComplex32(T):
+    fieldRe*: GlobalArray[D, float32]
+    fieldIm*: GlobalArray[D, float32]
+  elif isComplex64(T):
+    fieldRe*: GlobalArray[D, float64]
+    fieldIm*: GlobalArray[D, float64]
   else:
     field*: GlobalArray[D, T]
-
-#[ field constructor ]#
 
 proc newField*[D: static[int]](
   lattice: SimpleCubicLattice[D],
@@ -50,15 +73,21 @@ proc newField*[D: static[int]](
   let dimensions = lattice.dimensions
   let mpiGrid = lattice.mpiGrid
   let ghostGrid = lattice.ghostGrid
-  when isComplexType(T):
+  when isComplex32(T):
+    return Field[D, T](
+      lattice: lattice,
+      fieldRe: newGlobalArray(dimensions, mpiGrid, ghostGrid, float32),
+      fieldIm: newGlobalArray(dimensions, mpiGrid, ghostGrid, float32)
+    )
+  elif isComplex64(T):
     return Field[D, T](
       lattice: lattice,
       fieldRe: newGlobalArray(dimensions, mpiGrid, ghostGrid, float64),
       fieldIm: newGlobalArray(dimensions, mpiGrid, ghostGrid, float64)
     )
-  else:
+  else: 
     return Field[D, T](
-      lattice: lattice, 
+      lattice: lattice,
       field: newGlobalArray(dimensions, mpiGrid, ghostGrid, T)
     )
 
@@ -72,12 +101,12 @@ proc numSites*[D: static[int], T](field: Field[D, T]): int =
   ##
   ## Returns:
   ## The total number of local sites in the field
-  when isComplexType(T): return field.fieldRe.numSites()
+  when isComplex(T): return field.fieldRe.numSites()
   else: return field.field.numSites()
 
-#[ complex/real conversion ]#
+#[ type conversion ]#
 
-template toComplex*[D: static[int]](field: Field[D, float]): Field[D, Complex64] =
+template toComplex*[D: static[int], T](f: Field[D, T]): Field[D, Complex[T]] =
   ## Convert a real field to a complex field (imaginary part = 0)
   ##
   ## Parameters:
@@ -85,13 +114,13 @@ template toComplex*[D: static[int]](field: Field[D, float]): Field[D, Complex64]
   ##
   ## Returns:
   ## A complex Field with real part = field, imaginary part = 0
-  var result = newField(field.lattice): Complex64
-  let fview = field.localField()
+  var result = f.lattice.newField(): Complex[T]
+  let fview = f.localField()
   var rview = result.localField()
-  for i in every 0..<field.numSites(): rview[i] = complex(fview[i], 0.0)
+  for i in every 0..<f.numSites(): rview[i] = complex(fview[i], 0.0)
   result
 
-template realPart*[D: static[int]](field: Field[D, Complex64]): Field[D, float] =
+template re*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
   ## Extract the real part of a complex field
   ##
   ## Parameters:
@@ -99,13 +128,13 @@ template realPart*[D: static[int]](field: Field[D, Complex64]): Field[D, float] 
   ##
   ## Returns:
   ## A real Field containing the real parts
-  var result = newField(field.lattice): float
-  let fview = field.localField()
+  var result = f.lattice.newField(): T
+  let fview = f.localField()
   var rview = result.localField()
-  for i in every 0..<field.numSites(): rview[i] = fview[i].re
+  for i in every 0..<f.numSites(): rview[i] = fview[i].re
   result
 
-template imagPart*[D: static[int]](field: Field[D, Complex64]): Field[D, float] =
+template im*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
   ## Extract the imaginary part of a complex field
   ##
   ## Parameters:
@@ -113,57 +142,77 @@ template imagPart*[D: static[int]](field: Field[D, Complex64]): Field[D, float] 
   ##
   ## Returns:
   ## A real Field containing the imaginary parts
-  var result = newField(field.lattice): float
-  let fview = field.localField()
+  var result = f.lattice.newField(): T
+  let fview = f.localField()
   var rview = result.localField()
-  for i in every 0..<field.numSites(): rview[i] = fview[i].im
+  for i in every 0..<f.numSites(): rview[i] = fview[i].im
   result
 
-template conjugate*[D: static[int]](field: Field[D, Complex64]): Field[D, Complex64] =
-  ## Compute the complex conjugate of a field
+#[ grid conversion ]#
+
+template toPaddedField*[D: static[int], T](
+  tightField: Field[D, T],
+  ghostGrid: array[D, int]
+): Field[D, T] =
+  ## Convert a field to its padded version according to its lattice's ghost grid
   ##
   ## Parameters:
-  ## - `field`: Complex Field instance
+  ## - `tightField`: Field instance
+  ## - `ghostGrid`: Array specifying ghost zone sizes in each dimension
   ##
   ## Returns:
-  ## A complex Field with conjugated values
-  var result = newField(field.lattice): Complex64
-  let fview = field.localField()
-  var rview = result.localField()
-  for i in every 0..<field.numSites():
-    let val = fview[i]
-    rview[i] = complex(val.re, -val.im)
-  result
+  ## A new Field with dimensions padded according to the lattice's ghost grid
+  let paddedLattice = newSimpleCubicLattice(
+    tightField.lattice.dimensions,
+    tightField.lattice.mpiGrid,
+    ghostGrid
+  )
+  var paddedField = newField(paddedLattice): T
 
-template absSquared*[D: static[int]](field: Field[D, Complex64]): Field[D, float] =
-  ## Compute |z|² = re² + im² for each element
+  # Can't use direct assignment because ghost offsets make linear indices map differently
+  # direct assignment
+  paddedField := tightField
+
+  # halo exchange
+  when isComplex(T):
+    paddedField.fieldRe.updateGhosts()
+    paddedField.fieldIm.updateGhosts()
+  else: paddedField.field.updateGhosts()
+
+  paddedField
+
+template toTightField*[D: static[int], T](paddedField: Field[D, T]): Field[D, T] =
+  ## Convert a padded field to its tight version by removing ghost zones
   ##
   ## Parameters:
-  ## - `field`: Complex Field instance
+  ## - `paddedField`: Field instance
   ##
   ## Returns:
-  ## A real Field containing |z|² values
-  var result = newField(field.lattice): float
-  let fview = field.localField()
-  var rview = result.localField()
-  for i in every 0..<field.numSites():
-    let val = fview[i]
-    rview[i] = val.re * val.re + val.im * val.im
-  result
+  ## A new Field with dimensions tightened by removing ghost zones
+  let tightLattice = newSimpleCubicLattice(
+    paddedField.lattice.dimensions,
+    paddedField.lattice.mpiGrid
+  )
+  var tightField = newField(tightLattice): T
 
-template abs*[D: static[int]](field: Field[D, Complex64]): Field[D, float] =
-  ## Compute |z| = sqrt(re² + im²) for each element
+  tightField := paddedField
+
+  tightField
+
+template exchange*[D: static[int], T](f: Field[D, T]) =
+  ## Perform halo exchange on the field
   ##
   ## Parameters:
-  ## - `field`: Complex Field instance
+  ## - `field`: Field instance
   ##
   ## Returns:
-  ## A real Field containing |z| values
-  var result = field.absSquared()
-  result = result.sqrt()
-  result
+  ## Nothing; performs in-place halo exchange
+  when isComplex(T):
+    f.fieldRe.updateGhosts()
+    f.fieldIm.updateGhosts()
+  else: f.field.updateGhosts()
 
-#[ Chapel-like arithmetic promotion ]#
+#[ promotion ]#
 
 proc localField*[D: static[int], T](field: Field[D, T]): auto =
   ## Get the local view of the field
@@ -174,7 +223,12 @@ proc localField*[D: static[int], T](field: Field[D, T]): auto =
   ## Returns:
   ## A LocalView (real) or ComplexLocalView (complex) representing the local 
   ## portion of the field
-  when isComplexType(T):
+  when isComplex32(T):
+    ComplexLocalView[D, float32](
+      re: field.fieldRe.localView(),
+      im: field.fieldIm.localView()
+    )
+  elif isComplex64(T):
     ComplexLocalView[D, float64](
       re: field.fieldRe.localView(),
       im: field.fieldIm.localView()
@@ -381,104 +435,162 @@ template `/=`*(lhs, rhs: untyped) =
   ## ```
   block: lhs := lhs/rhs
 
-#[ ordinary mathematical functions ]#
+#[ mathematical operations ]#
 
-template sqrt*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template adj*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, Complex[T]] =
+  ## Compute the complex conjugate of a field
+  ##
+  ## Parameters:
+  ## - `f`: Complex Field instance
+  ##
+  ## Returns:
+  ## A complex Field with conjugated values
+  var result = f.lattice.newField: Complex[T]
+  let fview = f.localField()
+  var rview = result.localField()
+  for i in every 0..<f.numSites():
+    let val = fview[i]
+    rview[i] = complex(val.re, -val.im)
+  result
+
+template norm2*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+  ## Compute |z|² = re² + im² for each element
+  ##
+  ## Parameters:
+  ## - `f`: Complex Field instance
+  ##
+  ## Returns:
+  ## A real Field containing |z|² values
+  var result = f.lattice.newField: T
+  let fview = f.localField()
+  var rview = result.localField()
+  for i in every 0..<f.numSites():
+    let val = fview[i]
+    rview[i] = val.re * val.re + val.im * val.im
+  result
+
+template sqrt*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise square root of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the square root applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = sqrt(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = sqrt(fv[n])
   r
 
-template exp*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template norm*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+  ## Compute |z| = sqrt(re² + im²) for each element
+  ##
+  ## Parameters:
+  ## - `f`: Complex Field instance
+  ##
+  ## Returns:
+  ## A real Field containing |z| values
+  var result = f.norm2()
+  result = result.sqrt()
+  result
+
+template exp*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise exponential of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the exponential applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = exp(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = exp(fv[n])
   r
 
-template ln*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template ln*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise natural logarithm of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the natural logarithm applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = ln(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = ln(fv[n])
   r
 
-template sin*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template sin*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise sine of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the sine applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = sin(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = sin(fv[n])
   r
 
-template cos*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template cos*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise cosine of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the cosine applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = cos(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = cos(fv[n])
   r
 
-template tan*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template tan*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise tangent of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the tangent applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = tan(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = tan(fv[n])
   r
 
-template abs*[D: static[int], T](field: Field[D, T]): Field[D, T] =
+template abs*[D: static[int], T](f: Field[D, T]): Field[D, T] =
   ## Element-wise absolute value of field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `f`: Field instance
   ##
   ## Returns:
   ## A new Field with the absolute value applied element-wise
-  var r = newField(field.lattice): T
+  var r = f.lattice.newField: T
   var rv = r.localField()
-  let fv = field.localField()
-  for n in every 0..<field.numSites(): rv[n] = abs(fv[n])
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = abs(fv[n])
+  r
+
+template abs*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+  ## Element-wise absolute value of complex field
+  ##
+  ## Parameters:
+  ## - `f`: Complex Field instance
+  ##
+  ## Returns:
+  ## A new real Field with the absolute value (magnitude) applied element-wise
+  var r = f.lattice.newField: T
+  var rv = r.localField()
+  let fv = f.localField()
+  for n in every 0..<f.numSites(): rv[n] = abs(fv[n])
   r
 
 template `^`*[D: static[int], T](base: Field[D, T], exponent: T): Field[D, T] =
@@ -490,7 +602,7 @@ template `^`*[D: static[int], T](base: Field[D, T], exponent: T): Field[D, T] =
   ##
   ## Returns:
   ## A new Field with the power applied element-wise
-  var r = newField(base.lattice): T
+  var r = base.lattice.newField: T
   var rv = r.localField()
   let bv = base.localField()
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], exponent)
@@ -505,7 +617,7 @@ template `^`*[D: static[int], T](base: T, exponent: Field[D, T]): Field[D, T] =
   ##
   ## Returns:
   ## A new Field with the power applied element-wise
-  var r = newField(exponent.lattice): T
+  var r = exponent.lattice.newField: T
   var rv = r.localField()
   let ev = exponent.localField()
   for n in every 0..<exponent.numSites(): rv[n] = pow(base, ev[n])
@@ -520,449 +632,249 @@ template `^`*[D: static[int], T](base: Field[D, T], exponent: Field[D, T]): Fiel
   ##
   ## Returns:
   ## A new Field with the power applied element-wise
-  var r = newField(base.lattice): T
+  var r = base.lattice.newField: T
   var rv = r.localField()
   let bv = base.localField()
   let ev = exponent.localField()
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], ev[n])
   r
 
-#[ lattice padding conversion ]#
-
-template toPaddedField*[D: static[int], T](
-  tightField: Field[D, T],
-  ghostGrid: array[D, int]
-): Field[D, T] =
-  ## Convert a field to its padded version according to its lattice's ghost grid
-  ##
-  ## Parameters:
-  ## - `field`: Field instance
-  ##
-  ## Returns:
-  ## A new Field with dimensions padded according to the lattice's ghost grid
-  let paddedLattice = newSimpleCubicLattice(
-    tightField.lattice.dimensions,
-    tightField.lattice.mpiGrid,
-    ghostGrid
-  )
-  var paddedField = newField(paddedLattice): T
-
-  paddedField := tightField
-
-  # halo exchange
-  when isComplexType(T):
-    paddedField.fieldRe.updateGhosts()
-    paddedField.fieldIm.updateGhosts()
-  else: paddedField.field.updateGhosts()
-
-  paddedField
-
-template toTightField*[D: static[int], T](
-  paddedField: Field[D, T]
-): Field[D, T] =
-  ## Convert a padded field to its tight version by removing ghost zones
-  ##
-  ## Parameters:
-  ## - `field`: Field instance
-  ##
-  ## Returns:
-  ## A new Field with dimensions tightened by removing ghost zones
-  let tightLattice = newSimpleCubicLattice(
-    paddedField.lattice.dimensions,
-    paddedField.lattice.mpiGrid
-  )
-  var tightField = newField(tightLattice): T
-
-  tightField := paddedField
-
-  tightField
-
 #[ unit tests ]#
 
 test:
-  let lattice = newSimpleCubicLattice([8, 8, 8, 8*numRanks()])
-  var field1 = newField(lattice): float
-  var field2 = newField(lattice): float
-  var field3 = newField(lattice): float
-  var field4 = newField(lattice): float
-  
-  # Test basic field properties
-  assert(field1.lattice.dimensions == lattice.dimensions, "Lattice dimensions mismatch")
-  assert(field1.field.isInitialized(), "Field GlobalArray not initialized")
-  assert(field1.numSites() > 0, "Field should have positive number of local sites")
-  
-  echo "Process ", myRank(), "/", numRanks(), ": Local sites = ", field1.numSites()
-  
-  # Test simple assignment
-  field1 := 2.0
-  field2 := 3.0
-  
-  # Test arithmetic promotion
-  field3 := field1 + field2  # Should be 5.0
-  field4 := field1 * field2  # Should be 6.0
-  
-  # Verify values using local views
-  let view3 = field3.localField()
-  let view4 = field4.localField()
-  
-  for i in 0..<field3.numSites():
-    assert(abs(view3[i] - 5.0) < 1e-10, "field3 should be 5.0")
-    assert(abs(view4[i] - 6.0) < 1e-10, "field4 should be 6.0")
-  
-  # Test complex expression
-  field1 := field2 + 2.0*field3 - field4  # 3.0 + 10.0 - 6.0 = 7.0
-  
-  let view1 = field1.localField()
-  for i in 0..<field1.numSites():
-    assert(abs(view1[i] - 7.0) < 1e-10, "Complex expression failed")
-  
-  # Test compound assignment operators
-  field2 := 4.0
-  field2 += 2.0  # Should be 6.0
-  
-  let view2 = field2.localField()
-  for i in 0..<field2.numSites():
-    assert(abs(view2[i] - 6.0) < 1e-10, "Compound += failed")
-  
-  field2 *= 2.0  # Should be 12.0
-  for i in 0..<field2.numSites():
-    assert(abs(view2[i] - 12.0) < 1e-10, "Compound *= failed")
-  
-  field2 /= 3.0  # Should be 4.0
-  for i in 0..<field2.numSites():
-    assert(abs(view2[i] - 4.0) < 1e-10, "Compound /= failed")
-  
-  field2 -= 1.0  # Should be 3.0
-  for i in 0..<field2.numSites():
-    assert(abs(view2[i] - 3.0) < 1e-10, "Compound -= failed")
-  
-  echo "Process ", myRank(), "/", numRanks(), ": All Field tests passed!"
+  let lattice = newSimpleCubicLattice(
+    [8, 8, 8, 8*numRanks()], 
+    [1, 1, 1, numRanks()],
+    [0, 0, 0, 0]
+  )  # Distribute 8xn across n processes
+  let field = lattice.newField: float64
+  let cfield = lattice.newField: Complex64
 
-  # test promotion on arrays of fields
-  var fieldArray: array[4, Field[4, float]]
-  for i in 0..<4:
-    fieldArray[i] = newField(lattice): float
-    fieldArray[i] := float(i + 1)
-  fieldArray[0] := 1.0
-  
-  # Test mathematical function overloads
-  var mathField = newField(lattice): float
-  mathField := 4.0
-  
-  # Test sqrt
-  var sqrtField = mathField.sqrt()
-  let sqrtView = sqrtField.localField()
-  for i in 0..<sqrtField.numSites():
-    assert(abs(sqrtView[i] - 2.0) < 1e-10, "sqrt(4.0) should be 2.0")
-  
-  # Test exp and ln (inverse operations)
-  mathField := 2.0
-  var expField = mathField.exp()
-  var lnField = expField.ln()
-  let lnView = lnField.localField()
-  for i in 0..<lnField.numSites():
-    assert(abs(lnView[i] - 2.0) < 1e-10, "ln(exp(2.0)) should be 2.0")
-  
-  # Test sin and cos
-  mathField := 0.0
-  var sinField = mathField.sin()
-  var cosField = mathField.cos()
-  let sinView = sinField.localField()
-  let cosView = cosField.localField()
-  for i in 0..<sinField.numSites():
-    assert(abs(sinView[i] - 0.0) < 1e-10, "sin(0.0) should be 0.0")
-    assert(abs(cosView[i] - 1.0) < 1e-10, "cos(0.0) should be 1.0")
-  
-  # Test tan
-  mathField := PI/4.0
-  var tanField = mathField.tan()
-  let tanView = tanField.localField()
-  for i in 0..<tanField.numSites():
-    assert(abs(tanView[i] - 1.0) < 1e-10, "tan(π/4) should be 1.0")
-  
-  # Test abs
-  mathField := -5.0
-  var absField = mathField.abs()
-  let absView = absField.localField()
-  for i in 0..<absField.numSites():
-    assert(abs(absView[i] - 5.0) < 1e-10, "abs(-5.0) should be 5.0")
-  
-  # Test power operator (field ^ scalar)
-  mathField := 2.0
-  var powField1 = mathField ^ 3.0
-  let powView1 = powField1.localField()
-  for i in 0..<powField1.numSites():
-    assert(abs(powView1[i] - 8.0) < 1e-10, "2.0^3.0 should be 8.0")
-  
-  # Test power operator (scalar ^ field)
-  mathField := 3.0
-  var powField2 = 2.0 ^ mathField
-  let powView2 = powField2.localField()
-  for i in 0..<powField2.numSites():
-    assert(abs(powView2[i] - 8.0) < 1e-10, "2.0^3.0 should be 8.0")
-  
-  # Test power operator (field ^ field)
-  var baseField = newField(lattice): float
-  var expField2 = newField(lattice): float
-  baseField := 2.0
-  expField2 := 4.0
-  var powField3 = baseField ^ expField2
-  let powView3 = powField3.localField()
-  for i in 0..<powField3.numSites():
-    assert(abs(powView3[i] - 16.0) < 1e-10, "2.0^4.0 should be 16.0")
-  
-  echo "Process ", myRank(), "/", numRanks(), ": All mathematical function tests passed!"
-  
-  # Test complex fields
-  var cfield1 = newField(lattice): Complex64
-  var cfield2 = newField(lattice): Complex64
-  
-  # Test complex assignment
-  cfield1 := complex(2.0, 3.0)
-  cfield2 := complex(1.0, -1.0)
-  
-  let cview1 = cfield1.localField()
-  let cview2 = cfield2.localField()
-  for i in 0..<cfield1.numSites():
-    let val1 = cview1[i]
-    let val2 = cview2[i]
-    assert(abs(val1.re - 2.0) < 1e-10, "Complex real part should be 2.0")
-    assert(abs(val1.im - 3.0) < 1e-10, "Complex imag part should be 3.0")
-    assert(abs(val2.re - 1.0) < 1e-10, "Complex real part should be 1.0")
-    assert(abs(val2.im + 1.0) < 1e-10, "Complex imag part should be -1.0")
-  
-  # Test complex arithmetic with promotion
-  var cfield3 = newField(lattice): Complex64
-  var cfield4 = newField(lattice): Complex64
-  var cfield5 = newField(lattice): Complex64
-  
-  # Test addition: (2+3i) + (1-i) = (3+2i)
-  cfield3 := cfield1 + cfield2
-  let cview3 = cfield3.localField()
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 3.0) < 1e-10, "Complex sum real part should be 3.0")
-    assert(abs(val.im - 2.0) < 1e-10, "Complex sum imag part should be 2.0")
-  
-  # Test subtraction: (2+3i) - (1-i) = (1+4i)
-  cfield3 := cfield1 - cfield2
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 1.0) < 1e-10, "Complex difference real part should be 1.0")
-    assert(abs(val.im - 4.0) < 1e-10, "Complex difference imag part should be 4.0")
-  
-  # Test multiplication: (2+3i) * (1-i) = 2-2i+3i-3i² = 2+i+3 = (5+i)
-  cfield3 := cfield1 * cfield2
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 5.0) < 1e-10, "Complex product real part should be 5.0")
-    assert(abs(val.im - 1.0) < 1e-10, "Complex product imag part should be 1.0")
-  
-  # Test division: (2+3i) / (1-i) = (2+3i)(1+i) / ((1-i)(1+i)) = (2+2i+3i+3i²) / 2 = (-1+5i)/2 = (-0.5+2.5i)
-  cfield3 := cfield1 / cfield2
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - (-0.5)) < 1e-10, "Complex quotient real part should be -0.5")
-    assert(abs(val.im - 2.5) < 1e-10, "Complex quotient imag part should be 2.5")
-  
-  # Test complex expression with multiple operations: (2+3i) + 2*(1-i) - (2+3i)*(1-i)
-  # = (2+3i) + (2-2i) - (5+i) = (4+i) - (5+i) = (-1+0i)
-  cfield4 := cfield1 + 2.0*cfield2
-  cfield5 := cfield1 * cfield2
-  cfield3 := cfield4 - cfield5
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - (-1.0)) < 1e-10, "Complex expression real part should be -1.0")
-    assert(abs(val.im - 0.0) < 1e-10, "Complex expression imag part should be 0.0")
-  
-  # Test compound assignment operators with complex fields
-  cfield3 := complex(3.0, 4.0)
-  cfield3 += complex(1.0, 1.0)  # (3+4i) + (1+i) = (4+5i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 4.0) < 1e-10, "Complex += real part should be 4.0")
-    assert(abs(val.im - 5.0) < 1e-10, "Complex += imag part should be 5.0")
-  
-  cfield3 *= complex(2.0, 0.0)  # (4+5i) * 2 = (8+10i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 8.0) < 1e-10, "Complex *= real part should be 8.0")
-    assert(abs(val.im - 10.0) < 1e-10, "Complex *= imag part should be 10.0")
-  
-  cfield3 /= complex(2.0, 0.0)  # (8+10i) / 2 = (4+5i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 4.0) < 1e-10, "Complex /= real part should be 4.0")
-    assert(abs(val.im - 5.0) < 1e-10, "Complex /= imag part should be 5.0")
-  
-  cfield3 -= complex(1.0, 2.0)  # (4+5i) - (1+2i) = (3+3i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 3.0) < 1e-10, "Complex -= real part should be 3.0")
-    assert(abs(val.im - 3.0) < 1e-10, "Complex -= imag part should be 3.0")
-  
-  # Test scalar multiplication with complex fields
-  cfield1 := complex(1.0, 2.0)
-  cfield3 := 3.0 * cfield1  # 3 * (1+2i) = (3+6i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 3.0) < 1e-10, "Scalar * complex real part should be 3.0")
-    assert(abs(val.im - 6.0) < 1e-10, "Scalar * complex imag part should be 6.0")
-  
-  # Test mixed real and complex field arithmetic
-  var rfield1 = newField(lattice): float
-  var rfield2 = newField(lattice): float
-  rfield1 := 2.0
-  rfield2 := 5.0
-  
-  # Complex field + real scalar: (3+4i) + 2 = (5+4i)
-  cfield1 := complex(3.0, 4.0)
-  cfield3 := cfield1 + 2.0
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 5.0) < 1e-10, "Complex + scalar real part should be 5.0")
-    assert(abs(val.im - 4.0) < 1e-10, "Complex + scalar imag part should be 4.0")
-  
-  # Real scalar + complex field: 2 + (3+4i) = (5+4i)
-  cfield3 := 2.0 + cfield1
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 5.0) < 1e-10, "Scalar + complex real part should be 5.0")
-    assert(abs(val.im - 4.0) < 1e-10, "Scalar + complex imag part should be 4.0")
-  
-  # Complex field * real scalar: (3+4i) * 2 = (6+8i)
-  cfield3 := cfield1 * 2.0
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 6.0) < 1e-10, "Complex * scalar real part should be 6.0")
-    assert(abs(val.im - 8.0) < 1e-10, "Complex * scalar imag part should be 8.0")
-  
-  # Real scalar * complex field: 2 * (3+4i) = (6+8i)
-  cfield3 := 2.0 * cfield1
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 6.0) < 1e-10, "Scalar * complex real part should be 6.0")
-    assert(abs(val.im - 8.0) < 1e-10, "Scalar * complex imag part should be 8.0")
-  
-  # Complex field / real scalar: (6+8i) / 2 = (3+4i)
-  cfield1 := complex(6.0, 8.0)
-  cfield3 := cfield1 / 2.0
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 3.0) < 1e-10, "Complex / scalar real part should be 3.0")
-    assert(abs(val.im - 4.0) < 1e-10, "Complex / scalar imag part should be 4.0")
-  
-  # Complex field - real scalar: (5+4i) - 2 = (3+4i)
-  cfield1 := complex(5.0, 4.0)
-  cfield3 := cfield1 - 2.0
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 3.0) < 1e-10, "Complex - scalar real part should be 3.0")
-    assert(abs(val.im - 4.0) < 1e-10, "Complex - scalar imag part should be 4.0")
-  
-  # Real scalar - complex field: 10 - (3+4i) = (7-4i)
-  cfield3 := 10.0 - cfield1
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 5.0) < 1e-10, "Scalar - complex real part should be 5.0")
-    assert(abs(val.im - (-4.0)) < 1e-10, "Scalar - complex imag part should be -4.0")
-  
-  # Complex expression with real and complex: 2 * (3+4i) + 5 = (6+8i) + 5 = (11+8i)
-  cfield1 := complex(3.0, 4.0)
-  cfield3 := 2.0 * cfield1 + 5.0
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 11.0) < 1e-10, "Mixed expression real part should be 11.0")
-    assert(abs(val.im - 8.0) < 1e-10, "Mixed expression imag part should be 8.0")
-  
-  # Test conjugate-like operations (using subtraction of imaginary part)
-  cfield1 := complex(3.0, 4.0)
-  cfield2 := complex(3.0, -4.0)  # Conjugate
-  cfield3 := cfield1 * cfield2  # (3+4i)(3-4i) = 9 - 16i² = 9 + 16 = 25
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 25.0) < 1e-10, "Complex conjugate product real part should be 25.0")
-    assert(abs(val.im - 0.0) < 1e-10, "Complex conjugate product imag part should be 0.0")
-  
-  echo "Process ", myRank(), "/", numRanks(), ": All complex field tests passed!"
-  
+  var fieldA = lattice.newField: float64
+  var fieldB = lattice.newField: float64
+  var fieldC = lattice.newField: float64 
+  var fieldD = lattice.newField: float64
 
-  ########################################################## <--- hang location
+  fieldA := 2.0
+  fieldB := 3.0
+  fieldC := 4.0
+  fieldD := fieldA + fieldB*fieldC - 5.0
 
-  # Test complex/real conversion functions
+  let localD = fieldD.localField()
+  for n in 0..<localD.numSites():
+    assert localD[n] == 2.0 + 3.0*4.0 - 5.0
   
-  # Test toComplex: convert real field to complex
-  rfield1 := 5.0
-  var cfield_from_real = rfield1.toComplex()
-  let cfr_view = cfield_from_real.localField()
-  for i in 0..<cfield_from_real.numSites():
-    let val = cfr_view[i]
-    assert(abs(val.re - 5.0) < 1e-10, "toComplex real part should be 5.0")
-    assert(abs(val.im - 0.0) < 1e-10, "toComplex imag part should be 0.0")
+  fieldD += 1.0
+  for n in 0..<localD.numSites():
+    assert localD[n] == 2.0 + 3.0*4.0 - 5.0 + 1.0
   
-  # Test realPart: extract real part from complex field
-  cfield1 := complex(3.0, 4.0)
-  var real_part = cfield1.realPart()
-  let rp_view = real_part.localField()
-  for i in 0..<real_part.numSites():
-    assert(abs(rp_view[i] - 3.0) < 1e-10, "realPart should be 3.0")
+  fieldD *= 2.0
+  for n in 0..<localD.numSites():
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0
   
-  # Test imagPart: extract imaginary part from complex field
-  var imag_part = cfield1.imagPart()
-  let ip_view = imag_part.localField()
-  for i in 0..<imag_part.numSites():
-    assert(abs(ip_view[i] - 4.0) < 1e-10, "imagPart should be 4.0")
-  
-  # Test conjugate: compute complex conjugate
-  var cfield_conj = cfield1.conjugate()
-  let cc_view = cfield_conj.localField()
-  for i in 0..<cfield_conj.numSites():
-    let val = cc_view[i]
-    assert(abs(val.re - 3.0) < 1e-10, "conjugate real part should be 3.0")
-    assert(abs(val.im - (-4.0)) < 1e-10, "conjugate imag part should be -4.0")
-  
-  # Test absSquared: |z|² for z = 3+4i should be 9+16 = 25
-  var abs_sq = cfield1.absSquared()
-  let absq_view = abs_sq.localField()
-  for i in 0..<abs_sq.numSites():
-    assert(abs(absq_view[i] - 25.0) < 1e-10, "absSquared should be 25.0")
-  
-  # Test abs: |z| for z = 3+4i should be 5
-  var cabs_field = cfield1.abs()
-  let cabsf_view = cabs_field.localField()
-  for i in 0..<cabs_field.numSites():
-    assert(abs(cabsf_view[i] - 5.0) < 1e-10, "abs should be 5.0")
-  
-  # Test that conjugate * original gives real result with imaginary part = 0
-  cfield1 := complex(2.0, 3.0)
-  cfield2 := cfield1.conjugate()
-  cfield3 := cfield1 * cfield2  # Should be |z|² = 4 + 9 = 13
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 13.0) < 1e-10, "z * conj(z) real part should be 13.0")
-    assert(abs(val.im - 0.0) < 1e-10, "z * conj(z) imag part should be 0.0")
-  
-  # Test arithmetic with converted fields
-  rfield1 := 3.0
-  rfield2 := 4.0
-  var cfield_r1 = rfield1.toComplex()
-  var cfield_r2 = rfield2.toComplex()
-  cfield3 := cfield_r1 + cfield_r2  # (3+0i) + (4+0i) = (7+0i)
-  for i in 0..<cfield3.numSites():
-    let val = cview3[i]
-    assert(abs(val.re - 7.0) < 1e-10, "Converted field sum real part should be 7.0")
-    assert(abs(val.im - 0.0) < 1e-10, "Converted field sum imag part should be 0.0")
-  echo "Process ", myRank(), "/", numRanks(), ": All complex/real conversion tests passed!"
+  fieldD /= 4.0
+  for n in 0..<localD.numSites():
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0
 
-  # Test toPaddedField conversion
-  let ghostGrid = [1, 1, 1, 1]
-  var paddedField = field1.toPaddedField(ghostGrid)
-  var tightField = paddedField.toTightField()
-  var paddedView = paddedField.localField()
-  var originalView = field1.localField()
-  var tightView = tightField.localField()
-  for i in 0..<field1.numSites():
-    let errMsg = "Padded field value should match original field value at site "
-    assert abs(paddedView[i] - originalView[i]) < 1e-10, errMsg & $i
-    assert abs(tightView[i] - originalView[i]) < 1e-10, errMsg & $i
-  echo "Process ", myRank(), "/", numRanks(), ": All padded field tests passed!"
+  fieldD -= 0.5 
+  for n in 0..<localD.numSites():
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0 - 0.5 
+  
+  var cfieldA = lattice.newField: Complex64
+  var cfieldB = lattice.newField: Complex64
+  var cfieldC = lattice.newField: Complex64
+  var cfieldD = lattice.newField: Complex64
+
+  cfieldA := complex(1.0, -1.0)
+  cfieldB := complex(2.0, -2.0)
+  cfieldC := complex(3.0, -3.0)
+  cfieldD := cfieldA + cfieldB*cfieldC - complex(10.0, -10.0)
+
+  var ca = complex(1.0, -1.0)
+  var cb = complex(2.0, -2.0)
+  var cc = complex(3.0, -3.0)
+  var cd = ca + cb*cc - complex(10.0, -10.0)
+
+  let localCD = cfieldD.localField()
+  for n in 0..<localCD.numSites():
+    assert localCD[n] == cd
+  
+  cfieldD += complex(1.0, -1.0)
+  for n in 0..<localCD.numSites():
+    assert localCD[n] == cd + complex(1.0, -1.0)
+  
+  cfieldD *= complex(2.0, -2.0)
+  for n in 0..<localCD.numSites():
+    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0)
+  
+  cfieldD /= complex(4.0, -4.0)
+  for n in 0..<localCD.numSites():
+    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0) / complex(4.0, -4.0)
+  
+  cfieldD := 5.0
+  for n in 0..<localCD.numSites():
+    assert localCD[n] == complex(5.0, 0.0)
+  
+  echo "field promotion tests passed"
+  
+  var rfieldD = cfieldD.re
+  var ifieldD = cfieldD.im
+
+  let localRD = rfieldD.localField()
+  let localID = ifieldD.localField()
+  for n in 0..<localCD.numSites():
+    assert localRD[n] == 5.0
+    assert localID[n] == 0.0
+  
+  var cfieldE = rfieldD.toComplex()
+  let localE = cfieldE.localField()
+  for n in 0..<cfieldE.localField().numSites():
+    assert localE[n] == complex(5.0, 0.0)
+  
+  echo "field conversion tests passed"
+
+  cfieldE := cfieldD * cfieldD.adj 
+  var fieldE = cfieldD.norm2
+  let clocalFE = cfieldE.localField()
+  let localFE = fieldE.localField()
+  for n in 0..<clocalFE.numSites():
+    assert localFE[n] == clocalFE[n].re
+
+  # Test sqrt function
+  fieldD := 4.0
+  fieldE = fieldD.sqrt
+  let localFsqrt = fieldE.localField()
+  for n in 0..<localFsqrt.numSites():
+    assert abs(localFsqrt[n] - 2.0) < 1e-10
+
+  # Test exp function  
+  fieldD := 0.0
+  fieldE = fieldD.exp
+  let localFexp = fieldE.localField()
+  for n in 0..<localFexp.numSites():
+    assert abs(localFexp[n] - 1.0) < 1e-10
+
+  # Test ln function
+  fieldD := 1.0
+  fieldE = fieldD.ln
+  let localFln = fieldE.localField()
+  for n in 0..<localFln.numSites():
+    assert abs(localFln[n] - 0.0) < 1e-10
+
+  # Test sin function
+  fieldD := 0.0
+  fieldE = fieldD.sin
+  let localFsin = fieldE.localField()
+  for n in 0..<localFsin.numSites():
+    assert abs(localFsin[n] - 0.0) < 1e-10
+
+  # Test cos function
+  fieldD := 0.0
+  fieldE = fieldD.cos
+  let localFcos = fieldE.localField()
+  for n in 0..<localFcos.numSites():
+    assert abs(localFcos[n] - 1.0) < 1e-10
+
+  # Test tan function
+  fieldD := 0.0
+  fieldE = fieldD.tan
+  let localFtan = fieldE.localField()
+  for n in 0..<localFtan.numSites():
+    assert abs(localFtan[n] - 0.0) < 1e-10
+
+  # Test abs function  
+  fieldD := -3.0
+  fieldE = fieldD.abs
+  let localFabs = fieldE.localField()
+  for n in 0..<localFabs.numSites():
+    assert abs(localFabs[n] - 3.0) < 1e-10
+
+  # Test norm function for complex fields
+  cfieldD := complex(3.0, 4.0)
+  fieldE = cfieldD.norm
+  let localFnorm = fieldE.localField()
+  for n in 0..<localFnorm.numSites():
+    assert abs(localFnorm[n] - 5.0) < 1e-10  # sqrt(3^2 + 4^2) = 5
+
+  # Test power operations: field^scalar
+  fieldD := 2.0
+  fieldE = fieldD ^ 3.0
+  let localFpow1 = fieldE.localField()
+  for n in 0..<localFpow1.numSites():
+    assert abs(localFpow1[n] - 8.0) < 1e-10  # 2^3 = 8
+
+  # Test power operations: scalar^field  
+  fieldD := 3.0
+  fieldE = 2.0 ^ fieldD
+  let localFpow2 = fieldE.localField()
+  for n in 0..<localFpow2.numSites():
+    assert abs(localFpow2[n] - 8.0) < 1e-10  # 2^3 = 8
+
+  # Test power operations: field^field
+  var fieldF = newField(lattice, float64)
+  fieldD := 2.0
+  fieldF := 3.0
+  fieldE = fieldD ^ fieldF
+  let localFpow3 = fieldE.localField()
+  for n in 0..<localFpow3.numSites():
+    assert abs(localFpow3[n] - 8.0) < 1e-10  # 2^3 = 8
+
+  # Test mathematical functions with more complex values
+  fieldD := PI / 2.0  # π/2
+  fieldE = fieldD.sin
+  let localFsinPi2 = fieldE.localField()
+  for n in 0..<localFsinPi2.numSites():
+    assert abs(localFsinPi2[n] - 1.0) < 1e-10  # sin(π/2) = 1
+
+  fieldD := PI / 2.0  # π/2  
+  fieldE = fieldD.cos
+  let localFcosPi2 = fieldE.localField()
+  for n in 0..<localFcosPi2.numSites():
+    assert abs(localFcosPi2[n] - 0.0) < 1e-10  # cos(π/2) = 0
+
+  fieldD := PI / 4.0  # π/4
+  fieldE = fieldD.tan
+  let localFtanPi4 = fieldE.localField()
+  for n in 0..<localFtanPi4.numSites():
+    assert abs(localFtanPi4[n] - 1.0) < 1e-10  # tan(π/4) = 1
+
+  # Test exp and ln are inverse operations
+  fieldD := 2.0
+  fieldE = fieldD.exp
+  fieldE = fieldE.ln
+  let localFexpln = fieldE.localField()
+  for n in 0..<localFexpln.numSites():
+    assert abs(localFexpln[n] - 2.0) < 1e-10  # ln(exp(2)) = 2
+
+  # Test sqrt and square are inverse operations
+  fieldD := 9.0
+  fieldE = fieldD.sqrt 
+  fieldE = fieldE ^ 2.0
+  let localFsqrtSq = fieldE.localField() 
+  for n in 0..<localFsqrtSq.numSites():
+    assert abs(localFsqrtSq[n] - 9.0) < 1e-10  # (sqrt(9))^2 = 9
+
+  echo "comprehensive mathematical operation tests passed"
+
+  let paddedField = fieldD.toPaddedField([1, 1, 1, 1])
+  let tightField = paddedField.toTightField()
+
+  #tightField := fieldD
+  #paddedField := tightField
+
+  let localPadded = paddedField.localField()
+  let localTight = tightField.localField()
+  let localOriginal = fieldD.localField()
+  
+  for n in 0..<localOriginal.numSites():
+    assert localPadded[n] == localOriginal[n]
+    assert localTight[n] == localOriginal[n]
+    assert localPadded[n] == localTight[n]
+
+  paddedField.exchange()
+
+  echo "grid conversion tests passed"
+
+  ## --
+
+  echo "scalarfield.nim tests passed"

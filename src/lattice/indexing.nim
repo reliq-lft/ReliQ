@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/globalarrays/gabase.nim
+  Source file: src/lattice/indexing.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -12,7 +12,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -27,46 +27,37 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-when isMainModule:
-  import gampi
-  import utils/[commandline]
+proc flatToCoords*[D: static[int]](
+  idx: int,
+  dims: array[D, int]
+): array[D, int] =
+  ## Convert flat index to D-dimensional coordinates
+  ##
+  ## Parameters:
+  ## - `idx`: Flat index (0..numSites-1)
+  ## - `dims`: Dimensions of the local lattice portion
+  ##
+  ## Returns:
+  ## Array of D coordinates
+  var remaining = idx
+  for i in countdown(D-1, 0):
+    result[i] = remaining mod dims[i]
+    remaining = remaining div dims[i]
 
-template GlobalArrays*(body: untyped): untyped =
-  {.pragma: ga, header: "ga.h".}
-  {.pragma: ma, header: "madecls.h".}
-  body
-
-GlobalArrays: discard
-
-#[ Global Arrays initialization ]#
-
-proc initGA*() {.importc: "GA_Initialize", ga.}
-
-proc initGA*(argc: ptr cint, argv: ptr cstringArray) 
-  {.importc: "GA_Initialize_args", ga.}
-
-proc finalizeGA*() {.importc: "GA_Terminate", ga.}
-
-#[ unit tests ]#
-
-when isMainModule:
-  block:
-    var argc = cargc()
-    var argv = cargv(argc)
-    
-    # Explicit MPI and GA initialization sequence
-    # This allows proper shutdown without mpirun warnings
-    initMPI(addr argc, addr argv)
-    echo "MPI initialized"
-    
-    initGA()
-    echo "Global Arrays initialized"
-    
-    echo "before GlobalArrays finalization"
-    finalizeGA()
-    echo "Global Arrays finalized"
-    
-    finalizeMPI()
-    echo "MPI finalized"
-
-    echo "gabase tests completed successfully"
+proc coordsToFlat*[D: static[int]](
+  coords: array[D, int],
+  dims: array[D, int]
+): int =
+  ## Convert D-dimensional coordinates to flat index
+  ##
+  ## Parameters:
+  ## - `coords`: Array of D coordinates
+  ## - `dims`: Dimensions of the local lattice portion
+  ##
+  ## Returns:
+  ## Flat index
+  result = 0
+  var stride = 1
+  for i in countdown(D-1, 0):
+    result += coords[i] * stride
+    stride *= dims[i]

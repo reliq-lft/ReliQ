@@ -1,9 +1,12 @@
-
 import reliq
+import arrays
+
 import scalarfield
 import tensorfield
 
-import utils/[complex]
+import lattice/[simplecubiclattice]
+import kokkos/[kokkosdispatch]
+import utils/[nimutils]
 
 type TransporterKind* = enum tkShift, tkCovariantShift
 
@@ -81,7 +84,7 @@ proc newTransporter*[D: static[int], T](
 
   # halo exchange - may not be needed when covariant forward
   for i in 0..<tensor.numComponents():
-    when isComplex(T):
+    when isComplexType(T):
       tensor.components[i].fieldRe.updateGhostDirection(direction, 1, true)
       tensor.components[i].fieldIm.updateGhostDirection(direction, 1, true)
     else: tensor.components[i].field.updateGhostDirection(direction, 1, true)
@@ -163,12 +166,6 @@ proc getTensor*[D: static[int], T](transporter: Transporter[D, T]): Tensor[D, T]
 
 #[ transport operations ]#
 
-template transport*[D: static[int], T](
-  transporter: Transporter[D, T],
-  tensor: Tensor[D, T]
-): Tensor[D, T] =
-
-#[
 template transport*[D: static[int], T](
   transporter: Transporter[D, T],
   tensor: Tensor[D, T]
@@ -273,7 +270,6 @@ template `*`*[D: static[int], T](
   ## let result = transporter * myTensor
   ## ```
   transport(transporter, tensor)
-]#
 
 #[ unit tests ]#
 
@@ -310,9 +306,8 @@ test:
   for dir in 0..<4:
     assert transporters[dir].direction == dir, "Direction mismatch at " & $dir
     assert transporters[dir].distance == distances[dir], "Distance mismatch at " & $dir
-  echo "transporter array created with correct properties"
+  echo "  ✓ Transporter array created with correct properties"
 
-  #[
   # ===== Test 3: Index Arithmetic - flatToCoords =====
   echo "\nTest 3: Index arithmetic - flatToCoords..."
   let dims: array[4, int] = [8, 8, 8, 16]
@@ -367,7 +362,6 @@ test:
   echo "  ✓ All round-trip conversions successful"
 
   # ===== Test 6: Shift Coordinates with Ghost Offset =====
-  ]#
   #[
   echo "\nTest 6: Shift coordinates with ghost offsets..."
   let localDims: array[4, int] = [8, 8, 8, 16]
@@ -390,7 +384,6 @@ test:
   echo "  ✓ Shift coordinate calculations correct"
   ]#
 
-  #[
   # ===== Test 7: Simple Shift Transport =====
   echo "\nTest 7: Simple shift transport operation..."
   var field1 = lattice.newTensor(@[4, 4]): float
@@ -490,4 +483,3 @@ test:
   echo "\n" & separator
   echo "ALL TESTS PASSED ✓"
   echo separator & "\n"
-  ]#

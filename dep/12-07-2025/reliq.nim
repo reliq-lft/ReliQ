@@ -1,15 +1,9 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/kokkos/kokkosbase.nim
+  Source file: src/reliq.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  Notes:
-  * Kokkos GitHub: https://github.com/kokkos/kokkos
-  * Kokkos wiki: https://kokkos.org/kokkos-core-wiki/
-  * UPC++ + Kokkos: https://tinyurl.com/4cvza7v2
-  * Lectures on Kokkos: https://tinyurl.com/dhbrr7yn
 
   MIT License
   
@@ -18,7 +12,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -33,42 +27,26 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[commandline]
+#[ ReliQ utilities and runtime environment ]#
 
-template Kokkos*(pragmas: untyped): untyped = 
-  {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-  pragmas
-  
-Kokkos: discard
+import utils
+import runtime
 
-#[ frontend: runtime initializers/finalizers ]#
+export utils
+export runtime
 
-proc initKokkos*(argc: cint; argv: cstringArray)
-  {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
+#[ ReliQ lattice types ]#
 
-proc initKokkos* {.inline.} =
-  let 
-    argc = cargc()
-    argv = cargv(argc)
-  initKokkos(argc, argv)
-  deallocCStringArray(argv)
+import lattice/[latticeconcept]
+import lattice/[simplecubiclattice]
 
-proc finalizeKokkos* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
+export latticeconcept
+export simplecubiclattice
 
-#[ misc ]#
+#[ ReliQ field types ]#
 
-proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
+import field/[fieldconcept]
+import field/[simplecubicfield]
 
-proc localBarrier* {.importcpp: "Kokkos::fence()", inline, kokkos.}
-
-#[ unit tests ]#
-
-when isMainModule:
-  block:
-    initKokkos()
-    echo "Kokkos initialized"
-    
-    echo "Number of Kokkos threads: ", numThreads()
-    
-    finalizeKokkos()
-    echo "Kokkos finalized"
+export fieldconcept
+export simplecubicfield

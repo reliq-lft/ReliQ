@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/utils.nim
+  Source file: src/base/simplecubic.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -9,7 +9,7 @@
   
   Copyright (c) 2025 reliq-lft
   
-  Permission is hereby granted, free of chadge, to any person obtaining a copy
+  Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
   to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
@@ -27,7 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[nimutils, reliqutils]
+import lattice/[simplecubiclattice]
+import field/[simplecubicfield]
 
-export nimutils
-export reliqutils
+export simplecubiclattice
+export simplecubicfield

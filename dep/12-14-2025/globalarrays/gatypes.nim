@@ -1,15 +1,9 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/kokkos/kokkosbase.nim
+  Source file: src/globalarrays/gatypes.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  Notes:
-  * Kokkos GitHub: https://github.com/kokkos/kokkos
-  * Kokkos wiki: https://kokkos.org/kokkos-core-wiki/
-  * UPC++ + Kokkos: https://tinyurl.com/4cvza7v2
-  * Lectures on Kokkos: https://tinyurl.com/dhbrr7yn
 
   MIT License
   
@@ -33,42 +27,17 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[commandline]
+import gabase
 
-template Kokkos*(pragmas: untyped): untyped = 
-  {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-  pragmas
-  
-Kokkos: discard
+GlobalArrays: {.pragma: gacommon, header: "ga.h".}
 
-#[ frontend: runtime initializers/finalizers ]#
+var C_CHAR* {.importc: "C_CHAR", gacommon.}: cint
+var C_INT* {.importc: "C_INT", gacommon.}: cint
+var C_FLOAT* {.importc: "C_FLOAT", gacommon.}: cint
+var C_DBL* {.importc: "C_DBL", gacommon.}: cint
 
-proc initKokkos*(argc: cint; argv: cstringArray)
-  {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
+proc toGAType*(t: typedesc[char]): cint = C_CHAR
+proc toGAType*(t: typedesc[int]): cint = C_INT
+proc toGAType*(t: typedesc[float32]): cint = C_FLOAT
+proc toGAType*(t: typedesc[float64]): cint = C_DBL
 
-proc initKokkos* {.inline.} =
-  let 
-    argc = cargc()
-    argv = cargv(argc)
-  initKokkos(argc, argv)
-  deallocCStringArray(argv)
-
-proc finalizeKokkos* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
-
-#[ misc ]#
-
-proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
-
-proc localBarrier* {.importcpp: "Kokkos::fence()", inline, kokkos.}
-
-#[ unit tests ]#
-
-when isMainModule:
-  block:
-    initKokkos()
-    echo "Kokkos initialized"
-    
-    echo "Number of Kokkos threads: ", numThreads()
-    
-    finalizeKokkos()
-    echo "Kokkos finalized"

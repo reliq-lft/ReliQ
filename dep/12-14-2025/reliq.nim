@@ -27,27 +27,19 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice
-import globalarrays
-import kokkos
+import utils/[commandline]
+import communication/[mpi]
+import globalarrays/[gabase]
+import kokkos/[kokkosbase]
+import utils/[nimutils]
 
-import utils/[complex]
-
-import types/[localview]
-
-export globalarrays # global PGAS array
-export kokkos # local view array & parallel execution
-export lattice # lattice structures
-
-export complex # complex number support
-
-export localview # bridge between global array and local view
+export nimutils
 
 template main*(body: untyped): untyped =
   ## Main execution
   ## 
-  ## Initializes MPI, Kokkos, and GlobalArrays, executes the provided body of code,
-  ## then finalizes GlobalArrays, Kokkos, and MPI.
+  ## Initializes MPI, Kokkos, and Global Arrays, then executes the provided body of code,
+  ## and finally finalizes Global Arrays, Kokkos, and MPI.
   ## 
   ## Parameters:
   ## - `body`: The main body of code to execute within the initialized environment.
@@ -58,37 +50,59 @@ template main*(body: untyped): untyped =
   ##   echo "Hello, World!"
   ## ```
   block:
-    initGlobalArrays()
-    initKokkos()
+    let argc {.inject.} = cargc()
+    let argv {.inject.} = cargv(argc)
     
-    body
+    initMPI(addr argc, addr argv)
+    initKokkos(argc, argv)
+    initGlobalArrays()
 
-    finalizeKokkos()
+    deallocCStringArray(argv)
+    body
+    
     finalizeGlobalArrays()
+    finalizeKokkos()
+    finalizeMPI()
 
 template test*(body: untyped): untyped =
   ## Test execution
   ## 
-  ## Initializes MPI, Kokkos, and GlobalArrays, executes the provided body of code,
-  ## then finalizes GlobalArrays, Kokkos, and MPI.
+  ## Executes the provided body of code as a test case within the main execution environment.
   ## 
   ## Parameters:
-  ## - `body`: The test body of code to execute within the initialized environment.
+  ## - `body`: The test code to execute.
   ## 
   ## Example:
   ## ```nim
   ## test:
-  ##   assert 1 + 1 == 2
+  ##   echo "Running test case"
   ## ```
   when isMainModule:
-    block:
-      initGlobalArrays()
-      initKokkos()
-        
-      body
+    main: body
+  
+proc myRank*: int = int(GA_Nodeid())
+  ## Returns the rank of the current process in the MPI communicator
+  ## 
+  ## Returns:
+  ## Rank of the current process
+  ## 
+  ## Example:
+  ## ```nim
+  ## let rank = myRank()
+  ## echo "My rank is ", rank
+  ## ```
 
-      finalizeKokkos()
-      finalizeGlobalArrays()
+proc numRanks*: int = int(GA_Nnodes())
+  ## Returns the total number of processes in the MPI communicator
+  ## 
+  ## Returns:
+  ## Total number of processes
+  ## 
+  ## Example:
+  ## ```nim
+  ## let totalRanks = numRanks()
+  ## echo "Total number of ranks is ", totalRanks
+  ## ```
 
 test:
-  assert 1 + 1 == 2
+  echo "hello from rank ", myRank(), "/", numRanks()

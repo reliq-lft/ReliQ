@@ -1,15 +1,9 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/kokkos/kokkosbase.nim
+  Source file: src/globalarrays.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  Notes:
-  * Kokkos GitHub: https://github.com/kokkos/kokkos
-  * Kokkos wiki: https://kokkos.org/kokkos-core-wiki/
-  * UPC++ + Kokkos: https://tinyurl.com/4cvza7v2
-  * Lectures on Kokkos: https://tinyurl.com/dhbrr7yn
 
   MIT License
   
@@ -33,42 +27,32 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import globalarrays/[gabase]
+import globalarrays/[gampi]
+import globalarrays/[gatypes]
+import globalarrays/[gawrap]
+
 import utils/[commandline]
 
-template Kokkos*(pragmas: untyped): untyped = 
-  {.pragma: kokkos, header: "<Kokkos_Core.hpp>".}
-  pragmas
+#[ exports ]#
+
+export gatypes # GlobalArray type/functionality
+
+#[ full GlobalArrays initialization ]#
+
+template initGlobalArrays*: untyped = 
+  let argc = cargc()
+  let argv = cargv(argc)
   
-Kokkos: discard
+  initMPI(addr argc, addr argv)
+  initGA()
 
-#[ frontend: runtime initializers/finalizers ]#
-
-proc initKokkos*(argc: cint; argv: cstringArray)
-  {.importcpp: "Kokkos::initialize(#, #)", inline, kokkos.}
-
-proc initKokkos* {.inline.} =
-  let 
-    argc = cargc()
-    argv = cargv(argc)
-  initKokkos(argc, argv)
-  deallocCStringArray(argv)
-
-proc finalizeKokkos* {.importcpp: "Kokkos::finalize()", inline, kokkos.}
+template finalizeGlobalArrays*: untyped = 
+  finalizeGA()
+  finalizeMPI()
 
 #[ misc ]#
 
-proc numThreads*: cint {.importcpp: "Kokkos::num_threads()", inline, kokkos.}
+template myRank*: int = GA_Nodeid()
 
-proc localBarrier* {.importcpp: "Kokkos::fence()", inline, kokkos.}
-
-#[ unit tests ]#
-
-when isMainModule:
-  block:
-    initKokkos()
-    echo "Kokkos initialized"
-    
-    echo "Number of Kokkos threads: ", numThreads()
-    
-    finalizeKokkos()
-    echo "Kokkos finalized"
+template numRanks*: int = GA_Nnodes()

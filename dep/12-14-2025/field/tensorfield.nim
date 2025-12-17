@@ -1,41 +1,13 @@
-#[ 
-  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/field/tensorfield.nim
-  Contact: reliq-lft@proton.me
-
-  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
-
-  MIT License
-  
-  Copyright (c) 2025 reliq-lft
-  
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-  
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
-  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-]#
-
 import std/[macros]
-import std/[tables]
-import std/[strutils]
-import std/[math]
 
 import reliq
+import arrays
 import scalarfield
 
-import utils/[complex]
+import lattice/[simplecubiclattice]
+import kokkos/[kokkosdispatch]
+
+import std/[math, complex]
 
 type Tensor*[D: static[int], T] = object
   ## Simple cubic tensor implementation
@@ -268,7 +240,7 @@ template complexTranspose*[D: static[int], T](tensor: Tensor[D, T]): Tensor[D, T
   var r = tensor.transpose()
   for i in 0..<rows:
     for j in 0..<cols: 
-      let conj = tensor[[i, j]].adj
+      let conj = tensor[[i, j]].conjugate()
       r[[j, i]] := conj
   r
 
@@ -537,7 +509,7 @@ template frobeniusNorm2*[D: static[int]](tensor: Tensor[D, Complex64]): Field[D,
   ## ```
   var sumSq = newField(tensor.lattice): float
   sumSq := 0.0
-  for i in 0..<tensor.numComponents(): sumSq += tensor.components[i].norm2()
+  for i in 0..<tensor.numComponents(): sumSq += tensor.components[i].absSquared()
   sumSq
 
 template traceNorm2*[D: static[int]](tensor: Tensor[D, float]): Field[D, float] =
@@ -598,10 +570,14 @@ template toPaddedTensor*[D: static[int], T](
   )
   var paddedTensor = paddedLattice.newTensor(tightTensor.shape): T
   
-  # Use field-level assignment for each component instead of component assignment
   for ijk in 0..<tightTensor.numComponents():
-    let paddedField = tightTensor.components[ijk].toPaddedField(ghostGrid)
-    paddedTensor.components[ijk] := paddedField
+    paddedTensor.components[ijk] := tightTensor.components[ijk]
+
+    # halo exchange
+    when isComplexType(T):
+      paddedTensor.components[ijk].fieldRe.updateGhosts()
+      paddedTensor.components[ijk].fieldIm.updateGhosts()
+    else: paddedTensor.components[ijk].field.updateGhosts()
   
   paddedTensor
 
@@ -620,10 +596,8 @@ template toTightTensor*[D: static[int], T](
   )
   var tightTensor = tightLattice.newTensor(paddedTensor.shape): T
   
-  # Use field-level conversion for each component instead of direct assignment
   for ijk in 0..<paddedTensor.numComponents():
-    let tightField = paddedTensor.components[ijk].toTightField()
-    tightTensor.components[ijk] := tightField
+    tightTensor.components[ijk] := paddedTensor.components[ijk]
   
   tightTensor
 
@@ -635,7 +609,7 @@ template exchange*[D: static[int], T](tensor: Tensor[D, T]) =
   ## tensor.exchange()
   ## ```
   for i in 0..<tensor.numComponents():
-    when isComplex(T):
+    when isComplexType(T):
       tensor.components[i].fieldRe.updateGhosts()
       tensor.components[i].fieldIm.updateGhosts()
     else: tensor.components[i].field.updateGhosts()
@@ -991,36 +965,14 @@ test:
     assert(abs(ctnormView[i] - expected) < 1e-10, "Complex trace norm failed")
   echo "Process ", myRank(), "/", numRanks(), ": All norm tests passed!"
 
-  # Test tensor padding conversion with a fresh tensor
-  var testTensor = newTensor(lattice, @[2, 2]): float
-  testTensor[[0, 0]] := 1.0
-  testTensor[[0, 1]] := 2.0
-  testTensor[[1, 0]] := 3.0
-  testTensor[[1, 1]] := 4.0
-  
+  # Test tensor padding conversion
   let ghostGrid = [1, 1, 1, 1]
-  let paddedLattice = newSimpleCubicLattice(lattice.dimensions, lattice.mpiGrid, ghostGrid)
-  var paddedTensor = newTensor(paddedLattice, testTensor.shape): float
-  let tightLattice = newSimpleCubicLattice(lattice.dimensions, lattice.mpiGrid)
-  var tightTensor = newTensor(tightLattice, testTensor.shape): float
-  
+  let paddedTensor = A.toPaddedTensor(ghostGrid)
   assert paddedTensor.lattice.ghostGrid == ghostGrid, "Padded tensor ghost grid mismatch"
-  
-  # Test tensor assignments across different lattice configurations
-  # This mirrors the scalar field test approach
-  for i in 0..<testTensor.numComponents():
-    tightTensor.components[i] := testTensor.components[i]
-    paddedTensor.components[i] := tightTensor.components[i]
-  
-  # Verify that assignments worked correctly
-  for i in 0..<testTensor.numComponents():
-    let originalView = testTensor.components[i].localField()
-    let tightView = tightTensor.components[i].localField()
-    let paddedView = paddedTensor.components[i].localField()
-    
-    for j in 0..<originalView.numSites():
-      assert abs(originalView[j] - tightView[j]) < 1e-10, "Tight tensor assignment mismatch"
-      assert abs(originalView[j] - paddedView[j]) < 1e-10, "Padded tensor assignment mismatch"
-      assert abs(tightView[j] - paddedView[j]) < 1e-10, "Tight-padded tensor assignment mismatch"
-      
+  let tightTensor = paddedTensor.toTightTensor()
+  for i in 0..<A.numComponents():
+    let aView = A.components[i].localField()
+    let tView = tightTensor.components[i].localField()
+    for j in 0..<A.components[i].numSites():
+      assert abs(aView[j] - tView[j]) < 1e-10, "Tight tensor component mismatch after padding conversion"
   echo "Process ", myRank(), "/", numRanks(), ": Tensor padding conversion tests passed!"
