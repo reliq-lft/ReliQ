@@ -93,7 +93,9 @@ proc newTensor*[R: static[int], D: static[int]](
   shape: array[R, int],
   T: typedesc
 ): Tensor[D, T] =
-  return newTensor(lattice, shape.toSeq(), T)
+  var s = newSeq[int](R)
+  for i in 0..<R: s[i] = shape[i]
+  return newTensor(lattice, s, T)
 
 proc newTensor*[D: static[int]](
   lattice: SimpleCubicLattice[D],

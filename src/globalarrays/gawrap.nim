@@ -62,6 +62,9 @@ proc NGA_Distribution*(g_a: cint, pid: cint, lo: ptr cint, hi: ptr cint)
 proc NGA_Access*(g_a: cint, lo: ptr cint, hi: ptr cint, p: ptr pointer, ld: ptr cint) 
   {.importc: "NGA_Access", ga.}
 
+proc NGA_Access_ghosts*(g_a: cint, dims: ptr cint, p: ptr pointer, ld: ptr cint) 
+  {.importc: "NGA_Access_ghosts", ga.}
+
 # releasing global array data
 
 proc NGA_Release*(g_a: cint, lo: ptr cint, hi: ptr cint) 

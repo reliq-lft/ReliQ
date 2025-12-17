@@ -40,7 +40,7 @@ type LocalView*[D: static[int], T] = object
   ## that provides efficient access for computations.
   handle: KokkosHandle
   rank: int
-  dims: array[D, int]
+  dims*: array[D, int]
   ghostGrid*: array[D, int]
 
 type ComplexLocalView*[D: static[int], F] = object
@@ -131,7 +131,7 @@ proc `[]`*[D: static[int], T](view: LocalView[D, T], indices: array[D, int]): T 
   ## Returns:
   ## The value at the specified location
   var idx: array[D, csize_t]
-  for i in 0..<D: idx[i] = csize_t(indices[i]) #+ view.ghostGrid[i])
+  for i in 0..<D: idx[i] = csize_t(indices[i] + view.ghostGrid[i])
   
   when T is int32:
     return T(viewGetInt32(view.handle, csize_t(D), addr idx[0]))
@@ -150,8 +150,7 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], indices: array[D, int]
   ## - `indices`: Array of indices for each dimension
   ## - `value`: The value to set
   var idx: array[D, csize_t]
-  for i in 0..<D:
-    idx[i] = csize_t(indices[i]) #+ view.ghostGrid[i])
+  for i in 0..<D: idx[i] = csize_t(indices[i] + view.ghostGrid[i])
   
   when T is int32:
     viewSetInt32(view.handle, csize_t(D), addr idx[0], cint(value))
@@ -171,19 +170,12 @@ proc `[]`*[D: static[int], T](view: LocalView[D, T], index: SomeInteger): T =
   ##
   ## Returns:
   ## The value at the specified location
-  var idx: array[D, csize_t]
+  var coord: array[D, int]
   
   let indices = flatToCoords(int(index), view.dims)
-  for i in 0..<D: idx[i] = csize_t(indices[i])
-  
-  when T is int32:
-    return T(viewGetInt32(view.handle, csize_t(D), addr idx[0]))
-  elif T is int64:
-    return T(viewGetInt64(view.handle, csize_t(D), addr idx[0]))
-  elif T is float32:
-    return T(viewGetFloat32(view.handle, csize_t(D), addr idx[0]))
-  elif T is float64:
-    return T(viewGetFloat64(view.handle, csize_t(D), addr idx[0]))
+  for i in 0..<D: coord[i] = int(indices[i])
+
+  return view[coord]
 
 proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, value: T) =
   ## Set element in the LocalView using linear index
@@ -192,19 +184,12 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, va
   ## - `view`: The LocalView to modify
   ## - `index`: Linear index (row-major order)
   ## - `value`: The value to set
-  var idx: array[D, csize_t]
-  
+  var coord: array[D, int]
+
   let indices = flatToCoords(int(index), view.dims)
-  for i in 0..<D: idx[i] = csize_t(indices[i])
+  for i in 0..<D: coord[i] = int(indices[i])
   
-  when T is int32:
-    viewSetInt32(view.handle, csize_t(D), addr idx[0], cint(value))
-  elif T is int64:
-    viewSetInt64(view.handle, csize_t(D), addr idx[0], cint(value))
-  elif T is float32:
-    viewSetFloat32(view.handle, csize_t(D), addr idx[0], cfloat(value))
-  elif T is float64:
-    viewSetFloat64(view.handle, csize_t(D), addr idx[0], cdouble(value))
+  view[coord] = value
 
 proc `[]`*[D: static[int], F](view: ComplexLocalView[D, F], idx: int): Complex[F] =
   ## Access complex value at index
@@ -243,3 +228,20 @@ proc numSites*[D: static[int], F](view: ComplexLocalView[D, F]): int =
   ## Returns:
   ## The total number of sites
   return view.re.numSites()
+
+proc shiftIndex*[D: static[int], T](
+  view: LocalView[D, T];
+  index, direction, shift: int
+): int =
+  ## Get the shifted index accounting for ghost zones
+  ##
+  ## Parameters:
+  ## - `view`: The LocalView instance
+  ## - `index`: Linear index (row-major order)
+  ##
+  ## Returns:
+  ## The shifted linear index including ghost zones
+  var coords = flatToCoords(index, view.dims)
+  for i in 0..<D:
+    if i == direction: coords[i] += shift
+  return coordsToFlat(coords, view.dims)

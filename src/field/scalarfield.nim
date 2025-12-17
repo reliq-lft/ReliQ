@@ -169,8 +169,6 @@ template toPaddedField*[D: static[int], T](
   )
   var paddedField = newField(paddedLattice): T
 
-  # Can't use direct assignment because ghost offsets make linear indices map differently
-  # direct assignment
   paddedField := tightField
 
   # halo exchange
@@ -662,23 +660,23 @@ test:
 
   let localD = fieldD.localField()
   for n in 0..<localD.numSites():
-    assert localD[n] == 2.0 + 3.0*4.0 - 5.0
+    assert localD[n] == 2.0 + 3.0*4.0 - 5.0, "got: " & $localD[n]
   
   fieldD += 1.0
   for n in 0..<localD.numSites():
-    assert localD[n] == 2.0 + 3.0*4.0 - 5.0 + 1.0
+    assert localD[n] == 2.0 + 3.0*4.0 - 5.0 + 1.0, "got: " & $localD[n]
   
   fieldD *= 2.0
   for n in 0..<localD.numSites():
-    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0, "got: " & $localD[n]
   
   fieldD /= 4.0
   for n in 0..<localD.numSites():
-    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0, "got: " & $localD[n]
 
   fieldD -= 0.5 
   for n in 0..<localD.numSites():
-    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0 - 0.5 
+    assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0 - 0.5, "got: " & $localD[n]
   
   var cfieldA = lattice.newField: Complex64
   var cfieldB = lattice.newField: Complex64
@@ -697,23 +695,23 @@ test:
 
   let localCD = cfieldD.localField()
   for n in 0..<localCD.numSites():
-    assert localCD[n] == cd
+    assert localCD[n] == cd, "got: " & $localCD[n]
   
   cfieldD += complex(1.0, -1.0)
   for n in 0..<localCD.numSites():
-    assert localCD[n] == cd + complex(1.0, -1.0)
+    assert localCD[n] == cd + complex(1.0, -1.0), "got: " & $localCD[n]
   
   cfieldD *= complex(2.0, -2.0)
   for n in 0..<localCD.numSites():
-    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0)
+    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0), "got: " & $localCD[n]
   
   cfieldD /= complex(4.0, -4.0)
   for n in 0..<localCD.numSites():
-    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0) / complex(4.0, -4.0)
+    assert localCD[n] == (cd + complex(1.0, -1.0))*complex(2.0, -2.0) / complex(4.0, -4.0), "got: " & $localCD[n]
   
   cfieldD := 5.0
   for n in 0..<localCD.numSites():
-    assert localCD[n] == complex(5.0, 0.0)
+    assert localCD[n] == complex(5.0, 0.0), "got: " & $localCD[n]
   
   echo "field promotion tests passed"
   

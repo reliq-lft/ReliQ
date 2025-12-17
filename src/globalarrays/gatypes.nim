@@ -279,9 +279,12 @@ proc `=destroy`*[D: static[int], T](local: LocalData[D, T]) =
 proc `=copy`*[D: static[int], T](dest: var LocalData[D, T], src: LocalData[D, T]) {.error.}
   ## Prevent copying of LocalData - it represents exclusive access to GA data
 
-#[ downcasting to local data ]#
+#[ local data accession ]#
 
-proc downcast*[D: static[int], T](ga: GlobalArray[D, T]): LocalData[D, T] =
+proc downcast*[D: static[int], T](
+  ga: GlobalArray[D, T],
+  includeGhosts: bool = true # important default
+): LocalData[D, T] =
   ## Access the local portion of the GlobalArray on the current process
   ##
   ## Returns a LocalData object containing a pointer to the local data
@@ -304,12 +307,18 @@ proc downcast*[D: static[int], T](ga: GlobalArray[D, T]): LocalData[D, T] =
   var lo_c: array[D, cint]
   var hi_c: array[D, cint]
   var ld_c: array[D-1, cint]
+  var dims: array[D, cint]
   var p: pointer
   var local: LocalData[D, T]
   let pid = GA_Nodeid()
 
+  if includeGhosts:
+    for i in 0..<D: dims[i] = cint(ga.latticeGrid[i] + 2*ga.ghostGrid[i])
+
   NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
-  NGA_Access(ga.handle, addr lo_c[0], addr hi_c[0], addr p, addr ld_c[0])
+  if not includeGhosts:
+    NGA_Access(ga.handle, addr lo_c[0], addr hi_c[0], addr p, addr ld_c[0])
+  else: NGA_Access_ghosts(ga.handle, addr dims[0], addr p, addr ld_c[0])
   
   local.ga_handle = ga.handle
   local.data = cast[ptr UncheckedArray[T]](p)

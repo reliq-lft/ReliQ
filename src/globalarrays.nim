@@ -56,3 +56,5 @@ template finalizeGlobalArrays*: untyped =
 template myRank*: int = GA_Nodeid()
 
 template numRanks*: int = GA_Nnodes()
+
+template globalBarrier*: untyped = GA_Sync()
