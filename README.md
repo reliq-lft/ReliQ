@@ -6,7 +6,7 @@
 ![](https://github.com/reliq-lft/ReliQ/blob/main/reliq/reliq.png)
 
 
-`ReliQ` is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind. As such, `ReliQ` is written in the elegant [Nim](https://nim-lang.org/) programming language, and we are experimenting with the use of a [partitioned global address space](https://en.wikipedia.org/wiki/Partitioned_global_address_space) for `ReliQ`'s distributed memory model using the [Unified Parallel C++ (UPC++)](https://upcxx.lbl.gov/docs/html/guide.html) framework. Each address space operates on the shared memory model implemented by [Kokkos](https://kokkos.org/). 
+`ReliQ` is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind. As such, `ReliQ` is written in the elegant [Nim](https://nim-lang.org/) programming language, and we are experimenting with the use of a [partitioned global address space](https://en.wikipedia.org/wiki/Partitioned_global_address_space) for `ReliQ`'s distributed memory model using the [GlobalArrays (GA)](https://globalarrays.github.io/) distributed memory framework. Each address space operates on the shared memory model implemented by [Kokkos](https://kokkos.org/). 
 
 > Please note that `ReliQ` is in the early development stage; it is not ready for production. However, if you like what you're seeing, we could use help; please contact us at [reliq-lft@protonmail.me](reliq-lft@protonmail.me). Otherwise, you can follow us by clicking the `Follow` button in the top right corner of this page or our [organization page](https://github.com/reliq-lft).
 >
@@ -48,7 +48,7 @@ Replace `<reliq_build>` with the location that you'd like `ReliQ` to be installe
 
 #### Step 3: Install `ReliQ` dependencies
 
-We now need to get `Nim`, `UPC++`, and `Kokkos`. Make sure that you are in you `<reliq_build>` directory. From there, execute the following.
+We now need to get `Nim`, `GlobalArrays`, and `Kokkos`. Make sure that you are in you `<reliq_build>` directory. From there, execute the following.
 ```
 <reliq_src>/bootstrap
 ```
@@ -66,7 +66,7 @@ And that's it!
 
 The `<reliq_src>/bootstrap` script performs a local installation of [Spack](https://spack.io/) before using `Spack` it to install `Nim`, `UPC++`, and `Kokkos`. The following directory is created locally. 
 
-* `<reliq_build>/external`: The local install of `Spack`, `Nim`, `UPC++`, and `Kokkos`.
+* `<reliq_build>/external`: The local install of `Spack`, `Nim`, `GlobalArrays`, and `Kokkos`.
 
 The `<reliq_src>/bootstrap` script also comes with a number of options that are configurable by specifying flags. To see available options, run
 ```
