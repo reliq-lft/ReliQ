@@ -98,7 +98,7 @@ if __name__ == '__main__':
     for var, value in env_vars.items(): os.environ[var] = value
 
     # assertions
-    assert int(XXX_NUM_THREADS) % 2 == 0, "number of threads must be a power of 2"
+    assert int(XXX_NUM_THREADS) % 2 == 0 or int(XXX_NUM_THREADS) == 1, "number of threads must be unity or even"
 
     # execute ReliQ program
     cmd = str(SWD / 'external' / 'bin' / 'mpirun')
