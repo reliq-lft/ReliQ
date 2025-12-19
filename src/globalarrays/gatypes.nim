@@ -114,25 +114,23 @@ proc newGlobalArray*[D: static[int]](
   ## let ghostgrid = [1, 1, 1, 1]
   ## var myGA = newGlobalArray(latticeGrid, mpigrid, ghostgrid): float
   ## ```
-  let handle = GA_Create_handle()
+  let handle = GA_Create_handle(); GA_Sync();
   var dims: array[D, cint]
   var chunks: array[D, cint]
   var widths: array[D, cint]
 
   for i in 0..<D:
     dims[i] = cint(latticeGrid[i])
-    if mpiGrid[i] == -1:
-      chunks[i] = cint(-1)  # Let GlobalArrays decide the chunk size
-    else:
-      chunks[i] = cint(latticeGrid[i] div mpiGrid[i])
+    if mpiGrid[i] == -1: chunks[i] = cint(-1)  # GlobalArrays decides the chunk size
+    else: chunks[i] = cint(latticeGrid[i] div mpiGrid[i])
     widths[i] = cint(ghostGrid[i])
   
-  handle.GA_Set_name(cast[ptr cchar](GLOBALNAME))
-  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T))
-  handle.GA_Set_chunk(addr chunks[0])
-  handle.GA_Set_ghosts(addr widths[0])
+  handle.GA_Set_name(cast[ptr cchar](GLOBALNAME)); GA_Sync();
+  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T)); GA_Sync();
+  handle.GA_Set_chunk(addr chunks[0]); GA_Sync();
+  handle.GA_Set_ghosts(addr widths[0]); GA_Sync();
 
-  let status = handle.GA_Allocate()
+  let status = handle.GA_Allocate(); GA_Sync(); 
   if status == 0:
     let errMsg = "Error in GA " & $handle & " construction"
     raise newException(ValueError): errMsg & "; status code: " & $status
@@ -188,10 +186,10 @@ proc `=copy`*[D: static[int], T](
   ## - `src`: The source GlobalArray to copy from.
   if dest.handle == src.handle: return
   if dest.handle != 0 and src.handle != 0 and conformable(dest, src):
-    GA_Copy(src.handle, dest.handle)
+    GA_Copy(src.handle, dest.handle); GA_Sync();
   elif dest.handle == 0 and src.handle != 0:
     dest = newGlobalArray(src.latticeGrid, src.mpiGrid, src.ghostGrid): T
-    GA_Copy(src.handle, dest.handle)
+    GA_Copy(src.handle, dest.handle); GA_Sync();
   elif src.handle == 0:
     let errMsg = "Error in GA copy from " & $src.handle & " to " & $dest.handle
     raise newException(ValueError): errMsg & "; source is uninitialized"
@@ -355,6 +353,7 @@ proc updateGhostDirection*[D: static[int], T](
     cint(side), 
     update_corners_c
   )
+  GA_Sync()
 
 proc updateGhosts*[D: static[int], T](
   ga: GlobalArray[D, T]; 

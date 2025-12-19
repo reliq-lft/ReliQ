@@ -79,7 +79,11 @@ proc GA_Update_ghost_dir*(
   update_corners: cint
 ) {.importc: "NGA_Update_ghost_dir", ga.}
 
-# synchronization
+# synchronization, barriers, fences
+
+proc GA_Init_fence*() {.importc: "GA_Init_fence", ga.}
+
+proc GA_Fence*() {.importc: "GA_Fence", ga.}
 
 proc GA_Sync*() {.importc: "GA_Sync", ga.}
 

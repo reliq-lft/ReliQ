@@ -51,6 +51,13 @@ template finalizeGlobalArrays*: untyped =
   finalizeGA()
   finalizeMPI()
 
+#[ fence ]#
+
+template localFence*(body: untyped): untyped =
+  GA_Init_fence()
+  body
+  GA_Fence()
+
 #[ misc ]#
 
 template myRank*: int = GA_Nodeid()

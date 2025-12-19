@@ -27,6 +27,11 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+# considerations for parallel reduction:
+# - should be threaded & vectorized
+# - need to handle different data types (int, float, complex)
+# - need to handle different reduction operations (sum, max, min, etc.)
+
 import std/[macros]
 
 import kokkosbase

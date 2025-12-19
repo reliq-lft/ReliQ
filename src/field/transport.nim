@@ -207,74 +207,9 @@ template transport*[D: static[int], T](
     var rView = result.components[ijk].localField()
     var sView = tensor.components[ijk].localField()
 
-    for n in every 0..<tensor.numSites():
+    for n in every 0..<rView.numSites():
       rView[n] = sView[sView.shiftIndex(n, dir, dist)]
-
-  result
-
-#[
-template transport*[D: static[int], T](
-  transporter: Transporter[D, T],
-  tensor: Tensor[D, T]
-): Tensor[D, T] =
-  ## Transport a field using the specified transporter
-  ##
-  ## Parameters:
-  ## - `transporter`: The transporter to use for shifting the field
-  ## - `field`: The field to be transported
-  ##
-  ## Returns:
-  ## A new Field instance representing the transported field
-  ##
-  ## Example:
-  ## ```nim
-  ## let lattice = newSimpleCubicLattice([8, 8, 8, 16], ghostGrid = [1, 1, 1, 1])
-  ## let transporter = newTransporter(lattice, 0, 1)
-  ## var field = newField(lattice): float
-  ## field := 1.0
-  ## let shiftedField = transport(transporter, field)
-  ## ```
-  for i in 0..<D:
-    let errMsg = "Transporter distance exceeds ghost cells in direction " & $i
-    assert tensor.lattice.ghostGrid[i] >= abs(transporter.distance), errMsg
-
-  let dir = transporter.direction
-  let head = (if transporter.distance > 0: 1 else: -1)
-  let dist = transporter.distance
-  let ghostWidth = tensor.lattice.ghostGrid
-
-  var localDims: array[D, int]
-  var totalDims: array[D, int]
-
-  var result = newTensor(tensor.lattice, tensor.shape): T
-
-  # halo exchange
-  for i in 0..<tensor.components.len:
-    when isComplexType(T):
-      tensor.components[i].fieldRe.updateGhostDirection(dir, head, true)
-      tensor.components[i].fieldIm.updateGhostDirection(dir, head, true)
-    else: tensor.components[i].field.updateGhostDirection(dir, head, true)
-
-  # determine local and total dimensions
-  when isComplexType(T): 
-    let localData = tensor.components[0].fieldRe.downcast()
-  else: 
-    let localData = tensor.components[0].field.downcast()
-  for mu in 0..<D:
-    localDims[mu] = localData.hi[mu] - localData.lo[mu] + 1
-    totalDims[mu] = localDims[mu] + 2 * ghostWidth[mu]
-
-  # shift
-  for ijk in 0..<tensor.numComponents():
-    var rView = result.components[ijk].localField()
-    var sView = tensor.components[ijk].localField()
-
-    for n in every 0..<tensor.numSites():
-      let c = flatToCoords(n, localDims)
-      let sc = c.shiftCoords(dir, dist, localDims, ghostWidth)
-      let sn = sc.coordsToFlat(totalDims)
-
-      rView[n] = sView[sn]
+    
 
   # transport (if covariant)
   case transporter.kind:
@@ -285,57 +220,35 @@ template transport*[D: static[int], T](
     if head < 0: # shift backward-propagating link
       var shiftedTrns = newTensor(trns.lattice, trns.shape): T
 
-      when isComplexType(T): trns = trns.complexTranspose()
-      else: trns = trns.transpose()
+      # flip direction of transporting link: tensor contextualization ensures
+      # that inverse is appropriate for group, if tensor represents group element
+      trns = trns.inverse()
       
       # shift
       for ijk in 0..<tensor.numComponents():
-        var tView = trns.components[ijk].localField() 
+        var tView = trns.components[ijk].localField()
         var sView = shiftedTrns.components[ijk].localField()
 
-        for n in every 0..<tensor.numSites():
-          let c = flatToCoords(n, localDims)
-          let sc = c.shiftCoords(dir, dist, localDims, ghostWidth)
-          let sn = sc.coordsToFlat(totalDims)
-
-          sView[n] = tView[sn]
+        for n in every 0..<tView.numSites():
+          sView[n] = tView[tView.shiftIndex(n, dir, dist)]
       
       result := matmul(shiftedTrns, result)
     else: result := matmul(trns, result)
 
-  # return result
   result
-
-template `*`*[D: static[int], T](
-  transporter: Transporter[D, T],
-  tensor: Tensor[D, T]
-): Tensor[D, T] =
-  ## Convenience operator for transport: transporter * tensor
-  ##
-  ## Example:
-  ## ```nim
-  ## let result = transporter * myTensor
-  ## ```
-  transport(transporter, tensor)
-]#
 
 #[ unit tests ]#
 
 test:
-  let separator = "============================================================"
-  echo "\n" & separator
-  echo "TRANSPORT COMPREHENSIVE TEST SUITE"
-  echo separator & "\n"
-
   # ===== Test 1: Transporter Constructors =====
-  echo "Test 1: Transporter constructors..."
+  #echo "Test 1: Transporter constructors..."
   let lattice = newSimpleCubicLattice([8, 8, 8, 16], ghostGrid = [1, 1, 1, 1])
   let transporter1 = newTransporter(lattice, 0, 1)
   
   assert transporter1.kind == tkShift, "Transporter 1 should be tkShift"
   assert transporter1.direction == 0, "Transporter 1 direction should be 0"
   assert transporter1.distance == 1, "Transporter 1 distance should be 1"
-  echo "  ✓ Simple transporter created correctly"
+  echo "simple transporter created correctly"
 
   var transporterField = lattice.newTensor(@[4, 4]): float
   let transporter2 = newTransporter(transporterField, 1, -1)
@@ -343,10 +256,10 @@ test:
   assert transporter2.kind == tkCovariantShift, "Transporter 2 should be tkCovariantShift"
   assert transporter2.direction == 1, "Transporter 2 direction should be 1"
   assert transporter2.distance == -1, "Transporter 2 distance should be -1"
-  echo "  ✓ Covariant transporter created correctly"
+  echo "covariant transporter created correctly"
 
   # ===== Test 2: Transporter Array Factory =====
-  echo "\nTest 2: Transporter array factory..."
+  #echo "\nTest 2: Transporter array factory..."
   let distances: array[4, int] = [1, -1, 1, -1]
   var transporters: Transporters[4, float] = newTransporters(lattice, distances)
   
@@ -354,10 +267,10 @@ test:
   for dir in 0..<4:
     assert transporters[dir].direction == dir, "Direction mismatch at " & $dir
     assert transporters[dir].distance == distances[dir], "Distance mismatch at " & $dir
-  echo "  ✓ transporter array created with correct properties"
+  echo "transporter array created with correct properties"
 
   # ===== Test 3: transport =====
-  echo "\nTest 3: Shift operation..."
+  #echo "\nTest 3: Shift operation..."
   for i in 0..<lattice.D:
     let transporter = lattice.newTransporter(i, 1)
     var field = lattice.newTensor([4, 4]): float
@@ -377,7 +290,7 @@ test:
     #  idx[i] = j
     #  let after = tfieldView[idx]
     #  assert after == -float(j-1), "Shift failed at index " & $j & " and direction " & $i & " (got " & $after & ", expected " & $(-float(j-1)) & ")"
-  echo "  ✓ Shift operation successful for all directions"
+  echo "shift operation successful for all directions"
 
   #[
   # ===== Test 3: Index Arithmetic - flatToCoords =====
@@ -558,3 +471,5 @@ test:
   echo "ALL TESTS PASSED ✓"
   echo separator & "\n"
   ]#
+
+  echo "transport.nim tests passed"

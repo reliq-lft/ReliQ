@@ -29,7 +29,6 @@
 
 import std/[macros]
 import std/[tables]
-import std/[strutils]
 import std/[math]
 
 import reliq
@@ -37,11 +36,28 @@ import scalarfield
 
 import utils/[complex]
 
+type Group = enum
+  gkNone,
+  gkUnitary,
+  gkSpecialUnitary
+
+type Representation* = enum
+  rkNone,
+  rkFundamental,
+  rkAdjoint
+
+type TensorContext* = object
+  group*: Group
+  representation*: Representation
+
+let defaultCtx = TensorContext(group: gkNone, representation: rkNone)
+
 type Tensor*[D: static[int], T] = object
   ## Simple cubic tensor implementation
   ##
   ## Represents a tensor field defined on a simple cubic lattice.
   ## Each component is stored as a separate Field.
+  ctx*: TensorContext
   lattice*: SimpleCubicLattice[D]
   shape*: seq[int]
   components*: seq[Field[D, T]]
@@ -68,6 +84,7 @@ proc flatIndex(indices: openArray[int], shape: seq[int]): int =
 proc newTensor*[D: static[int]](
   lattice: SimpleCubicLattice[D],
   shape: seq[int],
+  ctx: TensorContext,
   T: typedesc
 ): Tensor[D, T] =
   ## Create a new Tensor
@@ -86,25 +103,45 @@ proc newTensor*[D: static[int]](
   ## ```
   var tensor = newSeq[Field[D, T]](product(shape))
   for i in 0..<tensor.len: tensor[i] = newField(lattice, T)
-  return Tensor[D, T](lattice: lattice, shape: shape, components: tensor)
+  return Tensor[D, T](ctx: ctx, lattice: lattice, shape: shape, components: tensor)
+
+proc newTensor*[D: static[int]](
+  lattice: SimpleCubicLattice[D],
+  shape: seq[int],
+  T: typedesc
+): Tensor[D, T] = lattice.newTensor(shape, defaultCtx, T)
+
+proc newTensor*[R: static[int], D: static[int]](
+  lattice: SimpleCubicLattice[D],
+  shape: array[R, int],
+  ctx: TensorContext,
+  T: typedesc
+): Tensor[D, T] =
+  var s = newSeq[int](R)
+  for i in 0..<R: s[i] = shape[i]
+  return newTensor(lattice, s, ctx, T)
 
 proc newTensor*[R: static[int], D: static[int]](
   lattice: SimpleCubicLattice[D],
   shape: array[R, int],
   T: typedesc
-): Tensor[D, T] =
-  var s = newSeq[int](R)
-  for i in 0..<R: s[i] = shape[i]
-  return newTensor(lattice, s, T)
+): Tensor[D, T] = lattice.newTensor(shape, defaultCtx, T)
+
+proc newTensor*[D: static[int]](
+  lattice: SimpleCubicLattice[D],
+  ctx: TensorContext,
+  T: typedesc
+): Tensor[D, T] = newTensor(lattice, @[1], ctx, T)
 
 proc newTensor*[D: static[int]](
   lattice: SimpleCubicLattice[D],
   T: typedesc
-): Tensor[D, T] = newTensor(lattice, @[1], T)
+): Tensor[D, T] = newTensor(lattice, @[1], defaultCtx, T)
 
 proc newGaugeTensor*[D: static[int]](
   lattice: SimpleCubicLattice[D],
   shape: seq[int],
+  ctx: TensorContext,
   T: typedesc
 ): GaugeTensor[D, T] =
   ## Create a new GaugeTensor
@@ -121,7 +158,7 @@ proc newGaugeTensor*[D: static[int]](
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
   ## let gaugeTensor = newGaugeTensor(lattice, @[3, 3], float)
   ## ```
-  for i in 0..<D: result[i] = newTensor(lattice, shape, T)
+  for i in 0..<D: result[i] = newTensor(lattice, shape, ctx, T)
 
 #[ accessors ]#
 
@@ -507,12 +544,18 @@ template inverse*[D: static[int], T](tensor: Tensor[D, T]): Tensor[D, T] =
   assert tensor.rank == 2, "Inverse only defined for rank-2 tensors"
   assert tensor.shape[0] == tensor.shape[1], "Inverse requires square matrix"
   
-  let det = tensor.determinant()
-  let adj = tensor.adjugate()
-  
   var inv = newTensor(tensor.lattice, tensor.shape): T
-  for i in 0..<tensor.numComponents():
-    inv.components[i] := adj.components[i] / det
+
+  case tensor.ctx.group:
+  of gkUnitary, gkSpecialUnitary:
+    when isComplex(T): inv = tensor.complexTranspose()
+    else: inv = tensor.transpose()
+  of gkNone:
+    let det = tensor.determinant()
+    let adj = tensor.adjugate()
+    for i in 0..<tensor.numComponents(): 
+      inv.components[i] := adj.components[i] / det
+  
   inv
 
 template frobeniusNorm2*[D: static[int]](tensor: Tensor[D, float]): Field[D, float] =

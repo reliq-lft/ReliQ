@@ -233,15 +233,23 @@ proc shiftIndex*[D: static[int], T](
   view: LocalView[D, T];
   index, direction, shift: int
 ): int =
-  ## Get the shifted index accounting for ghost zones
+  ## Get the shifted index accounting for ghost zones and periodic boundaries
   ##
   ## Parameters:
   ## - `view`: The LocalView instance
   ## - `index`: Linear index (row-major order)
+  ## - `direction`: Direction to shift (0, 1, 2, ...)
+  ## - `shift`: Amount to shift (can be positive or negative)
   ##
   ## Returns:
-  ## The shifted linear index including ghost zones
+  ## The shifted linear index with proper boundary wrapping
   var coords = flatToCoords(index, view.dims)
-  for i in 0..<D:
-    if i == direction: coords[i] += shift
+  
+  # Apply shift in the specified direction with periodic wrapping
+  if direction >= 0 and direction < D:
+    coords[direction] = (coords[direction] + shift) mod view.dims[direction]
+    # Handle negative modulo result
+    if coords[direction] < 0:
+      coords[direction] += view.dims[direction]
+  
   return coordsToFlat(coords, view.dims)
