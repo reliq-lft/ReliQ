@@ -97,8 +97,11 @@ if __name__ == '__main__':
     }
     for var, value in env_vars.items(): os.environ[var] = value
 
+    # assertions
+    assert int(XXX_NUM_THREADS) % 2 == 0, "number of threads must be a power of 2"
+
     # execute ReliQ program
     cmd = str(SWD / 'external' / 'bin' / 'mpirun')
-    cmd += ' -np ' + args.ntasks
+    cmd += ' -np ' + str(int(args.ntasks) + 1)
     cmd += ' ' + str(SWD / 'bin' / args.executable)
     subprocess.run(cmd, shell = True, check = True)
