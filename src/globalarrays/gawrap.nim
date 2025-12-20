@@ -93,6 +93,15 @@ proc GA_Nodeid*(): cint {.importc: "GA_Nodeid", ga.}
 
 proc GA_Nnodes*(): cint {.importc: "GA_Nnodes", ga.}
 
+#[ GlobalArrays global operations ]#
+
+# GlobalArrays global operations for doubles and integers
+proc GA_Dgop*(x: ptr float64, n: cint, op: cstring) 
+  {.importc: "GA_Dgop", ga, discardable.}
+  
+proc GA_Igop*(x: ptr clong, n: cint, op: cstring) 
+  {.importc: "GA_Igop", ga, discardable.}
+
 #[ unit tests ]#
 
 when isMainModule:

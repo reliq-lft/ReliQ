@@ -637,6 +637,54 @@ template `^`*[D: static[int], T](base: Field[D, T], exponent: Field[D, T]): Fiel
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], ev[n])
   r
 
+#[ reduction ]#
+
+template sumField*[D: static[int], T](f: Field[D, T]): T =
+  ## Compute the sum of all elements in the field
+  ##
+  ## Parameters:
+  ## - `f`: Field instance
+  ##
+  ## Returns:
+  ## The sum of all elements in the field
+  when isComplex(T):
+    # Handle complex types by summing real and imaginary parts separately
+    let fv = f.localField()
+    when isComplex32(T):
+      let realSumLocal = sum[float32](0, f.numSites(), n): fv[n].re
+      let imagSumLocal = sum[float32](0, f.numSites(), n): fv[n].im
+      # Global reduction across all MPI ranks using GlobalArrays
+      let realSumGlobal = gaGlobalSumFloat32(unsafeAddr realSumLocal)
+      let imagSumGlobal = gaGlobalSumFloat32(unsafeAddr imagSumLocal)
+      complex(realSumGlobal, imagSumGlobal)
+    elif isComplex64(T):
+      let realSumLocal = sum[float64](0, f.numSites(), n): fv[n].re
+      let imagSumLocal = sum[float64](0, f.numSites(), n): fv[n].im
+      # Global reduction across all MPI ranks using GlobalArrays
+      let realSumGlobal = gaGlobalSumFloat64(unsafeAddr realSumLocal)
+      let imagSumGlobal = gaGlobalSumFloat64(unsafeAddr imagSumLocal)
+      complex(realSumGlobal, imagSumGlobal)
+  else:
+    # Handle real/integer types directly
+    let fv = f.localField()
+    let localSum = sum[T](0, f.numSites(), n): fv[n]
+    # Global reduction across all MPI ranks using GlobalArrays
+    when T is float64: gaGlobalSumFloat64(unsafeAddr localSum)
+    elif T is float32: gaGlobalSumFloat32(unsafeAddr localSum)
+    elif T is int32: gaGlobalSumInt32(unsafeAddr localSum)
+    elif T is int64: gaGlobalSumInt64(unsafeAddr localSum)
+    else: {.error: "Unsupported type for global sum reduction".}
+
+template sum*[D: static[int], T](f: Field[D, T]): T =
+  ## Compute the sum of all elements in the field
+  ##
+  ## Parameters:
+  ## - `f`: Field instance
+  ##
+  ## Returns:
+  ## The sum of all elements in the field
+  sumField(f)
+
 #[ unit tests ]#
 
 test:
@@ -714,6 +762,40 @@ test:
     assert localCD[n] == complex(5.0, 0.0), "got: " & $localCD[n]
   
   echo "field promotion tests passed"
+
+  # Test sum reduction
+  fieldA := 1.0
+  let sumA = fieldA.sum()
+  let expectedSumA = float64(fieldA.numSites()) * float64(numRanks())
+  assert abs(sumA - expectedSumA) < 1e-10, "Sum test failed: got " & $sumA & ", expected " & $expectedSumA
+  
+  fieldB := 2.5
+  let sumB = fieldB.sum()
+  let expectedSumB = 2.5 * float64(fieldB.numSites()) * float64(numRanks())
+  assert abs(sumB - expectedSumB) < 1e-10, "Sum test failed: got " & $sumB & ", expected " & $expectedSumB
+  assert abs(sumB - expectedSumB) < 1e-10, "Sum test failed: got " & $sumB & ", expected " & $expectedSumB
+  
+  # Test sum with different values - use a simple pattern for the test
+  fieldA := 0.0  # Reset to zero first
+  var localFieldA = fieldA.localField()
+  for n in 0..<localFieldA.numSites():
+    localFieldA[n] = float64(n)
+  
+  let sumSequential = fieldA.sum()
+  var expectedSequential = 0.0
+  for n in 0..<fieldA.numSites():
+    expectedSequential += float64(n)
+  expectedSequential *= float64(numRanks())  # Scale by number of ranks
+  assert abs(sumSequential - expectedSequential) < 1e-10, "Sequential sum test failed: got " & $sumSequential & ", expected " & $expectedSequential
+  
+  # Test complex sum
+  cfieldA := complex(1.0, 2.0)
+  let sumCA = cfieldA.sum()
+  let expectedSumCA = complex(1.0, 2.0) * float64(cfieldA.numSites()) * float64(numRanks())
+  assert abs(sumCA.re - expectedSumCA.re) < 1e-10 and abs(sumCA.im - expectedSumCA.im) < 1e-10, 
+    "Complex sum test failed: got " & $sumCA & ", expected " & $expectedSumCA
+  
+  echo "field sum tests passed"
   
   var rfieldD = cfieldD.re
   var ifieldD = cfieldD.im

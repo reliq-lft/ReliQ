@@ -42,6 +42,47 @@ proc initMPI*(argc: ptr cint, argv: ptr cstringArray): cint
 
 proc finalizeMPI*(): cint {.importc: "MPI_Finalize", mpi, discardable.}
 
+#[ MPI communication ]#
+
+# Import raw MPI_Allreduce function
+proc MPI_Allreduce*(
+  sendbuf: pointer, 
+  recvbuf: pointer, 
+  count: cint, 
+  datatype: cint, 
+  op: cint, 
+  comm: cint
+): cint {.importc: "MPI_Allreduce", mpi, discardable.}
+
+# MPI constants
+var MPI_COMM_WORLD* {.importc: "MPI_COMM_WORLD", mpi.}: cint
+var MPI_SUM* {.importc: "MPI_SUM", mpi.}: cint
+var MPI_DOUBLE* {.importc: "MPI_DOUBLE", mpi.}: cint
+var MPI_FLOAT* {.importc: "MPI_FLOAT", mpi.}: cint
+var MPI_INT* {.importc: "MPI_INT", mpi.}: cint
+var MPI_LONG_LONG* {.importc: "MPI_LONG_LONG", mpi.}: cint
+
+# MPI_Allreduce wrappers for different types
+proc allReduceFloat64*(sendbuf: ptr float64, recvbuf: ptr float64, count: cint): cint =
+  if sendbuf.isNil or recvbuf.isNil:
+    raise newException(ValueError, "Null pointer passed to allReduceFloat64")
+  return MPI_Allreduce(cast[pointer](sendbuf), cast[pointer](recvbuf), count, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD)
+
+proc allReduceFloat32*(sendbuf: ptr float32, recvbuf: ptr float32, count: cint): cint =
+  if sendbuf.isNil or recvbuf.isNil:
+    raise newException(ValueError, "Null pointer passed to allReduceFloat32")
+  return MPI_Allreduce(cast[pointer](sendbuf), cast[pointer](recvbuf), count, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD)
+
+proc allReduceInt32*(sendbuf: ptr int32, recvbuf: ptr int32, count: cint): cint =
+  if sendbuf.isNil or recvbuf.isNil:
+    raise newException(ValueError, "Null pointer passed to allReduceInt32")
+  return MPI_Allreduce(cast[pointer](sendbuf), cast[pointer](recvbuf), count, MPI_INT, MPI_SUM, MPI_COMM_WORLD)
+
+proc allReduceInt64*(sendbuf: ptr int64, recvbuf: ptr int64, count: cint): cint =
+  if sendbuf.isNil or recvbuf.isNil:
+    raise newException(ValueError, "Null pointer passed to allReduceInt64")
+  return MPI_Allreduce(cast[pointer](sendbuf), cast[pointer](recvbuf), count, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD)
+
 #[ unit tests ]#
 
 when isMainModule:
