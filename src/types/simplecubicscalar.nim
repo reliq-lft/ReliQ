@@ -257,7 +257,7 @@ template `-`*[D: static[int], T](a, b: SimpleCubicField[D, T]): SimpleCubicField
 
 # collects identifiers from syntax tree and transforms them into view declarations
 proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: NimNode) =
-  when defined(MACRO_DEBUG): echo node.repr, " -> ", node.kind
+  when defined(MACRO_DEBUG): print node.repr, " -> ", node.kind
   case node.kind:
     of nnkIdent, nnkSym, nnkBracketExpr, nnkDotExpr, nnkCall: # treat whole expr as identifier
       let identStr = node.repr
@@ -282,7 +282,7 @@ proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: N
     of nnkPar: # parenthesized expressions
       assn.declViews(repls, node[0])
     else: 
-      when defined(MACRO_DEBUG): echo "  (ignoring node kind: ", node.kind, ")"
+      when defined(MACRO_DEBUG): print "  (ignoring node kind: ", node.kind, ")"
 
 # transform rhs AST into indexed access of views
 proc promoteAST(repls: Table[string, string]; node: NimNode): NimNode =
@@ -760,7 +760,7 @@ test:
   for n in 0..<localCD.numSites():
     assert localCD[n] == complex(5.0, 0.0), "got: " & $localCD[n]
   
-  echo "field promotion tests passed"
+  print "field promotion tests passed"
 
   # Test sum reduction
   fieldA := 1.0
@@ -794,7 +794,7 @@ test:
   assert abs(sumCA.re - expectedSumCA.re) < 1e-10 and abs(sumCA.im - expectedSumCA.im) < 1e-10, 
     "Complex sum test failed: got " & $sumCA & ", expected " & $expectedSumCA
   
-  echo "field sum tests passed"
+  print "field sum tests passed"
   
   var rfieldD = cfieldD.re
   var ifieldD = cfieldD.im
@@ -810,7 +810,7 @@ test:
   for n in 0..<cfieldE.localSimpleCubicField().numSites():
     assert localE[n] == complex(5.0, 0.0)
   
-  echo "field conversion tests passed"
+  print "field conversion tests passed"
 
   cfieldE := cfieldD * cfieldD.adj 
   var fieldE = cfieldD.norm2
@@ -933,7 +933,7 @@ test:
   for n in 0..<localFsqrtSq.numSites():
     assert abs(localFsqrtSq[n] - 9.0) < 1e-10  # (sqrt(9))^2 = 9
 
-  echo "comprehensive mathematical operation tests passed"
+  print "comprehensive mathematical operation tests passed"
 
   let paddedSimpleCubicField = fieldD.toPaddedSimpleCubicField([1, 1, 1, 1])
   let tightSimpleCubicField = paddedSimpleCubicField.toTightSimpleCubicField()
@@ -952,8 +952,8 @@ test:
 
   paddedSimpleCubicField.exchange()
 
-  echo "grid conversion tests passed"
+  print "grid conversion tests passed"
 
   ## --
 
-  echo "scalarfield.nim tests passed"
+  print "scalarfield.nim tests passed"

@@ -38,6 +38,8 @@ import utils/[complex]
 
 type Group = enum
   gkNone,
+  gkOrthogonal,
+  gkSpecialOrthogonal,
   gkUnitary,
   gkSpecialUnitary
 
@@ -547,9 +549,12 @@ template inverse*[D: static[int], T](tensor: SimpleCubicTensor[D, T]): SimpleCub
   var inv = newSimpleCubicTensor(tensor.lattice, tensor.shape): T
 
   case tensor.ctx.group:
+  of gkOrthogonal, gkSpecialOrthogonal:
+    inv = tensor.transpose()
   of gkUnitary, gkSpecialUnitary:
     when isComplex(T): inv = tensor.complexTranspose()
-    else: inv = tensor.transpose()
+    else: 
+      raise newException ValueError, "complex transpose only defined for complex types"
   of gkNone:
     let det = tensor.determinant()
     let adj = tensor.adjugate()
@@ -907,7 +912,7 @@ test:
     assert(abs(id4_01_view[i]) < 1e-9, "Inverse 4x4: M*M^(-1) [0,1] != 0")
     assert(abs(id4_12_view[i]) < 1e-9, "Inverse 4x4: M*M^(-1) [1,2] != 0")
   
-  echo "Process ", myRank(), "/", numRanks(), ": All adjugate and inverse tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": All adjugate and inverse tests passed!"
   
   # Test matrix-vector multiplication
   var Mmv = newSimpleCubicTensor(lattice, @[3, 3]): float
@@ -962,13 +967,13 @@ test:
     assert(abs(o10_view[i] - 8.0) < 1e-10, "Outer product [1,0] failed")
     assert(abs(o21_view[i] - 15.0) < 1e-10, "Outer product [2,1] failed")
   
-  echo "Process ", myRank(), "/", numRanks(), ": All matrix-vector and outer product tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": All matrix-vector and outer product tests passed!"
   
   # Test compound operations
   A += B
   A *= 2.0
   
-  echo "Process ", myRank(), "/", numRanks(), ": All SimpleCubicTensor tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": All SimpleCubicTensor tests passed!"
   
   # Test complex tensor
   var CT = newSimpleCubicTensor(lattice, @[2, 2]): Complex64
@@ -985,7 +990,7 @@ test:
     assert(abs(val.re - 2.0) < 1e-10, "Complex trace real part should be 2.0")
     assert(abs(val.im) < 1e-10, "Complex trace imag part should be 0.0")
   
-  echo "Process ", myRank(), "/", numRanks(), ": All complex tensor tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": All complex tensor tests passed!"
   
   # Test Frobenius norm for real tensor
   var FN = newSimpleCubicTensor(lattice, @[2, 2]): float
@@ -1034,7 +1039,7 @@ test:
     # tr(CT† CT) = 4, |4| = 4
     let expected = 4.0
     assert(abs(ctnormView[i] - expected) < 1e-10, "Complex trace norm failed")
-  echo "Process ", myRank(), "/", numRanks(), ": All norm tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": All norm tests passed!"
 
   # Test tensor padding conversion with a fresh tensor
   var testSimpleCubicTensor = newSimpleCubicTensor(lattice, @[2, 2]): float
@@ -1068,4 +1073,4 @@ test:
       assert abs(originalView[j] - paddedView[j]) < 1e-10, "Padded tensor assignment mismatch"
       assert abs(tightView[j] - paddedView[j]) < 1e-10, "Tight-padded tensor assignment mismatch"
       
-  echo "Process ", myRank(), "/", numRanks(), ": SimpleCubicTensor padding conversion tests passed!"
+  print "Process ", myRank(), "/", numRanks(), ": SimpleCubicTensor padding conversion tests passed!"

@@ -241,14 +241,14 @@ template transport*[D: static[int], T](
 
 test:
   # ===== Test 1: Transporter Constructors =====
-  #echo "Test 1: Transporter constructors..."
+  #print "Test 1: Transporter constructors..."
   let lattice = newSimpleCubicLattice([8, 8, 8, 16], ghostGrid = [1, 1, 1, 1])
   let transporter1 = newTransporter(lattice, 0, 1)
   
   assert transporter1.kind == tkShift, "Transporter 1 should be tkShift"
   assert transporter1.direction == 0, "Transporter 1 direction should be 0"
   assert transporter1.distance == 1, "Transporter 1 distance should be 1"
-  echo "simple transporter created correctly"
+  print "simple transporter created correctly"
 
   var transporterSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
   let transporter2 = newTransporter(transporterSimpleCubicField, 1, -1)
@@ -256,10 +256,10 @@ test:
   assert transporter2.kind == tkCovariantShift, "Transporter 2 should be tkCovariantShift"
   assert transporter2.direction == 1, "Transporter 2 direction should be 1"
   assert transporter2.distance == -1, "Transporter 2 distance should be -1"
-  echo "covariant transporter created correctly"
+  print "covariant transporter created correctly"
 
   # ===== Test 2: Transporter Array Factory =====
-  #echo "\nTest 2: Transporter array factory..."
+  #print "\nTest 2: Transporter array factory..."
   let distances: array[4, int] = [1, -1, 1, -1]
   var transporters: Transporters[4, float] = newTransporters(lattice, distances)
   
@@ -267,10 +267,10 @@ test:
   for dir in 0..<4:
     assert transporters[dir].direction == dir, "Direction mismatch at " & $dir
     assert transporters[dir].distance == distances[dir], "Distance mismatch at " & $dir
-  echo "transporter array created with correct properties"
+  print "transporter array created with correct properties"
 
   # ===== Test 3: transport =====
-  #echo "\nTest 3: Shift operation..."
+  #print "\nTest 3: Shift operation..."
   for i in 0..<lattice.D:
     let transporter = lattice.newTransporter(i, 1)
     var field = lattice.newSimpleCubicTensor([4, 4]): float
@@ -290,11 +290,11 @@ test:
     #  idx[i] = j
     #  let after = tfieldView[idx]
     #  assert after == -float(j-1), "Shift failed at index " & $j & " and direction " & $i & " (got " & $after & ", expected " & $(-float(j-1)) & ")"
-  echo "shift operation successful for all directions"
+  print "shift operation successful for all directions"
 
   #[
   # ===== Test 3: Index Arithmetic - flatToCoords =====
-  echo "\nTest 3: Index arithmetic - flatToCoords..."
+  print "\nTest 3: Index arithmetic - flatToCoords..."
   let dims: array[4, int] = [8, 8, 8, 16]
   
   # Test 0: Should map to [0,0,0,0]
@@ -316,10 +316,10 @@ test:
   # Test larger index: flat=128 (16*8) → [0,1,0,0]
   let coords_128 = flatToCoords(128, dims)
   assert coords_128 == [0, 1, 0, 0], "Index 128 should map to [0,1,0,0]"
-  echo "  ✓ flatToCoords conversions correct"
+  print "  ✓ flatToCoords conversions correct"
 
   # ===== Test 4: Index Arithmetic - coordsToFlat =====
-  echo "\nTest 4: Index arithmetic - coordsToFlat..."
+  print "\nTest 4: Index arithmetic - coordsToFlat..."
   
   # Test [0,0,0,0]: Should map to 0
   let flat_0 = coordsToFlat([0, 0, 0, 0], dims)
@@ -336,20 +336,20 @@ test:
   # Test [0,1,0,0]: Should map to 128 (8*16)
   let flat_128 = coordsToFlat([0, 1, 0, 0], dims)
   assert flat_128 == 128, "[0,1,0,0] should map to 128"
-  echo "  ✓ coordsToFlat conversions correct"
+  print "  ✓ coordsToFlat conversions correct"
 
   # ===== Test 5: Round-trip Index Conversion =====
-  echo "\nTest 5: Round-trip index conversions..."
+  print "\nTest 5: Round-trip index conversions..."
   for n in 0..<(dims[0] * dims[1] * dims[2] * dims[3]):
     let coords = flatToCoords(n, dims)
     let flatAgain = coordsToFlat(coords, dims)
     assert flatAgain == n, "Round-trip failed at index " & $n
-  echo "  ✓ All round-trip conversions successful"
+  print "  ✓ All round-trip conversions successful"
 
   # ===== Test 6: Shift Coordinates with Ghost Offset =====
   ]#
   #[
-  echo "\nTest 6: Shift coordinates with ghost offsets..."
+  print "\nTest 6: Shift coordinates with ghost offsets..."
   let localDims: array[4, int] = [8, 8, 8, 16]
   let ghostWidth: array[4, int] = [1, 1, 1, 1]
   
@@ -367,12 +367,12 @@ test:
   # Shift in direction 0 by +1 → [2,1,1,1]
   let shifted_0 = shiftCoords([0, 0, 0, 0], 0, 1, localDims, ghostWidth)
   assert shifted_0 == [2, 1, 1, 1], "Shift [0,0,0,0] in dir 0 by +1 should be [2,1,1,1]"
-  echo "  ✓ Shift coordinate calculations correct"
+  print "  ✓ Shift coordinate calculations correct"
   ]#
 
   #[
   # ===== Test 7: Simple Shift Transport =====
-  echo "\nTest 7: Simple shift transport operation..."
+  print "\nTest 7: Simple shift transport operation..."
   var field1 = lattice.newSimpleCubicTensor(@[4, 4]): float
   var field1View = field1.components[0].localSimpleCubicField()
   for j in 0..<field1.numSites():
@@ -382,10 +382,10 @@ test:
   assert transporter1.kind == tkShift, "Transporter should be tkShift"
   assert field1.shape == @[4, 4], "SimpleCubicField shape should match"
   assert transportedSimpleCubicField1.shape == @[4, 4], "Transported field shape should match"
-  echo "  ✓ Simple shift transport operation successful"
+  print "  ✓ Simple shift transport operation successful"
 
   # ===== Test 8: Covariant Transport with Identity Gauge =====
-  echo "\nTest 8: Covariant transport with identity gauge..."
+  print "\nTest 8: Covariant transport with identity gauge..."
   var gaugeSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
   var gaugeView = gaugeSimpleCubicField.components[0].localSimpleCubicField()
   for j in 0..<gaugeSimpleCubicField.numSites():
@@ -396,10 +396,10 @@ test:
   assert covariantTransporter.kind == tkCovariantShift, "Should be covariant transporter"
   assert gaugeSimpleCubicField.shape == @[4, 4], "Gauge field shape should match"
   assert transportedGaugeSimpleCubicField.shape == @[4, 4], "Transported gauge field shape should match"
-  echo "  ✓ Covariant transport operation successful"
+  print "  ✓ Covariant transport operation successful"
 
   # ===== Test 9: Multi-direction Transport =====
-  echo "\nTest 9: Multi-direction transport array..."
+  print "\nTest 9: Multi-direction transport array..."
   # Verify all transporters were created successfully
   var allCreated = true
   for dir in 0..<4:
@@ -407,15 +407,15 @@ test:
       allCreated = false
       break
   assert allCreated, "All transporters should be created with correct directions"
-  echo "  ✓ Multi-direction transport array created successfully"
+  print "  ✓ Multi-direction transport array created successfully"
 
   # ===== Test 10: Operator Overload (* syntax) =====
-  echo "\nTest 10: Operator overload for transporter * tensor..."
+  print "\nTest 10: Operator overload for transporter * tensor..."
   assert transporter1.kind == tkShift, "Operator should work with shift transporters"
-  echo "  ✓ Operator overload template defined"
+  print "  ✓ Operator overload template defined"
 
   # ===== Test 11: Multiple Consecutive Shifts =====
-  echo "\nTest 11: Multiple consecutive shifts..."
+  print "\nTest 11: Multiple consecutive shifts..."
   # NOTE: KNOWN LIMITATION - Disabled due to GlobalArrays library limitation
   # When multiple transport operations are performed and new tensors are created
   # after the first transport completes, the GlobalArrays library enters a corrupted
@@ -429,35 +429,35 @@ test:
   # Single transport operations work correctly (Tests 7-8).
   # Multiple independent transport operations on separate fields would likely work,
   # but consecutive operations that require new tensor allocation fail.
-  echo "  ⊘ Test disabled - GlobalArrays state corruption (known limitation)"
+  print "  ⊘ Test disabled - GlobalArrays state corruption (known limitation)"
 
   # ===== Test 12: Getter Function =====
-  echo "\nTest 12: SimpleCubicTensor getter function..."
+  print "\nTest 12: SimpleCubicTensor getter function..."
   let retrievedSimpleCubicTensor = transporter2.getSimpleCubicTensor()
   assert retrievedSimpleCubicTensor.lattice == transporterSimpleCubicField.lattice, "Retrieved tensor should match original"
-  echo "  ✓ SimpleCubicTensor getter returns correct field"
+  print "  ✓ SimpleCubicTensor getter returns correct field"
 
   # ===== Test 13: Different Shift Distances =====
-  echo "\nTest 13: Different shift distances..."
+  print "\nTest 13: Different shift distances..."
   let distTransporter1 = newTransporter(lattice, 0, 1)
   let distTransporter2 = newTransporter(lattice, 0, -1)
   
   assert distTransporter1.distance == 1, "Forward distance should be +1"
   assert distTransporter2.distance == -1, "Backward distance should be -1"
-  echo "  ✓ Transporters with various distances created (transport calls disabled)"
+  print "  ✓ Transporters with various distances created (transport calls disabled)"
 
   # ===== Test 14: Backward and Forward Shifts =====
-  echo "\nTest 14: Backward and forward shift directions..."
+  print "\nTest 14: Backward and forward shift directions..."
   let forwardTransporter = newTransporter(lattice, 1, 1)
   let backwardTransporter = newTransporter(lattice, 1, -1)
   
   assert forwardTransporter.distance == 1, "Forward distance should be +1"
   assert backwardTransporter.distance == -1, "Backward distance should be -1"
   assert forwardTransporter.direction == backwardTransporter.direction, "Directions should match"
-  echo "  ✓ Forward and backward transporters created and validated (transport calls disabled)"
+  print "  ✓ Forward and backward transporters created and validated (transport calls disabled)"
 
   # ===== Test 15: Transporter Properties =====
-  echo "\nTest 15: Transporter property accessors..."
+  print "\nTest 15: Transporter property accessors..."
   
   for dir in 0..<4:
     assert transporters[dir].direction == dir, "Direction mismatch"
@@ -465,11 +465,11 @@ test:
   
   assert transporter1.kind == tkShift, "Kind should be tkShift"
   assert transporter2.kind == tkCovariantShift, "Kind should be tkCovariantShift"
-  echo "  ✓ All transporter properties correct"
+  print "  ✓ All transporter properties correct"
 
-  echo "\n" & separator
-  echo "ALL TESTS PASSED ✓"
-  echo separator & "\n"
+  print "\n" & separator
+  print "ALL TESTS PASSED ✓"
+  print separator & "\n"
   ]#
 
-  echo "transport.nim tests passed"
+  print "transport.nim tests passed"
