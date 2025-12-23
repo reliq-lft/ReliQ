@@ -36,7 +36,7 @@ import std/[math]
 
 import utils/[complex]
 
-type Field*[D: static[int], T] = object
+type SimpleCubicField*[D: static[int], T] = object
   ## Simple cubic field implementation
   ##
   ## Represents a field defined on a simple cubic lattice.
@@ -52,52 +52,52 @@ type Field*[D: static[int], T] = object
   else:
     field*: GlobalArray[D, T]
 
-proc newField*[D: static[int]](
+proc newSimpleCubicField*[D: static[int]](
   lattice: SimpleCubicLattice[D],
   T: typedesc
-): Field[D, T] =
-  ## Create a new Field
+): SimpleCubicField[D, T] =
+  ## Create a new SimpleCubicField
   ##
   ## Parameters:
   ## - `lattice`: SimpleCubicLattice on which the field is defined
   ##
   ## Returns:
-  ## A new Field instance
+  ## A new SimpleCubicField instance
   ## 
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
-  ## let field = lattice.newField(float)
-  ## let cfield = lattice.newField(Complex64)
+  ## let field = lattice.newSimpleCubicField(float)
+  ## let cfield = lattice.newSimpleCubicField(Complex64)
   ## ```
   let dimensions = lattice.dimensions
   let mpiGrid = lattice.mpiGrid
   let ghostGrid = lattice.ghostGrid
   when isComplex32(T):
-    return Field[D, T](
+    return SimpleCubicField[D, T](
       lattice: lattice,
       fieldRe: newGlobalArray(dimensions, mpiGrid, ghostGrid, float32),
       fieldIm: newGlobalArray(dimensions, mpiGrid, ghostGrid, float32)
     )
   elif isComplex64(T):
-    return Field[D, T](
+    return SimpleCubicField[D, T](
       lattice: lattice,
       fieldRe: newGlobalArray(dimensions, mpiGrid, ghostGrid, float64),
       fieldIm: newGlobalArray(dimensions, mpiGrid, ghostGrid, float64)
     )
   else: 
-    return Field[D, T](
+    return SimpleCubicField[D, T](
       lattice: lattice,
       field: newGlobalArray(dimensions, mpiGrid, ghostGrid, T)
     )
 
 #[ virtual accessors ]#
 
-proc numSites*[D: static[int], T](field: Field[D, T]): int =
+proc numSites*[D: static[int], T](field: SimpleCubicField[D, T]): int =
   ## Get the number of local sites in the field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `field`: SimpleCubicField instance
   ##
   ## Returns:
   ## The total number of local sites in the field
@@ -106,102 +106,102 @@ proc numSites*[D: static[int], T](field: Field[D, T]): int =
 
 #[ type conversion ]#
 
-template toComplex*[D: static[int], T](f: Field[D, T]): Field[D, Complex[T]] =
+template toComplex*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, Complex[T]] =
   ## Convert a real field to a complex field (imaginary part = 0)
   ##
   ## Parameters:
-  ## - `field`: Real Field instance
+  ## - `field`: Real SimpleCubicField instance
   ##
   ## Returns:
-  ## A complex Field with real part = field, imaginary part = 0
-  var result = f.lattice.newField(): Complex[T]
-  let fview = f.localField()
-  var rview = result.localField()
+  ## A complex SimpleCubicField with real part = field, imaginary part = 0
+  var result = f.lattice.newSimpleCubicField(): Complex[T]
+  let fview = f.localSimpleCubicField()
+  var rview = result.localSimpleCubicField()
   for i in every 0..<f.numSites(): rview[i] = complex(fview[i], 0.0)
   result
 
-template re*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+template re*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, T] =
   ## Extract the real part of a complex field
   ##
   ## Parameters:
-  ## - `field`: Complex Field instance
+  ## - `field`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A real Field containing the real parts
-  var result = f.lattice.newField(): T
-  let fview = f.localField()
-  var rview = result.localField()
+  ## A real SimpleCubicField containing the real parts
+  var result = f.lattice.newSimpleCubicField(): T
+  let fview = f.localSimpleCubicField()
+  var rview = result.localSimpleCubicField()
   for i in every 0..<f.numSites(): rview[i] = fview[i].re
   result
 
-template im*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+template im*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, T] =
   ## Extract the imaginary part of a complex field
   ##
   ## Parameters:
-  ## - `field`: Complex Field instance
+  ## - `field`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A real Field containing the imaginary parts
-  var result = f.lattice.newField(): T
-  let fview = f.localField()
-  var rview = result.localField()
+  ## A real SimpleCubicField containing the imaginary parts
+  var result = f.lattice.newSimpleCubicField(): T
+  let fview = f.localSimpleCubicField()
+  var rview = result.localSimpleCubicField()
   for i in every 0..<f.numSites(): rview[i] = fview[i].im
   result
 
 #[ grid conversion ]#
 
-template toPaddedField*[D: static[int], T](
-  tightField: Field[D, T],
+template toPaddedSimpleCubicField*[D: static[int], T](
+  tightSimpleCubicField: SimpleCubicField[D, T],
   ghostGrid: array[D, int]
-): Field[D, T] =
+): SimpleCubicField[D, T] =
   ## Convert a field to its padded version according to its lattice's ghost grid
   ##
   ## Parameters:
-  ## - `tightField`: Field instance
+  ## - `tightSimpleCubicField`: SimpleCubicField instance
   ## - `ghostGrid`: Array specifying ghost zone sizes in each dimension
   ##
   ## Returns:
-  ## A new Field with dimensions padded according to the lattice's ghost grid
+  ## A new SimpleCubicField with dimensions padded according to the lattice's ghost grid
   let paddedLattice = newSimpleCubicLattice(
-    tightField.lattice.dimensions,
-    tightField.lattice.mpiGrid,
+    tightSimpleCubicField.lattice.dimensions,
+    tightSimpleCubicField.lattice.mpiGrid,
     ghostGrid
   )
-  var paddedField = newField(paddedLattice): T
+  var paddedSimpleCubicField = newSimpleCubicField(paddedLattice): T
 
-  paddedField := tightField
+  paddedSimpleCubicField := tightSimpleCubicField
 
   # halo exchange
   when isComplex(T):
-    paddedField.fieldRe.updateGhosts()
-    paddedField.fieldIm.updateGhosts()
-  else: paddedField.field.updateGhosts()
+    paddedSimpleCubicField.fieldRe.updateGhosts()
+    paddedSimpleCubicField.fieldIm.updateGhosts()
+  else: paddedSimpleCubicField.field.updateGhosts()
 
-  paddedField
+  paddedSimpleCubicField
 
-template toTightField*[D: static[int], T](paddedField: Field[D, T]): Field[D, T] =
+template toTightSimpleCubicField*[D: static[int], T](paddedSimpleCubicField: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Convert a padded field to its tight version by removing ghost zones
   ##
   ## Parameters:
-  ## - `paddedField`: Field instance
+  ## - `paddedSimpleCubicField`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with dimensions tightened by removing ghost zones
+  ## A new SimpleCubicField with dimensions tightened by removing ghost zones
   let tightLattice = newSimpleCubicLattice(
-    paddedField.lattice.dimensions,
-    paddedField.lattice.mpiGrid
+    paddedSimpleCubicField.lattice.dimensions,
+    paddedSimpleCubicField.lattice.mpiGrid
   )
-  var tightField = newField(tightLattice): T
+  var tightSimpleCubicField = newSimpleCubicField(tightLattice): T
 
-  tightField := paddedField
+  tightSimpleCubicField := paddedSimpleCubicField
 
-  tightField
+  tightSimpleCubicField
 
-template exchange*[D: static[int], T](f: Field[D, T]) =
+template exchange*[D: static[int], T](f: SimpleCubicField[D, T]) =
   ## Perform halo exchange on the field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `field`: SimpleCubicField instance
   ##
   ## Returns:
   ## Nothing; performs in-place halo exchange
@@ -212,11 +212,11 @@ template exchange*[D: static[int], T](f: Field[D, T]) =
 
 #[ promotion ]#
 
-proc localField*[D: static[int], T](field: Field[D, T]): auto =
+proc localSimpleCubicField*[D: static[int], T](field: SimpleCubicField[D, T]): auto =
   ## Get the local view of the field
   ##
   ## Parameters:
-  ## - `field`: Field instance
+  ## - `field`: SimpleCubicField instance
   ##
   ## Returns:
   ## A LocalView (real) or ComplexLocalView (complex) representing the local 
@@ -233,8 +233,8 @@ proc localField*[D: static[int], T](field: Field[D, T]): auto =
     )
   else: field.field.localView()
 
-proc localField*(x: SomeInteger | SomeFloat): auto = x
-proc localField*[T](x: Complex[T]): auto = x
+proc localSimpleCubicField*(x: SomeInteger | SomeFloat): auto = x
+proc localSimpleCubicField*[T](x: Complex[T]): auto = x
 
 proc `[]`*(x: SomeInteger | SomeFloat; n: SomeInteger): auto = x
 proc `[]`*[T](x: Complex[T]; n: SomeInteger): auto = x
@@ -243,17 +243,17 @@ proc `[]`*[T](x: Complex[T]; n: SomeInteger): auto = x
 # "field1 * field2" can be written and passed to the promotion macro.
 # They should never actually be called at runtime - the promotion macro
 # intercepts them and generates fused loops instead.
-template `*`*[D: static[int], T](a, b: Field[D, T]): Field[D, T] =
-  {.error: "Field arithmetic operators should only be used within := promotion context".}
+template `*`*[D: static[int], T](a, b: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
+  {.error: "SimpleCubicField arithmetic operators should only be used within := promotion context".}
 
-template `/`*[D: static[int], T](a, b: Field[D, T]): Field[D, T] =
-  {.error: "Field arithmetic operators should only be used within := promotion context".}
+template `/`*[D: static[int], T](a, b: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
+  {.error: "SimpleCubicField arithmetic operators should only be used within := promotion context".}
 
-template `+`*[D: static[int], T](a, b: Field[D, T]): Field[D, T] =
-  {.error: "Field arithmetic operators should only be used within := promotion context".}
+template `+`*[D: static[int], T](a, b: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
+  {.error: "SimpleCubicField arithmetic operators should only be used within := promotion context".}
 
-template `-`*[D: static[int], T](a, b: Field[D, T]): Field[D, T] =
-  {.error: "Field arithmetic operators should only be used within := promotion context".}
+template `-`*[D: static[int], T](a, b: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
+  {.error: "SimpleCubicField arithmetic operators should only be used within := promotion context".}
 
 # collects identifiers from syntax tree and transforms them into view declarations
 proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: NimNode) =
@@ -268,8 +268,8 @@ proc declViews(assn: var seq[NimNode]; repls: var Table[string, string]; node: N
       let newIdentViewStr = newIdentStrD & "View"
       if not repls.hasKey(identStr):
         let ident = newIdentNode(newIdentViewStr)
-        let local = newCall(newIdentNode("localField"), node) 
-        assn.add newVarStmt(ident, local) # compiles to "var nodev = localField(node)"
+        let local = newCall(newIdentNode("localSimpleCubicField"), node) 
+        assn.add newVarStmt(ident, local) # compiles to "var nodev = localSimpleCubicField(node)"
         repls[identStr] = newIdentViewStr # store new name to make sure no repeats
     of nnkHiddenDeref:
       # Unwrap hidden dereference and process the inner node
@@ -350,9 +350,9 @@ template `:=`*(lhs, rhs: untyped) =
   ## ``` 
   ## into 
   ## ```
-  ## var fieldAView = fieldA.localField()
-  ## var fieldBView = fieldB.localField()
-  ## var fieldCView = fieldC.localField()
+  ## var fieldAView = fieldA.localSimpleCubicField()
+  ## var fieldBView = fieldB.localSimpleCubicField()
+  ## var fieldCView = fieldC.localSimpleCubicField()
   ## var numView = num
   ## forevery 0, fieldA.numSites(), n:
   ##   fieldAView[n] = fieldBView[n] + 2.0*fieldBView[n] - numView[n]*fieldCView[n]
@@ -378,8 +378,8 @@ template `+=`*(lhs, rhs: untyped) =
   ## ``` 
   ## into 
   ## ```
-  ## var fieldAView = fieldA.localField()
-  ## var fieldBView = fieldB.localField()
+  ## var fieldAView = fieldA.localSimpleCubicField()
+  ## var fieldBView = fieldB.localSimpleCubicField()
   ## forevery 0, fieldA.numSites(), n:
   ##   fieldAView[n] += fieldBView[n]
   ## ```
@@ -394,8 +394,8 @@ template `-=`*(lhs, rhs: untyped) =
   ## ``` 
   ## into 
   ## ```
-  ## var fieldAView = fieldA.localField()
-  ## var fieldBView = fieldB.localField()
+  ## var fieldAView = fieldA.localSimpleCubicField()
+  ## var fieldBView = fieldB.localSimpleCubicField()
   ## forevery 0, fieldA.numSites(), n:
   ##   fieldAView[n] -= fieldBView[n]
   ## ```
@@ -410,8 +410,8 @@ template `*=`*(lhs, rhs: untyped) =
   ## ``` 
   ## into 
   ## ```
-  ## var fieldAView = fieldA.localField()
-  ## var fieldBView = fieldB.localField()
+  ## var fieldAView = fieldA.localSimpleCubicField()
+  ## var fieldBView = fieldB.localSimpleCubicField()
   ## forevery 0, fieldA.numSites(), n:
   ##   fieldAView[n] *= fieldBView[n]
   ## ```
@@ -426,8 +426,8 @@ template `/=`*(lhs, rhs: untyped) =
   ## ``` 
   ## into 
   ## ```
-  ## var fieldAView = fieldA.localField()
-  ## var fieldBView = fieldB.localField()
+  ## var fieldAView = fieldA.localSimpleCubicField()
+  ## var fieldBView = fieldB.localSimpleCubicField()
   ## forevery 0, fieldA.numSites(), n:
   ##   fieldAView[n] /= fieldBView[n]
   ## ```
@@ -435,219 +435,219 @@ template `/=`*(lhs, rhs: untyped) =
 
 #[ mathematical operations ]#
 
-template adj*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, Complex[T]] =
+template adj*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, Complex[T]] =
   ## Compute the complex conjugate of a field
   ##
   ## Parameters:
-  ## - `f`: Complex Field instance
+  ## - `f`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A complex Field with conjugated values
-  var result = f.lattice.newField: Complex[T]
-  let fview = f.localField()
-  var rview = result.localField()
+  ## A complex SimpleCubicField with conjugated values
+  var result = f.lattice.newSimpleCubicField: Complex[T]
+  let fview = f.localSimpleCubicField()
+  var rview = result.localSimpleCubicField()
   for i in every 0..<f.numSites():
     let val = fview[i]
     rview[i] = complex(val.re, -val.im)
   result
 
-template norm2*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+template norm2*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, T] =
   ## Compute |z|² = re² + im² for each element
   ##
   ## Parameters:
-  ## - `f`: Complex Field instance
+  ## - `f`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A real Field containing |z|² values
-  var result = f.lattice.newField: T
-  let fview = f.localField()
-  var rview = result.localField()
+  ## A real SimpleCubicField containing |z|² values
+  var result = f.lattice.newSimpleCubicField: T
+  let fview = f.localSimpleCubicField()
+  var rview = result.localSimpleCubicField()
   for i in every 0..<f.numSites():
     let val = fview[i]
     rview[i] = val.re * val.re + val.im * val.im
   result
 
-template sqrt*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template sqrt*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise square root of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the square root applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the square root applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = sqrt(fv[n])
   r
 
-template norm*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+template norm*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, T] =
   ## Compute |z| = sqrt(re² + im²) for each element
   ##
   ## Parameters:
-  ## - `f`: Complex Field instance
+  ## - `f`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A real Field containing |z| values
+  ## A real SimpleCubicField containing |z| values
   var result = f.norm2()
   result = result.sqrt()
   result
 
-template exp*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template exp*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise exponential of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the exponential applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the exponential applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = exp(fv[n])
   r
 
-template ln*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template ln*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise natural logarithm of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the natural logarithm applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the natural logarithm applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = ln(fv[n])
   r
 
-template sin*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template sin*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise sine of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the sine applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the sine applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = sin(fv[n])
   r
 
-template cos*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template cos*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise cosine of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the cosine applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the cosine applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = cos(fv[n])
   r
 
-template tan*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template tan*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise tangent of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the tangent applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the tangent applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = tan(fv[n])
   r
 
-template abs*[D: static[int], T](f: Field[D, T]): Field[D, T] =
+template abs*[D: static[int], T](f: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise absolute value of field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
-  ## A new Field with the absolute value applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new SimpleCubicField with the absolute value applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = abs(fv[n])
   r
 
-template abs*[D: static[int], T](f: Field[D, Complex[T]]): Field[D, T] =
+template abs*[D: static[int], T](f: SimpleCubicField[D, Complex[T]]): SimpleCubicField[D, T] =
   ## Element-wise absolute value of complex field
   ##
   ## Parameters:
-  ## - `f`: Complex Field instance
+  ## - `f`: Complex SimpleCubicField instance
   ##
   ## Returns:
-  ## A new real Field with the absolute value (magnitude) applied element-wise
-  var r = f.lattice.newField: T
-  var rv = r.localField()
-  let fv = f.localField()
+  ## A new real SimpleCubicField with the absolute value (magnitude) applied element-wise
+  var r = f.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let fv = f.localSimpleCubicField()
   for n in every 0..<f.numSites(): rv[n] = abs(fv[n])
   r
 
-template `^`*[D: static[int], T](base: Field[D, T], exponent: T): Field[D, T] =
+template `^`*[D: static[int], T](base: SimpleCubicField[D, T], exponent: T): SimpleCubicField[D, T] =
   ## Element-wise power of field
   ##
   ## Parameters:
-  ## - `base`: Field instance (the base)
+  ## - `base`: SimpleCubicField instance (the base)
   ## - `exponent`: Exponent value
   ##
   ## Returns:
-  ## A new Field with the power applied element-wise
-  var r = base.lattice.newField: T
-  var rv = r.localField()
-  let bv = base.localField()
+  ## A new SimpleCubicField with the power applied element-wise
+  var r = base.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let bv = base.localSimpleCubicField()
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], exponent)
   r
 
-template `^`*[D: static[int], T](base: T, exponent: Field[D, T]): Field[D, T] =
+template `^`*[D: static[int], T](base: T, exponent: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise power of field
   ##
   ## Parameters:
   ## - `base`: Base value
-  ## - `exponent`: Field instance (the exponent)
+  ## - `exponent`: SimpleCubicField instance (the exponent)
   ##
   ## Returns:
-  ## A new Field with the power applied element-wise
-  var r = exponent.lattice.newField: T
-  var rv = r.localField()
-  let ev = exponent.localField()
+  ## A new SimpleCubicField with the power applied element-wise
+  var r = exponent.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let ev = exponent.localSimpleCubicField()
   for n in every 0..<exponent.numSites(): rv[n] = pow(base, ev[n])
   r
 
-template `^`*[D: static[int], T](base: Field[D, T], exponent: Field[D, T]): Field[D, T] =
+template `^`*[D: static[int], T](base: SimpleCubicField[D, T], exponent: SimpleCubicField[D, T]): SimpleCubicField[D, T] =
   ## Element-wise power of field
   ##
   ## Parameters:
-  ## - `base`: Field instance (the base)
-  ## - `exponent`: Field instance (the exponent)
+  ## - `base`: SimpleCubicField instance (the base)
+  ## - `exponent`: SimpleCubicField instance (the exponent)
   ##
   ## Returns:
-  ## A new Field with the power applied element-wise
-  var r = base.lattice.newField: T
-  var rv = r.localField()
-  let bv = base.localField()
-  let ev = exponent.localField()
+  ## A new SimpleCubicField with the power applied element-wise
+  var r = base.lattice.newSimpleCubicField: T
+  var rv = r.localSimpleCubicField()
+  let bv = base.localSimpleCubicField()
+  let ev = exponent.localSimpleCubicField()
   for n in every 0..<base.numSites(): rv[n] = pow(bv[n], ev[n])
   r
 
 #[ reduction ]#
 
-template sumField*[D: static[int], T](f: Field[D, T]): T =
+template sumSimpleCubicField*[D: static[int], T](f: SimpleCubicField[D, T]): T =
   ## Compute the sum of all elements in the field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
   ## The sum of all elements in the field
-  let fv = f.localField()
+  let fv = f.localSimpleCubicField()
   when isComplex(T): # Handle complex types by summing re and im parts separately
     when isComplex32(T):
       let realSumLocal = sum[float32](0, f.numSites(), n): fv[n].re
@@ -674,15 +674,15 @@ template sumField*[D: static[int], T](f: Field[D, T]): T =
     elif T is float64: gaGlobalSumFloat64(unsafeAddr localSum)
     else: {.error: "Unsupported type for global sum reduction".}
 
-template sum*[D: static[int], T](f: Field[D, T]): T =
+template sum*[D: static[int], T](f: SimpleCubicField[D, T]): T =
   ## Compute the sum of all elements in the field
   ##
   ## Parameters:
-  ## - `f`: Field instance
+  ## - `f`: SimpleCubicField instance
   ##
   ## Returns:
   ## The sum of all elements in the field
-  sumField(f)
+  sumSimpleCubicField(f)
 
 #[ unit tests ]#
 
@@ -692,20 +692,20 @@ test:
     [1, 1, 1, numRanks()],
     [0, 0, 0, 0]
   )  # Distribute 8xn across n processes
-  let field = lattice.newField: float64
-  let cfield = lattice.newField: Complex64
+  let field = lattice.newSimpleCubicField: float64
+  let cfield = lattice.newSimpleCubicField: Complex64
 
-  var fieldA = lattice.newField: float64
-  var fieldB = lattice.newField: float64
-  var fieldC = lattice.newField: float64 
-  var fieldD = lattice.newField: float64
+  var fieldA = lattice.newSimpleCubicField: float64
+  var fieldB = lattice.newSimpleCubicField: float64
+  var fieldC = lattice.newSimpleCubicField: float64 
+  var fieldD = lattice.newSimpleCubicField: float64
 
   fieldA := 2.0
   fieldB := 3.0
   fieldC := 4.0
   fieldD := fieldA + fieldB*fieldC - 5.0
 
-  let localD = fieldD.localField()
+  let localD = fieldD.localSimpleCubicField()
   for n in 0..<localD.numSites():
     assert localD[n] == 2.0 + 3.0*4.0 - 5.0, "got: " & $localD[n]
   
@@ -725,10 +725,10 @@ test:
   for n in 0..<localD.numSites():
     assert localD[n] == (2.0 + 3.0*4.0 - 5.0 + 1.0)*2.0 / 4.0 - 0.5, "got: " & $localD[n]
   
-  var cfieldA = lattice.newField: Complex64
-  var cfieldB = lattice.newField: Complex64
-  var cfieldC = lattice.newField: Complex64
-  var cfieldD = lattice.newField: Complex64
+  var cfieldA = lattice.newSimpleCubicField: Complex64
+  var cfieldB = lattice.newSimpleCubicField: Complex64
+  var cfieldC = lattice.newSimpleCubicField: Complex64
+  var cfieldD = lattice.newSimpleCubicField: Complex64
 
   cfieldA := complex(1.0, -1.0)
   cfieldB := complex(2.0, -2.0)
@@ -740,7 +740,7 @@ test:
   var cc = complex(3.0, -3.0)
   var cd = ca + cb*cc - complex(10.0, -10.0)
 
-  let localCD = cfieldD.localField()
+  let localCD = cfieldD.localSimpleCubicField()
   for n in 0..<localCD.numSites():
     assert localCD[n] == cd, "got: " & $localCD[n]
   
@@ -776,9 +776,9 @@ test:
   
   # Test sum with different values - use a simple pattern for the test
   fieldA := 0.0  # Reset to zero first
-  var localFieldA = fieldA.localField()
-  for n in 0..<localFieldA.numSites():
-    localFieldA[n] = float64(n)
+  var localSimpleCubicFieldA = fieldA.localSimpleCubicField()
+  for n in 0..<localSimpleCubicFieldA.numSites():
+    localSimpleCubicFieldA[n] = float64(n)
   
   let sumSequential = fieldA.sum()
   var expectedSequential = 0.0
@@ -799,121 +799,121 @@ test:
   var rfieldD = cfieldD.re
   var ifieldD = cfieldD.im
 
-  let localRD = rfieldD.localField()
-  let localID = ifieldD.localField()
+  let localRD = rfieldD.localSimpleCubicField()
+  let localID = ifieldD.localSimpleCubicField()
   for n in 0..<localCD.numSites():
     assert localRD[n] == 5.0
     assert localID[n] == 0.0
   
   var cfieldE = rfieldD.toComplex()
-  let localE = cfieldE.localField()
-  for n in 0..<cfieldE.localField().numSites():
+  let localE = cfieldE.localSimpleCubicField()
+  for n in 0..<cfieldE.localSimpleCubicField().numSites():
     assert localE[n] == complex(5.0, 0.0)
   
   echo "field conversion tests passed"
 
   cfieldE := cfieldD * cfieldD.adj 
   var fieldE = cfieldD.norm2
-  let clocalFE = cfieldE.localField()
-  let localFE = fieldE.localField()
+  let clocalFE = cfieldE.localSimpleCubicField()
+  let localFE = fieldE.localSimpleCubicField()
   for n in 0..<clocalFE.numSites():
     assert localFE[n] == clocalFE[n].re
 
   # Test sqrt function
   fieldD := 4.0
   fieldE = fieldD.sqrt
-  let localFsqrt = fieldE.localField()
+  let localFsqrt = fieldE.localSimpleCubicField()
   for n in 0..<localFsqrt.numSites():
     assert abs(localFsqrt[n] - 2.0) < 1e-10
 
   # Test exp function  
   fieldD := 0.0
   fieldE = fieldD.exp
-  let localFexp = fieldE.localField()
+  let localFexp = fieldE.localSimpleCubicField()
   for n in 0..<localFexp.numSites():
     assert abs(localFexp[n] - 1.0) < 1e-10
 
   # Test ln function
   fieldD := 1.0
   fieldE = fieldD.ln
-  let localFln = fieldE.localField()
+  let localFln = fieldE.localSimpleCubicField()
   for n in 0..<localFln.numSites():
     assert abs(localFln[n] - 0.0) < 1e-10
 
   # Test sin function
   fieldD := 0.0
   fieldE = fieldD.sin
-  let localFsin = fieldE.localField()
+  let localFsin = fieldE.localSimpleCubicField()
   for n in 0..<localFsin.numSites():
     assert abs(localFsin[n] - 0.0) < 1e-10
 
   # Test cos function
   fieldD := 0.0
   fieldE = fieldD.cos
-  let localFcos = fieldE.localField()
+  let localFcos = fieldE.localSimpleCubicField()
   for n in 0..<localFcos.numSites():
     assert abs(localFcos[n] - 1.0) < 1e-10
 
   # Test tan function
   fieldD := 0.0
   fieldE = fieldD.tan
-  let localFtan = fieldE.localField()
+  let localFtan = fieldE.localSimpleCubicField()
   for n in 0..<localFtan.numSites():
     assert abs(localFtan[n] - 0.0) < 1e-10
 
   # Test abs function  
   fieldD := -3.0
   fieldE = fieldD.abs
-  let localFabs = fieldE.localField()
+  let localFabs = fieldE.localSimpleCubicField()
   for n in 0..<localFabs.numSites():
     assert abs(localFabs[n] - 3.0) < 1e-10
 
   # Test norm function for complex fields
   cfieldD := complex(3.0, 4.0)
   fieldE = cfieldD.norm
-  let localFnorm = fieldE.localField()
+  let localFnorm = fieldE.localSimpleCubicField()
   for n in 0..<localFnorm.numSites():
     assert abs(localFnorm[n] - 5.0) < 1e-10  # sqrt(3^2 + 4^2) = 5
 
   # Test power operations: field^scalar
   fieldD := 2.0
   fieldE = fieldD ^ 3.0
-  let localFpow1 = fieldE.localField()
+  let localFpow1 = fieldE.localSimpleCubicField()
   for n in 0..<localFpow1.numSites():
     assert abs(localFpow1[n] - 8.0) < 1e-10  # 2^3 = 8
 
   # Test power operations: scalar^field  
   fieldD := 3.0
   fieldE = 2.0 ^ fieldD
-  let localFpow2 = fieldE.localField()
+  let localFpow2 = fieldE.localSimpleCubicField()
   for n in 0..<localFpow2.numSites():
     assert abs(localFpow2[n] - 8.0) < 1e-10  # 2^3 = 8
 
   # Test power operations: field^field
-  var fieldF = newField(lattice, float64)
+  var fieldF = newSimpleCubicField(lattice, float64)
   fieldD := 2.0
   fieldF := 3.0
   fieldE = fieldD ^ fieldF
-  let localFpow3 = fieldE.localField()
+  let localFpow3 = fieldE.localSimpleCubicField()
   for n in 0..<localFpow3.numSites():
     assert abs(localFpow3[n] - 8.0) < 1e-10  # 2^3 = 8
 
   # Test mathematical functions with more complex values
   fieldD := PI / 2.0  # π/2
   fieldE = fieldD.sin
-  let localFsinPi2 = fieldE.localField()
+  let localFsinPi2 = fieldE.localSimpleCubicField()
   for n in 0..<localFsinPi2.numSites():
     assert abs(localFsinPi2[n] - 1.0) < 1e-10  # sin(π/2) = 1
 
   fieldD := PI / 2.0  # π/2  
   fieldE = fieldD.cos
-  let localFcosPi2 = fieldE.localField()
+  let localFcosPi2 = fieldE.localSimpleCubicField()
   for n in 0..<localFcosPi2.numSites():
     assert abs(localFcosPi2[n] - 0.0) < 1e-10  # cos(π/2) = 0
 
   fieldD := PI / 4.0  # π/4
   fieldE = fieldD.tan
-  let localFtanPi4 = fieldE.localField()
+  let localFtanPi4 = fieldE.localSimpleCubicField()
   for n in 0..<localFtanPi4.numSites():
     assert abs(localFtanPi4[n] - 1.0) < 1e-10  # tan(π/4) = 1
 
@@ -921,7 +921,7 @@ test:
   fieldD := 2.0
   fieldE = fieldD.exp
   fieldE = fieldE.ln
-  let localFexpln = fieldE.localField()
+  let localFexpln = fieldE.localSimpleCubicField()
   for n in 0..<localFexpln.numSites():
     assert abs(localFexpln[n] - 2.0) < 1e-10  # ln(exp(2)) = 2
 
@@ -929,28 +929,28 @@ test:
   fieldD := 9.0
   fieldE = fieldD.sqrt 
   fieldE = fieldE ^ 2.0
-  let localFsqrtSq = fieldE.localField() 
+  let localFsqrtSq = fieldE.localSimpleCubicField() 
   for n in 0..<localFsqrtSq.numSites():
     assert abs(localFsqrtSq[n] - 9.0) < 1e-10  # (sqrt(9))^2 = 9
 
   echo "comprehensive mathematical operation tests passed"
 
-  let paddedField = fieldD.toPaddedField([1, 1, 1, 1])
-  let tightField = paddedField.toTightField()
+  let paddedSimpleCubicField = fieldD.toPaddedSimpleCubicField([1, 1, 1, 1])
+  let tightSimpleCubicField = paddedSimpleCubicField.toTightSimpleCubicField()
 
-  #tightField := fieldD
-  #paddedField := tightField
+  #tightSimpleCubicField := fieldD
+  #paddedSimpleCubicField := tightSimpleCubicField
 
-  let localPadded = paddedField.localField()
-  let localTight = tightField.localField()
-  let localOriginal = fieldD.localField()
+  let localPadded = paddedSimpleCubicField.localSimpleCubicField()
+  let localTight = tightSimpleCubicField.localSimpleCubicField()
+  let localOriginal = fieldD.localSimpleCubicField()
   
   for n in 0..<localOriginal.numSites():
     assert localPadded[n] == localOriginal[n]
     assert localTight[n] == localOriginal[n]
     assert localPadded[n] == localTight[n]
 
-  paddedField.exchange()
+  paddedSimpleCubicField.exchange()
 
   echo "grid conversion tests passed"
 

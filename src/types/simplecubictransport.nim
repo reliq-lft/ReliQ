@@ -1,7 +1,7 @@
 
 import reliq
-import scalarfield
-import tensorfield
+import simplecubicscalar
+import simplecubictensor
 
 import utils/[complex]
 
@@ -15,7 +15,7 @@ type Transporter*[D: static[int], T] = ref object of RootObj
   case kind*: TransporterKind
     of tkShift: discard
     of tkCovariantShift:
-      tensor*: Tensor[D, T]
+      tensor*: SimpleCubicTensor[D, T]
   lattice*: SimpleCubicLattice[D]
   direction*: int
   distance*: int
@@ -55,7 +55,7 @@ proc newTransporter*[D: static[int]](
   )
 
 proc newTransporter*[D: static[int], T](
-  tensor: Tensor[D, T],
+  tensor: SimpleCubicTensor[D, T],
   direction: int,
   distance: int = 1
 ): Transporter[D, T] =
@@ -72,8 +72,8 @@ proc newTransporter*[D: static[int], T](
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
-  ## let transporterField = lattice.newTensor(@[4, 4]): float
-  ## let transporter = newTranspoter(transporterField, 0, 1)
+  ## let transporterSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
+  ## let transporter = newTranspoter(transporterSimpleCubicField, 0, 1)
   ## ```
   for mu in 0..<D:
     let errMsg = "Transporter distance exceeds ghost cells in direction " & $mu
@@ -116,7 +116,7 @@ proc newTransporters*[D: static[int]](
   for dir in 0..<D: result[dir] = newTransporter(lattice, dir, distances[dir])
 
 proc newTransporters*[D: static[int], T](
-  transporters: GaugeTensor[D, T],
+  transporters: GaugeSimpleCubicTensor[D, T],
   distances: array[D, int] = defaultDistances[D]()
 ): Transporters[D, T] =
   ## Create an array of Transporters for all directions using covariant transporters
@@ -131,18 +131,18 @@ proc newTransporters*[D: static[int], T](
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
-  ## var transporterFields: array[4, Tensor[4, float]]
+  ## var transporterSimpleCubicFields: array[4, SimpleCubicTensor[4, float]]
   ## for dir in 0..<4:
-  ##   transporterFields[dir] = lattice.newTensor(@[4, 4]): float
+  ##   transporterSimpleCubicFields[dir] = lattice.newSimpleCubicTensor(@[4, 4]): float
   ## let distances = [1, 0, -1, 0]
-  ## let transporters = newTransporters(transporterFields, distances)
+  ## let transporters = newTransporters(transporterSimpleCubicFields, distances)
   ## ```
   for dir in 0..<D:
     result[dir] = newTransporter[D, T](transporters[dir], dir, distances[dir])
 
 #[ accessors ]#
 
-proc getTensor*[D: static[int], T](transporter: Transporter[D, T]): Tensor[D, T] =
+proc getSimpleCubicTensor*[D: static[int], T](transporter: Transporter[D, T]): SimpleCubicTensor[D, T] =
   ## Get the tensor field associated with a covariant transporter
   ##
   ## Parameters:
@@ -154,9 +154,9 @@ proc getTensor*[D: static[int], T](transporter: Transporter[D, T]): Tensor[D, T]
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16])
-  ## let transporterField = lattice.newTensor(@[4, 4]): float
-  ## let transporter = newTransporter(transporterField, 0, 1)
-  ## let tensor = transporter.getTensor()
+  ## let transporterSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
+  ## let transporter = newTransporter(transporterSimpleCubicField, 0, 1)
+  ## let tensor = transporter.getSimpleCubicTensor()
   ## ```
   assert transporter.kind == tkCovariantShift, "Transporter is not covariant"
   return transporter.tensor
@@ -165,8 +165,8 @@ proc getTensor*[D: static[int], T](transporter: Transporter[D, T]): Tensor[D, T]
 
 template transport*[D: static[int], T](
   transporter: Transporter[D, T],
-  tensor: Tensor[D, T]
-): Tensor[D, T] =
+  tensor: SimpleCubicTensor[D, T]
+): SimpleCubicTensor[D, T] =
   ## Transport a field using the specified transporter
   ##
   ## Parameters:
@@ -174,15 +174,15 @@ template transport*[D: static[int], T](
   ## - `field`: The field to be transported
   ##
   ## Returns:
-  ## A new Field instance representing the transported field
+  ## A new SimpleCubicField instance representing the transported field
   ##
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([8, 8, 8, 16], ghostGrid = [1, 1, 1, 1])
   ## let transporter = newTransporter(lattice, 0, 1)
-  ## var field = newField(lattice): float
+  ## var field = newSimpleCubicField(lattice): float
   ## field := 1.0
-  ## let shiftedField = transport(transporter, field)
+  ## let shiftedSimpleCubicField = transport(transporter, field)
   ## ```
   for i in 0..<D:
     let errMsg = "Transporter distance exceeds ghost cells in direction " & $i
@@ -193,7 +193,7 @@ template transport*[D: static[int], T](
   let head = (if dist > 0: 1 else: -1)
   let ghostWidth = tensor.lattice.ghostGrid
 
-  var result = newTensor(tensor.lattice, tensor.shape): T
+  var result = newSimpleCubicTensor(tensor.lattice, tensor.shape): T
 
   # halo exchange - only update in transport direction
   for i in 0..<tensor.components.len:
@@ -204,8 +204,8 @@ template transport*[D: static[int], T](
 
   # shift
   for ijk in 0..<tensor.numComponents():
-    var rView = result.components[ijk].localField()
-    var sView = tensor.components[ijk].localField()
+    var rView = result.components[ijk].localSimpleCubicField()
+    var sView = tensor.components[ijk].localSimpleCubicField()
 
     for n in every 0..<rView.numSites():
       rView[n] = sView[sView.shiftIndex(n, dir, dist)]
@@ -215,10 +215,10 @@ template transport*[D: static[int], T](
   case transporter.kind:
   of tkShift: discard
   of tkCovariantShift:
-    var trns = transporter.getTensor()
+    var trns = transporter.getSimpleCubicTensor()
 
     if head < 0: # shift backward-propagating link
-      var shiftedTrns = newTensor(trns.lattice, trns.shape): T
+      var shiftedTrns = newSimpleCubicTensor(trns.lattice, trns.shape): T
 
       # flip direction of transporting link: tensor contextualization ensures
       # that inverse is appropriate for group, if tensor represents group element
@@ -226,8 +226,8 @@ template transport*[D: static[int], T](
       
       # shift
       for ijk in 0..<tensor.numComponents():
-        var tView = trns.components[ijk].localField()
-        var sView = shiftedTrns.components[ijk].localField()
+        var tView = trns.components[ijk].localSimpleCubicField()
+        var sView = shiftedTrns.components[ijk].localSimpleCubicField()
 
         for n in every 0..<tView.numSites():
           sView[n] = tView[tView.shiftIndex(n, dir, dist)]
@@ -250,8 +250,8 @@ test:
   assert transporter1.distance == 1, "Transporter 1 distance should be 1"
   echo "simple transporter created correctly"
 
-  var transporterField = lattice.newTensor(@[4, 4]): float
-  let transporter2 = newTransporter(transporterField, 1, -1)
+  var transporterSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
+  let transporter2 = newTransporter(transporterSimpleCubicField, 1, -1)
   
   assert transporter2.kind == tkCovariantShift, "Transporter 2 should be tkCovariantShift"
   assert transporter2.direction == 1, "Transporter 2 direction should be 1"
@@ -273,8 +273,8 @@ test:
   #echo "\nTest 3: Shift operation..."
   for i in 0..<lattice.D:
     let transporter = lattice.newTransporter(i, 1)
-    var field = lattice.newTensor([4, 4]): float
-    var fieldView = field.components[0].localField()
+    var field = lattice.newSimpleCubicTensor([4, 4]): float
+    var fieldView = field.components[0].localSimpleCubicField()
     
     #for j in 0..<field.numSites(): fieldView[j] = float(j)
     #for j in 0..<lattice.dimensions[0]: 
@@ -284,7 +284,7 @@ test:
 
     var tfield = transporter.transport(field)
 
-    #let tfieldView = tfield.components[0].localField()
+    #let tfieldView = tfield.components[0].localSimpleCubicField()
     #for j in 1..<lattice.dimensions[0]:
     #  var idx: array[4, int]
     #  idx[i] = j
@@ -373,29 +373,29 @@ test:
   #[
   # ===== Test 7: Simple Shift Transport =====
   echo "\nTest 7: Simple shift transport operation..."
-  var field1 = lattice.newTensor(@[4, 4]): float
-  var field1View = field1.components[0].localField()
+  var field1 = lattice.newSimpleCubicTensor(@[4, 4]): float
+  var field1View = field1.components[0].localSimpleCubicField()
   for j in 0..<field1.numSites():
     field1View[j] = 42.0
   
-  let transportedField1 = transport(transporter1, field1)
+  let transportedSimpleCubicField1 = transport(transporter1, field1)
   assert transporter1.kind == tkShift, "Transporter should be tkShift"
-  assert field1.shape == @[4, 4], "Field shape should match"
-  assert transportedField1.shape == @[4, 4], "Transported field shape should match"
+  assert field1.shape == @[4, 4], "SimpleCubicField shape should match"
+  assert transportedSimpleCubicField1.shape == @[4, 4], "Transported field shape should match"
   echo "  ✓ Simple shift transport operation successful"
 
   # ===== Test 8: Covariant Transport with Identity Gauge =====
   echo "\nTest 8: Covariant transport with identity gauge..."
-  var gaugeField = lattice.newTensor(@[4, 4]): float
-  var gaugeView = gaugeField.components[0].localField()
-  for j in 0..<gaugeField.numSites():
+  var gaugeSimpleCubicField = lattice.newSimpleCubicTensor(@[4, 4]): float
+  var gaugeView = gaugeSimpleCubicField.components[0].localSimpleCubicField()
+  for j in 0..<gaugeSimpleCubicField.numSites():
     gaugeView[j] = 1.0
   
-  let covariantTransporter = newTransporter(gaugeField, 0, 1)
-  let transportedGaugeField = transport(covariantTransporter, gaugeField)
+  let covariantTransporter = newTransporter(gaugeSimpleCubicField, 0, 1)
+  let transportedGaugeSimpleCubicField = transport(covariantTransporter, gaugeSimpleCubicField)
   assert covariantTransporter.kind == tkCovariantShift, "Should be covariant transporter"
-  assert gaugeField.shape == @[4, 4], "Gauge field shape should match"
-  assert transportedGaugeField.shape == @[4, 4], "Transported gauge field shape should match"
+  assert gaugeSimpleCubicField.shape == @[4, 4], "Gauge field shape should match"
+  assert transportedGaugeSimpleCubicField.shape == @[4, 4], "Transported gauge field shape should match"
   echo "  ✓ Covariant transport operation successful"
 
   # ===== Test 9: Multi-direction Transport =====
@@ -432,10 +432,10 @@ test:
   echo "  ⊘ Test disabled - GlobalArrays state corruption (known limitation)"
 
   # ===== Test 12: Getter Function =====
-  echo "\nTest 12: Tensor getter function..."
-  let retrievedTensor = transporter2.getTensor()
-  assert retrievedTensor.lattice == transporterField.lattice, "Retrieved tensor should match original"
-  echo "  ✓ Tensor getter returns correct field"
+  echo "\nTest 12: SimpleCubicTensor getter function..."
+  let retrievedSimpleCubicTensor = transporter2.getSimpleCubicTensor()
+  assert retrievedSimpleCubicTensor.lattice == transporterSimpleCubicField.lattice, "Retrieved tensor should match original"
+  echo "  ✓ SimpleCubicTensor getter returns correct field"
 
   # ===== Test 13: Different Shift Distances =====
   echo "\nTest 13: Different shift distances..."

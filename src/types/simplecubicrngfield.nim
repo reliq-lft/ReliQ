@@ -34,7 +34,7 @@ type RandomNumberGenerator = enum
   rkKokkosXorShift1024
 
 type
-  RandomNumberGeneratorField[R: static[RandomNumberGenerator], D: static[int]] = object
+  SimpleCubicRNGField[R: static[RandomNumberGenerator], D: static[int]] = object
     lattice*: SimpleCubicLattice[D]
     seed*: uint64
     when R == rkKokkosXorShift64:
@@ -44,12 +44,19 @@ type
     else:
       rng*: ptr UncheckedArray[KokkosXorShiftRNG[1024]]
 
+#[ destructor ]#
+
+proc `=destroy`*[R: static[RandomNumberGenerator], D: static[int]](
+  field: SimpleCubicRNGField[R, D]
+) = 
+  if field.rng != nil: dealloc(field.rng)
+
 #[ constructor ]#
 
-template newRandomNumberGeneratorField*[R: static[RandomNumberGenerator]](
+template newSimpleCubicRNGField*[R: static[RandomNumberGenerator]](
   lattice: SimpleCubicLattice;
   globalSeed: uint64
-): RandomNumberGeneratorField[R, lattice.D] =
+): SimpleCubicRNGField[R, lattice.D] =
   ## Create a new RNG field for the given lattice and RNG type.
   ##
   ## Params:
@@ -57,7 +64,9 @@ template newRandomNumberGeneratorField*[R: static[RandomNumberGenerator]](
   ## - `globalSeed`: The global seed for the RNGs
   ##
   ## Returns:
-  ## A new RandomNumberGeneratorField instance
+  ## A new SimpleCubicRNGField instance
+  ## 
+  ## Seeding is done serially due to hangs in Kokkos RNG initialization in parallel.
   var localDimensions: array[lattice.D, int]
   let dimensions = lattice.dimensions
   let mpiGrid = lattice.mpiGrid
@@ -66,7 +75,7 @@ template newRandomNumberGeneratorField*[R: static[RandomNumberGenerator]](
   let numSites = dummy.numSites()
   let (lo, hi) = dummy.getBounds()
 
-  var result = RandomNumberGeneratorField[R, lattice.D](lattice: lattice, seed: globalSeed)
+  var result = SimpleCubicRNGField[R, lattice.D](lattice: lattice, seed: globalSeed)
   for i in 0..<lattice.D: localDimensions[i] = hi[i] - lo[i] + 1
 
   when R == rkKokkosXorShift64:
@@ -91,7 +100,7 @@ template newRandomNumberGeneratorField*[R: static[RandomNumberGenerator]](
 #[ sampling ]#
 
 proc uniform*[R: static[RandomNumberGenerator], D: static[int], T](
-  rngField: RandomNumberGeneratorField[R, D];
+  rngField: SimpleCubicRNGField[R, D];
   n: SomeInteger,
   start, stop: T
 ): T {.inline.} =
@@ -109,7 +118,7 @@ proc uniform*[R: static[RandomNumberGenerator], D: static[int], T](
   else: return rngField.rng[n].uniform(start, stop)
 
 proc gaussian*[R: static[RandomNumberGenerator], D: static[int]](
-  rngField: RandomNumberGeneratorField[R, D];
+  rngField: SimpleCubicRNGField[R, D];
   n: SomeInteger;
   T: typedesc
 ): T {.inline.} =
@@ -142,8 +151,8 @@ proc gaussian*[R: static[RandomNumberGenerator], D: static[int]](
 test:
   let dimensions = [8, 8, 8, 16]
   let lattice = dimensions.newSimpleCubicLattice()
-  var rngField1 = newRandomNumberGeneratorField[rkKokkosXorShift64](lattice, 123456789'u64)
-  var rngField2 = newRandomNumberGeneratorField[rkKokkosXorShift1024](lattice, 123456789'u64)
+  var rngField1 = newSimpleCubicRNGField[rkKokkosXorShift64](lattice, 123456789'u64)
+  var rngField2 = newSimpleCubicRNGField[rkKokkosXorShift1024](lattice, 123456789'u64)
 
   # Get the number of local sites for this process
   let mpiGrid = lattice.mpiGrid
