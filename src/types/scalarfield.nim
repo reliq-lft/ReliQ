@@ -12,7 +12,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -647,32 +647,31 @@ template sumField*[D: static[int], T](f: Field[D, T]): T =
   ##
   ## Returns:
   ## The sum of all elements in the field
-  when isComplex(T):
-    # Handle complex types by summing real and imaginary parts separately
-    let fv = f.localField()
+  let fv = f.localField()
+  when isComplex(T): # Handle complex types by summing re and im parts separately
     when isComplex32(T):
       let realSumLocal = sum[float32](0, f.numSites(), n): fv[n].re
       let imagSumLocal = sum[float32](0, f.numSites(), n): fv[n].im
-      # Global reduction across all MPI ranks using GlobalArrays
+
       let realSumGlobal = gaGlobalSumFloat32(unsafeAddr realSumLocal)
       let imagSumGlobal = gaGlobalSumFloat32(unsafeAddr imagSumLocal)
+
       complex(realSumGlobal, imagSumGlobal)
     elif isComplex64(T):
       let realSumLocal = sum[float64](0, f.numSites(), n): fv[n].re
       let imagSumLocal = sum[float64](0, f.numSites(), n): fv[n].im
-      # Global reduction across all MPI ranks using GlobalArrays
+
       let realSumGlobal = gaGlobalSumFloat64(unsafeAddr realSumLocal)
       let imagSumGlobal = gaGlobalSumFloat64(unsafeAddr imagSumLocal)
+
       complex(realSumGlobal, imagSumGlobal)
-  else:
-    # Handle real/integer types directly
-    let fv = f.localField()
+  else: # Handle real/integer types directly
     let localSum = sum[T](0, f.numSites(), n): fv[n]
-    # Global reduction across all MPI ranks using GlobalArrays
-    when T is float64: gaGlobalSumFloat64(unsafeAddr localSum)
-    elif T is float32: gaGlobalSumFloat32(unsafeAddr localSum)
-    elif T is int32: gaGlobalSumInt32(unsafeAddr localSum)
+
+    when T is int32: gaGlobalSumInt32(unsafeAddr localSum)
     elif T is int64: gaGlobalSumInt64(unsafeAddr localSum)
+    elif T is float32: gaGlobalSumFloat32(unsafeAddr localSum)
+    elif T is float64: gaGlobalSumFloat64(unsafeAddr localSum)
     else: {.error: "Unsupported type for global sum reduction".}
 
 template sum*[D: static[int], T](f: Field[D, T]): T =

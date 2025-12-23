@@ -12,7 +12,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -27,26 +27,24 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifndef RELIQ_KOKKOSTYPES_HPP
+#define RELIQ_KOKKOSTYPES_HPP
+
 #include <Kokkos_Core.hpp>
+#include <Kokkos_Random.hpp>
 
 using Layout = Kokkos::LayoutLeft;
 using Memory = Kokkos::HostSpace;
 using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
+using DeviceMemory = Kokkos::DefaultExecutionSpace::memory_space;
 
-#define KOKKOS_VIEW1 Kokkos::View<T*, Layout, Memory, Traits>
-#define KOKKOS_VIEW2 Kokkos::View<T**, Layout, Memory, Traits>
-#define KOKKOS_VIEW3 Kokkos::View<T***, Layout, Memory, Traits>
-#define KOKKOS_VIEW4 Kokkos::View<T****, Layout, Memory, Traits>
-#define KOKKOS_VIEW5 Kokkos::View<T*****, Layout, Memory, Traits>
-#define KOKKOS_VIEW6 Kokkos::View<T******, Layout, Memory, Traits>
-#define KOKKOS_VIEW7 Kokkos::View<T*******, Layout, Memory, Traits>
-
-#define CONST_ARGS1 data, dims[0]
-#define CONST_ARGS2 data, dims[0], dims[1]
-#define CONST_ARGS3 data, dims[0], dims[1], dims[2]
-#define CONST_ARGS4 data, dims[0], dims[1], dims[2], dims[3]
-#define CONST_ARGS5 data, dims[0], dims[1], dims[2], dims[3], dims[4]
-#define CONST_ARGS6 data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5]
+#define KOKKOS_VIEW1 Kokkos::View<T*, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW2 Kokkos::View<T**, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW3 Kokkos::View<T***, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW4 Kokkos::View<T****, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW5 Kokkos::View<T*****, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW6 Kokkos::View<T******, Layout, DeviceMemory, Traits>
+#define KOKKOS_VIEW7 Kokkos::View<T*******, Layout, DeviceMemory, Traits>
 
 #define ACCSS_ARGS1 idxs[0]
 #define ACCSS_ARGS2 idxs[0], idxs[1]
@@ -56,25 +54,25 @@ using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
 #define ACCSS_ARGS6 idxs[0], idxs[1], idxs[2], idxs[3], idxs[4], idxs[5]
 
 //
-// constructions/destruction
+// factory functions
 //
 
 template<typename T>
-void* create_kokkos_view(T* data, size_t rank, const size_t* dims) {  
+void* create_kokkos_view(T* data, size_t rank, const size_t* dims) {
   /**
-   * @brief Create a Kokkos View of given rank and dimensions.
-   * @param data Pointer to the data.
+   * @brief Create a Kokkos View of given rank from raw data.
+   * @param data Pointer to the raw data.
    * @param rank Rank of the Kokkos View (1 to 6).
    * @param dims Array of dimensions for each rank.
    * @return Pointer to the created Kokkos View.
    */
   switch(rank) {
-    case 1: return static_cast<void*>(new KOKKOS_VIEW1(CONST_ARGS1)); break;
-    case 2: return static_cast<void*>(new KOKKOS_VIEW2(CONST_ARGS2)); break;
-    case 3: return static_cast<void*>(new KOKKOS_VIEW3(CONST_ARGS3)); break;
-    case 4: return static_cast<void*>(new KOKKOS_VIEW4(CONST_ARGS4)); break;
-    case 5: return static_cast<void*>(new KOKKOS_VIEW5(CONST_ARGS5)); break;
-    case 6: return static_cast<void*>(new KOKKOS_VIEW6(CONST_ARGS6)); break;
+    case 1: return static_cast<void*>(new KOKKOS_VIEW1(data, dims[0]));
+    case 2: return static_cast<void*>(new KOKKOS_VIEW2(data, dims[0], dims[1]));
+    case 3: return static_cast<void*>(new KOKKOS_VIEW3(data, dims[0], dims[1], dims[2]));
+    case 4: return static_cast<void*>(new KOKKOS_VIEW4(data, dims[0], dims[1], dims[2], dims[3]));
+    case 5: return static_cast<void*>(new KOKKOS_VIEW5(data, dims[0], dims[1], dims[2], dims[3], dims[4]));
+    case 6: return static_cast<void*>(new KOKKOS_VIEW6(data, dims[0], dims[1], dims[2], dims[3], dims[4], dims[5]));
     default: return nullptr;
 } }
 
@@ -82,7 +80,7 @@ template<typename T>
 void destroy_kokkos_view(void* handle, size_t rank) {
   /**
    * @brief Destroy a Kokkos View of given rank.
-   * @param handle Pointer to the Kokkos View to be destroyed.
+   * @param handle Pointer to the Kokkos View.
    * @param rank Rank of the Kokkos View (1 to 6).
    */
   switch(rank) {
@@ -134,4 +132,7 @@ void view_set(void* handle, size_t rank, const size_t* idxs, T value) {
     case 4: (*static_cast<KOKKOS_VIEW4*>(handle))(ACCSS_ARGS4) = value; break;
     case 5: (*static_cast<KOKKOS_VIEW5*>(handle))(ACCSS_ARGS5) = value; break;
     case 6: (*static_cast<KOKKOS_VIEW6*>(handle))(ACCSS_ARGS6) = value; break;
+    default: break;
 } }
+
+#endif // RELIQ_KOKKOSTYPES_HPP

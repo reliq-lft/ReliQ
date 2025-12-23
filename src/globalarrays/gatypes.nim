@@ -262,6 +262,58 @@ proc numSites*[D: static[int], T](ga: GlobalArray[D, T]): int =
   for i in 0..<D:
     result *= (int(hi_c[i]) - int(lo_c[i]) + 1)
 
+proc getLo*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
+  ## Get the lower bounds of the local portion for this process
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## An array representing the lower bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D: result[i] = int(lo_c[i])
+
+proc getHi*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
+  ## Get the upper bounds of the local portion for this process
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## An array representing the upper bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D: result[i] = int(hi_c[i])
+
+proc getBounds*[D: static[int], T](
+  ga: GlobalArray[D, T]
+): (array[D, int], array[D, int]) =
+  ## Get the lower and upper bounds of the local portion for this process
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## A tuple containing two arrays: the lower bounds and upper bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D:
+    result[0][i] = int(lo_c[i])
+    result[1][i] = int(hi_c[i])
+
 #[ LocalData destructors, copy assignment ]#
 
 proc `=destroy`*[D: static[int], T](local: LocalData[D, T]) =

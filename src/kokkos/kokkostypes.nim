@@ -12,7 +12,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
   in the Software without restriction, including without limitation the rights
-  to use, copy, modify, medge, publish, distribute, sublicense, and/or sell
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
   copies of the Software, and to permit persons to whom the Software is
   furnished to do so, subject to the following conditions:
 
@@ -29,11 +29,25 @@
 
 import kokkosbase
 
-Kokkos: {.pragma: kokkostypes, header: "../kokkos/kokkostypes.hpp".}
+Kokkos: 
+  {.pragma: kokkostypes, header: "../kokkos/kokkostypes.hpp".}
+  {.pragma: rng, header: "<Kokkos_Random.hpp>".}
+
+const 
+  XORSHIFT64 = "Kokkos::Random_XorShift64_Pool<Kokkos::DefaultExecutionSpace>"
+  XORSHIFT1024 = "Kokkos::Random_XorShift1024_Pool<Kokkos::DefaultExecutionSpace>"
 
 type KokkosHandle* = pointer
 
-#[ wrappers ]#
+type 
+  KokkosRNG64Obj {.importcpp: XORSHIFT64, rng.} = object
+  KokkosRNG64* = ptr KokkosRNG64Obj
+
+type 
+  KokkosRNG1024Obj {.importcpp: XORSHIFT1024, rng.} = object
+  KokkosRNG1024* = ptr KokkosRNG1024Obj
+
+#[ View wrappers ]#
 
 proc createViewInt32*(data: pointer, rank: csize_t, dims: ptr csize_t): pointer 
   {.importc: "create_kokkos_view<int>", kokkostypes, nodecl.}
@@ -82,3 +96,17 @@ proc viewSetFloat32*(handle: pointer, rank: csize_t, indices: ptr csize_t, value
 
 proc viewSetFloat64*(handle: pointer, rank: csize_t, indices: ptr csize_t, value: cdouble) 
   {.importc: "view_set<double>", kokkostypes, nodecl.}
+
+#[ RNG wrappers ]#
+
+proc newRNG64*(seed: uint64): KokkosRNG64
+  {.importcpp: "new " & XORSHIFT64 & "(#)", rng.}
+
+proc newRNG1024*(seed: uint64): KokkosRNG1024
+  {.importcpp: "new " & XORSHIFT1024 & "(#)", rng.}
+
+proc destroyRNG64*(rng: KokkosRNG64)
+  {.importcpp: "delete #", rng.}
+
+proc destroyRNG1024*(rng: KokkosRNG1024)
+  {.importcpp: "delete #", rng.}

@@ -60,32 +60,30 @@ template localFence*(body: untyped): untyped =
 
 #[ global operations ]#
 
-
-# GA global sum wrappers using GlobalArrays collective operations
-proc gaGlobalSumFloat64*(localSum: ptr float64): float64 =
+proc gaGlobalSumInt32*(localSum: ptr int32): int32 =
   var value = localSum[]
-  GA_Dgop(addr value, 1, "+")
-  GA_Sync()  # Ensure all ranks are synchronized after collective operation
-  return value
+  GA_Igop(addr value, 1, "+")
+  GA_Sync()
+  return int32(value)
+
+proc gaGlobalSumInt64*(localSum: ptr int64): int64 =
+  var value = localSum[]
+  GA_Lgop(addr value, 1, "+")
+  GA_Sync()
+  return int64(value)
 
 proc gaGlobalSumFloat32*(localSum: ptr float32): float32 =
   # Convert to double, sum, then convert back
-  var value = float64(localSum[])
-  GA_Dgop(addr value, 1, "+")
-  GA_Sync()  # Ensure all ranks are synchronized after collective operation
+  var value = localSum[]
+  GA_Fgop(addr value, 1, "+")
+  GA_Sync()
   return float32(value)
 
-proc gaGlobalSumInt64*(localSum: ptr int64): int64 =
-  var value = clong(localSum[])
-  GA_Igop(addr value, 1, "+")
-  GA_Sync()  # Ensure all ranks are synchronized after collective operation
-  return int64(value)
-
-proc gaGlobalSumInt32*(localSum: ptr int32): int32 =
-  var value = clong(localSum[])
-  GA_Igop(addr value, 1, "+")
-  GA_Sync()  # Ensure all ranks are synchronized after collective operation
-  return int32(value)
+proc gaGlobalSumFloat64*(localSum: ptr float64): float64 =
+  var value = localSum[]
+  GA_Dgop(addr value, 1, "+")
+  GA_Sync()
+  return value
 
 #[ misc ]#
 

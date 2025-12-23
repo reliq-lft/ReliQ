@@ -27,10 +27,12 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import lattice/[seeding]
 import lattice/[indexing]
 import lattice/[simplecubiclattice]
 
 export indexing # lexicographic indexing utilities
+export seeding # site seeding utilities
 export simplecubiclattice # SimpleCubicLattice implementation
 
 type Lattice*[D: static[int]] = concept x

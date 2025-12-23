@@ -30,7 +30,9 @@
 import kokkos/[kokkosbase]
 import kokkos/[kokkosdispatch]
 import kokkos/[kokkostypes]
+import kokkos/[kokkosrng]
 
 export kokkosbase # Kokkos init/finalize
 export kokkosdispatch # Kokkos parallel dispatch
 export kokkostypes # Kokkos types; namely views
+export kokkosrng # Kokkos random number generators

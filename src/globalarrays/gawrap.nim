@@ -95,12 +95,17 @@ proc GA_Nnodes*(): cint {.importc: "GA_Nnodes", ga.}
 
 #[ GlobalArrays global operations ]#
 
-# GlobalArrays global operations for doubles and integers
+proc GA_Igop*(x: ptr int32, n: cint, op: cstring) 
+  {.importc: "GA_Igop", ga, discardable.}
+
+proc GA_Lgop*(x: ptr int64, n: cint, op: cstring) 
+  {.importc: "GA_Lgop", ga, discardable.}
+
+proc GA_Fgop*(x: ptr float32, n: cint, op: cstring) 
+  {.importc: "GA_Fgop", ga, discardable.}
+
 proc GA_Dgop*(x: ptr float64, n: cint, op: cstring) 
   {.importc: "GA_Dgop", ga, discardable.}
-  
-proc GA_Igop*(x: ptr clong, n: cint, op: cstring) 
-  {.importc: "GA_Igop", ga, discardable.}
 
 #[ unit tests ]#
 
