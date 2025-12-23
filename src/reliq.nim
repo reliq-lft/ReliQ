@@ -27,6 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import std/[macros]
+
 import lattice
 import globalarrays
 import kokkos
@@ -90,5 +92,28 @@ template test*(body: untyped): untyped =
       finalizeKokkos()
       finalizeGlobalArrays()
 
+# macro that implements Nim "echo"; written for the fun of it, tbh
+macro reliqPrint(args: varargs[untyped]): untyped =
+  var statements: seq[NimNode]
+  for iarg, varg in args:
+    if iarg < args.len - 1:
+      statements.add newCall("write", ident"stdout", newCall(ident"$", varg))
+      statements.add newCall("write", ident"stdout", newLit(" "))
+    else: statements.add newCall("writeLine", ident"stdout", newCall(ident"$", varg))
+  return newStmtList(statements)
+
+template print*(args: varargs[untyped]): untyped =
+  ## Prints output only from the master MPI rank (rank 0).
+  ## 
+  ## Parameters:
+  ## - `args`: The arguments to print.
+  ## 
+  ## Example:
+  ## ```nim
+  ## print "Hello, World!"
+  ## ```
+  if myRank() == 0: reliqPrint(args)
+
 test:
   assert 1 + 1 == 2
+  print "ReliQ module loaded successfully."
