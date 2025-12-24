@@ -552,9 +552,10 @@ template inverse*[D: static[int], T](tensor: SimpleCubicTensor[D, T]): SimpleCub
   of gkOrthogonal, gkSpecialOrthogonal:
     inv = tensor.transpose()
   of gkUnitary, gkSpecialUnitary:
-    when isComplex(T): inv = tensor.complexTranspose()
+    when isComplex(T): 
+      inv = tensor.complexTranspose()
     else: 
-      raise newException ValueError, "complex transpose only defined for complex types"
+      raise newException(ValueError, "complex transpose only defined for complex types")
   of gkNone:
     let det = tensor.determinant()
     let adj = tensor.adjugate()

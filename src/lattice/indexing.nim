@@ -40,7 +40,7 @@ proc flatToCoords*[D: static[int]](
   ## Returns:
   ## Array of D coordinates
   var remaining = idx
-  for i in countdown(D-1, 0):
+  for i in 0..<D:
     result[i] = remaining mod dims[i]
     remaining = remaining div dims[i]
 
@@ -58,7 +58,7 @@ proc coordsToFlat*[D: static[int]](
   ## Flat index
   result = 0
   var stride = 1
-  for i in countdown(D-1, 0):
+  for i in 0..<D:
     result += coords[i] * stride
     stride *= dims[i]
 

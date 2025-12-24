@@ -33,7 +33,7 @@
 #include <Kokkos_Core.hpp>
 #include <Kokkos_Random.hpp>
 
-using Layout = Kokkos::LayoutLeft;
+using Layout = Kokkos::LayoutRight;
 using Memory = Kokkos::HostSpace;
 using Traits = Kokkos::MemoryTraits<Kokkos::Unmanaged>;
 using DeviceMemory = Kokkos::DefaultExecutionSpace::memory_space;
