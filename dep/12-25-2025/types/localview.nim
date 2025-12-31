@@ -172,7 +172,7 @@ proc `[]`*[D: static[int], T](view: LocalView[D, T], index: SomeInteger): T =
   ## The value at the specified location
   var coord: array[D, int]
   
-  let indices = flatToCoords(int(index), view.dims)
+  let indices = flatToCoords(int(index), view.dims) # waste of cycles
   for i in 0..<D: coord[i] = int(indices[i])
 
   return view[coord]
@@ -186,7 +186,7 @@ proc `[]=`*[D: static[int], T](view: var LocalView[D, T], index: SomeInteger, va
   ## - `value`: The value to set
   var coord: array[D, int]
 
-  let indices = flatToCoords(int(index), view.dims)
+  let indices = flatToCoords(int(index), view.dims) # waste of cycles
   for i in 0..<D: coord[i] = int(indices[i])
   
   view[coord] = value

@@ -31,12 +31,6 @@ import gabase
 
 GlobalArrays: discard
 
-var 
-  C_INT* {.importc: "C_INT", ga.}: cint
-  C_LONGLONG* {.importc: "C_LONGLONG", ga.}: cint
-  C_FLOAT* {.importc: "C_FLOAT", ga.}: cint
-  C_DBL* {.importc: "C_DBL", ga.}: cint
-
 # used for constructing global array
 
 proc GA_Create_handle*: cint {.importc: "GA_Create_handle", ga.}
@@ -112,45 +106,6 @@ proc GA_Fgop*(x: ptr float32, n: cint, op: cstring)
 
 proc GA_Dgop*(x: ptr float64, n: cint, op: cstring) 
   {.importc: "GA_Dgop", ga, discardable.}
-
-#[ derived wrappers ]#
-
-proc toGAType*(t: typedesc[int32]): cint = C_INT
-
-proc toGAType*(t: typedesc[int64]): cint = C_LONGLONG
-
-proc toGAType*(t: typedesc[float32]): cint = C_FLOAT
-
-proc toGAType*(t: typedesc[float64]): cint = C_DBL
-
-proc newHandle*(): cint =
-  result = GA_Create_handle()
-  GA_Sync()
-
-proc setName*(handle: cint; name: cstring) =
-  handle.GA_Set_name(cast[ptr cchar](name))
-  GA_Sync()
-
-proc setData*[D: static[int]](handle: cint; dims: array[D, cint]; T: typedesc) =
-  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T)) 
-  GA_Sync()
-
-proc setChunk*[D: static[int]](handle: cint; chunks: array[D, cint]) =
-  handle.GA_Set_chunk(addr chunks[0]) 
-  GA_Sync()
-
-proc setGhosts*[D: static[int]](handle: cint; widths: array[D, cint]) =
-  handle.GA_Set_ghosts(addr widths[0]) 
-  GA_Sync()
-
-proc alloc*(handle: cint) =
-  let status = handle.GA_Allocate()
-  GA_Sync()
-  if status == 0:
-    raise newException(ValueError, "Global Array allocation failed.")
-
-proc localIndices*[D: static[int]](handle: cint; lo, hi: var array[D, cint]) =
-  NGA_Distribution(handle, GA_Nodeid(), addr lo[0], addr hi[0])
 
 #[ unit tests ]#
 

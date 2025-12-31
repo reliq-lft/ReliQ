@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/base/simplecubic.nim
+  Source file: src/utils/commandline.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,8 +27,15 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice/[simplecubiclattice]
-import field/[simplecubicfield]
+import std/[cmdline, os]
 
-export simplecubiclattice
-export simplecubicfield
+# gets C argc (including program name)
+proc cargc*: cint = cint(paramCount() + 1)
+
+proc cargv*(argc: cint): cstringArray =
+  # gets C argv (including program name at index 0)
+  var argv = newSeq[string](argc)
+  argv[0] = getAppFilename()  # argv[0] is the program name
+  for idx in 1..<argv.len: 
+    argv[idx] = paramStr(idx)
+  return allocCStringArray(argv)

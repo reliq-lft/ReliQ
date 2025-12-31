@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/base/simplecubic.nim
+  Source file: src/utils/complex.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,8 +27,15 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice/[simplecubiclattice]
-import field/[simplecubicfield]
+import std/[complex]
 
-export simplecubiclattice
-export simplecubicfield
+export complex
+
+template isComplex32*(T: typedesc): bool =
+  T is Complex32
+
+template isComplex64*(T: typedesc): bool =
+  T is Complex64
+
+template isComplex*(T: typedesc): bool =
+  isComplex32(T) or isComplex64(T)

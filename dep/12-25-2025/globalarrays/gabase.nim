@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/base/simplecubic.nim
+  Source file: src/globalarrays/gabase.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,8 +27,46 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice/[simplecubiclattice]
-import field/[simplecubicfield]
+when isMainModule:
+  import gampi
+  import utils/[commandline]
 
-export simplecubiclattice
-export simplecubicfield
+template GlobalArrays*(body: untyped): untyped =
+  {.pragma: ga, header: "ga.h".}
+  {.pragma: ma, header: "madecls.h".}
+  body
+
+GlobalArrays: discard
+
+#[ Global Arrays initialization ]#
+
+proc initGA*() {.importc: "GA_Initialize", ga.}
+
+proc initGA*(argc: ptr cint, argv: ptr cstringArray) 
+  {.importc: "GA_Initialize_args", ga.}
+
+proc finalizeGA*() {.importc: "GA_Terminate", ga.}
+
+#[ unit tests ]#
+
+when isMainModule:
+  block:
+    var argc = cargc()
+    var argv = cargv(argc)
+    
+    # Explicit MPI and GA initialization sequence
+    # This allows proper shutdown without mpirun warnings
+    initMPI(addr argc, addr argv)
+    echo "MPI initialized"
+    
+    initGA()
+    echo "Global Arrays initialized"
+    
+    echo "before GlobalArrays finalization"
+    finalizeGA()
+    echo "Global Arrays finalized"
+    
+    finalizeMPI()
+    echo "MPI finalized"
+
+    echo "gabase tests completed successfully"
