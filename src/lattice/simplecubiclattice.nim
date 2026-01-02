@@ -27,21 +27,13 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import globalarrays/[gatypes]
-
 type SimpleCubicLattice*[D: static[int]] = object
   ## Simple cubic lattice implementation
   ##
-  ## Represents a simple cubic lattice with equal globalGrid in all directions.
-  globalGrid*: array[D, int]
-  localGrid*: array[D, int]
-  paddedGrid*: array[D, int]
+  ## Represents a simple cubic lattice with equal dimensions in all directions.
+  dimensions*: array[D, int]
   mpiGrid*: array[D, int]
   ghostGrid*: array[D, int]
-  hi*, lo*: array[D, int]
-  indices*: array[D, GlobalArray[D, int]]
-
-#[ constructor ]#
 
 proc defaultMPIGrid[D: static[int]](): array[D, int] =
   for i in 0..<D: result[i] = -1
@@ -50,14 +42,14 @@ proc defaultGhostGrid[D: static[int]](): array[D, int] =
   for i in 0..<D: result[i] = 0
 
 proc newSimpleCubicLattice*[D: static[int]](
-  globalGrid: array[D, int],
+  dimensions: array[D, int],
   mpiGrid: array[D, int] = defaultMPIGrid[D](),
   ghostGrid: array[D, int] = defaultGhostGrid[D]()
 ): SimpleCubicLattice[D] =
   ## Create a new SimpleCubicLattice
   ##
   ## Parameters:
-  ## - `dims`: globalGrid of the lattice in each direction
+  ## - `dims`: Dimensions of the lattice in each direction
   ## - `mpiGrid`: MPI grid configuration
   ## - `ghostGrid`: Ghost cell configuration
   ##
@@ -76,29 +68,9 @@ proc newSimpleCubicLattice*[D: static[int]](
   ## Note:
   ## Last two parameters have default values for convenience. If not specified, 
   ## `mpiGrid` uses algorithm provided by GlobalArrays for arranging lattice into
-  ## MPI ranks. `ghostGrid` defaults to no ghost cells.  
-  result = SimpleCubicLattice[D](
-    globalGrid: globalGrid, 
+  ## MPI ranks. `ghostGrid` defaults to no ghost cells.
+  SimpleCubicLattice[D](
+    dimensions: dimensions, 
     mpiGrid: mpiGrid, 
     ghostGrid: ghostGrid
   )
-
-  for mu in 0..<D:
-    var idxMu = newGlobalArray(globalGrid, mpiGrid, ghostGrid): int
-    let (loMu, hiMu) = idxMu.getBounds()
-    
-    result.indices[mu] = idxMu
-    result.hi[mu] = hiMu[mu]
-    result.lo[mu] = loMu[mu]
-    result.localGrid[mu] = hiMu[mu] - loMu[mu] + 1
-    result.paddedGrid[mu] = result.localGrid[mu] + 2 * ghostGrid[mu]
-
-  for mu in 0..<D:
-    var local = result.indices[mu].hostView()
-    for n in 0..<result.indices[mu].numSites():
-      local.data[][n] = n.flatToCoord(result.paddedGrid)[mu]
-      
-
-
-
-

@@ -1,5 +1,5 @@
 #[ 
-  ReliQ globalGrid field theory framework: https://github.com/reliq-lft/ReliQ
+  ReliQ latticeGrid field theory framework: https://github.com/reliq-lft/ReliQ
   Source file: src/globalarrays/gatypes.nim
   Contact: reliq-lft@proton.me
 
@@ -38,70 +38,65 @@ GlobalArrays: discard
 
 const GLOBALNAME = cstring("ReliQ_GlobalArray")
 
+var C_INT {.importc: "C_INT", ga.}: cint
+var C_LONGLONG {.importc: "C_LONGLONG", ga.}: cint
+var C_FLOAT {.importc: "C_FLOAT", ga.}: cint
+var C_DBL {.importc: "C_DBL", ga.}: cint
+
+type LocalData*[D: static[int], T] = object
+  ## Represents a local portion of a GlobalArray
+  ##
+  ## This object holds a pointer to the local data and metadata about
+  ## its bounds and layout. Must be released when done.
+  ga_handle: cint
+  data*: ptr UncheckedArray[T]
+  lo*: array[D, int]
+  hi*: array[D, int]
+  ld*: array[D-1, int]  # Leading dimensions for multidimensional access
+  ghostGrid*: array[D, int]
+
 type GlobalArray*[D: static[int], T] = object
   ## Represents a Global Array
   ##
   ## This object encapsulates a Global Array (GA) handle along with
-  ## metadata about its globalGrid dimensions, MPI grid configuration,
+  ## metadata about its latticeGrid dimensions, MPI grid configuration,
   ## and ghost cell widths.
   ## 
   ## Fields:
   ## - `handle`: The underlying GA handle.
-  ## - `globalGrid`: An array specifying the size of each dimension of the global array.
+  ## - `latticeGrid`: An array specifying the size of each dimension of the global array.
   ## - `mpiGrid`: An array specifying the distribution of the global array across MPI ranks.
   ## - `ghostGrid`: An array specifying the width of ghost cells for each dimension.
   ## 
   ## Note: The type parameter `T` indicates the data type of the elements in the global array.
   handle: cint
-  globalGrid: array[D, int] 
-  localGrid: array[D, int]
+  latticeGrid: array[D, int] 
   mpiGrid: array[D, int]
   ghostGrid: array[D, int]
-  lo, hi: array[D, int]
-
-type HostView*[D: static[int], T] = object
-  ## Represents a Local Array
-  ##
-  ## This object encapsulates a local array along with metadata about its
-  ## globalGrid dimensions, MPI grid configuration, and ghost cell widths.
-  ## 
-  ## Fields:
-  ## - `data`: A pointer to an UncheckedArray of type `T` representing the local data.
-  ## - `globalGrid`: An array specifying the size of each dimension of the global array.
-  ## - `mpiGrid`: An array specifying the distribution of the global array across MPI ranks.
-  ## - `ghostGrid`: An array specifying the width of ghost cells for each dimension.
-  ## 
-  ## Note: The type parameter `T` indicates the data type of the elements in the local array.
-  data: ptr UncheckedArray[T]
-  localGrid: array[D, int]
-  paddedGrid: array[D, int]
-  ghostGrid: array[D, int]
-  lo, hi: array[D, int]
-  ld: array[D-1, int]
 
 #[ global array constructor ]#
 
-proc mapTo[D: static[int], T, U](
-  arr: array[D, T]; 
-  targetType: typedesc[U]
-): array[D, U] =
-  var result: array[D, U]
-  for i in 0..<D: result[i] = U(arr[i])
-  result
+proc toGAType(t: typedesc[int32]): cint = C_INT
+
+proc toGAType(t: typedesc[int64]): cint = C_LONGLONG
+
+proc toGAType(t: typedesc[float32]): cint = C_FLOAT
+
+proc toGAType(t: typedesc[float64]): cint = C_DBL
 
 proc newGlobalArray*[D: static[int]](
-  globalGrid: array[D, SomeInteger],
+  latticeGrid: array[D, SomeInteger],
   mpiGrid: array[D, SomeInteger],
   ghostGrid: array[D, SomeInteger],
   T: typedesc
 ): GlobalArray[D, T] =
   ## Constructor for GlobalArray
   ## 
-  ## Creates a new GlobalArray with the specified globalGrid dimensions,
+  ## Creates a new GlobalArray with the specified latticeGrid dimensions,
   ## MPI grid configuration, ghost cell widths, and data type.
   ## 
   ## Parameters:
-  ## - `globalGrid`: Array specifying the size of each dimension of the global array.
+  ## - `latticeGrid`: Array specifying the size of each dimension of the global array.
   ## - `mpiGrid`: Array specifying distribution of the global array across MPI ranks.
   ## - `ghostGrid`: An array specifying the width of ghost cells for each dimension.
   ## - `T`: The data type of the elements in the global array.
@@ -114,68 +109,37 @@ proc newGlobalArray*[D: static[int]](
   ## 
   ## Example:
   ## ```nim
-  ## let globalGrid = [8, 8, 8, 16]
+  ## let latticeGrid = [8, 8, 8, 16]
   ## let mpigrid = [1, 1, 1, 2]
   ## let ghostgrid = [1, 1, 1, 1]
-  ## var myGA = newGlobalArray(globalGrid, mpigrid, ghostgrid): float
+  ## var myGA = newGlobalArray(latticeGrid, mpigrid, ghostgrid): float
   ## ```
-  let handle = newHandle()
+  let handle = GA_Create_handle(); GA_Sync();
   var dims: array[D, cint]
   var chunks: array[D, cint]
   var widths: array[D, cint]
-  var lo, hi: array[D, cint]
-  var localGrid: array[D, cint]
 
   for i in 0..<D:
-    dims[i] = cint(globalGrid[i])
-    if mpiGrid[i] == -1: chunks[i] = cint(-1) # GlobalArrays decides the chunk size
-    else: chunks[i] = cint(globalGrid[i] div mpiGrid[i])
+    dims[i] = cint(latticeGrid[i])
+    if mpiGrid[i] == -1: chunks[i] = cint(-1)  # GlobalArrays decides the chunk size
+    else: chunks[i] = cint(latticeGrid[i] div mpiGrid[i])
     widths[i] = cint(ghostGrid[i])
   
-  handle.setName(GLOBALNAME)
-  handle.setData(dims): T
-  handle.setChunk(chunks)
-  handle.setGhosts(widths)
+  handle.GA_Set_name(cast[ptr cchar](GLOBALNAME)); GA_Sync();
+  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T)); GA_Sync();
+  handle.GA_Set_chunk(addr chunks[0]); GA_Sync();
+  handle.GA_Set_ghosts(addr widths[0]); GA_Sync();
 
-  alloc handle
-
-  handle.localIndices(lo, hi)
-  for i in 0..<D: localGrid[i] = hi[i] - lo[i] + 1
+  let status = handle.GA_Allocate(); GA_Sync(); 
+  if status == 0:
+    let errMsg = "Error in GA " & $handle & " construction"
+    raise newException(ValueError): errMsg & "; status code: " & $status
 
   return GlobalArray[D, T](
     handle: handle,
-    globalGrid: globalGrid.mapTo(int),
-    localGrid: localGrid.mapTo(int),
-    lo: lo.mapTo(int),
-    hi: hi.mapTo(int),
-    mpiGrid: mpiGrid.mapTo(int),
-    ghostGrid: ghostGrid.mapTo(int)
-  )
-
-proc hostView*[D: static[int], T](ga: GlobalArray[D, T]): HostView[D, T] =
-  ## Constructor for HostView
-  ##
-  ## Creates a new HostView associated with the given GlobalArray.
-  ##
-  ## Parameters:
-  ## - `ga`: The GlobalArray instance to associate with the local array.
-  ##
-  ## Returns:
-  ## A new instance of `HostView[D, T]`.
-  var paddedGrid: array[D, cint]
-  var ld: array[D-1, cint]
-  var p: pointer
-
-  ga.handle.NGA_Access_ghosts(addr paddedGrid[0], addr p, addr ld[0])
-
-  return HostView[D, T](
-    data: cast[ptr UncheckedArray[T]](p),
-    localGrid: ga.localGrid,
-    paddedGrid: paddedGrid.mapTo(int),
-    lo: ga.lo,
-    hi: ga.hi,
-    ld: ld.mapTo(int),
-    ghostGrid: ga.ghostGrid
+    latticeGrid: latticeGrid,
+    mpiGrid: mpiGrid,
+    ghostGrid: ghostGrid
   )
 
 #[ global array move semantics ]#
@@ -193,7 +157,7 @@ proc conformable*[D: static[int], T](a, b: GlobalArray[D, T]): bool =
   ## Returns:
   ## `true` if the two GlobalArrays are conformable, `false` otherwise.
   for i in 0..<D:
-    if a.globalGrid[i] != b.globalGrid[i]: return false
+    if a.latticeGrid[i] != b.latticeGrid[i]: return false
     if a.mpiGrid[i] != b.mpiGrid[i]: return false
     if a.ghostGrid[i] != b.ghostGrid[i]: return false
   return true
@@ -205,7 +169,7 @@ proc `=destroy`*[D: static[int], T](ga: GlobalArray[D, T]) =
   ##
   ## Parameters:
   ## - `ga`: The GlobalArray instance to be destroyed.
-  if ga.handle != 0: ga.handle.GA_Destroy()
+  if ga.handle > 0: ga.handle.GA_Destroy()
 
 proc `=copy`*[D: static[int], T](
   dest: var GlobalArray[D, T], 
@@ -222,12 +186,10 @@ proc `=copy`*[D: static[int], T](
   ## - `src`: The source GlobalArray to copy from.
   if dest.handle == src.handle: return
   if dest.handle != 0 and src.handle != 0 and conformable(dest, src):
-    GA_Copy(src.handle, dest.handle) 
-    GA_Sync()
+    GA_Copy(src.handle, dest.handle); GA_Sync();
   elif dest.handle == 0 and src.handle != 0:
-    dest = newGlobalArray(src.globalGrid, src.mpiGrid, src.ghostGrid): T
-    GA_Copy(src.handle, dest.handle) 
-    GA_Sync()
+    dest = newGlobalArray(src.latticeGrid, src.mpiGrid, src.ghostGrid): T
+    GA_Copy(src.handle, dest.handle); GA_Sync();
   elif src.handle == 0:
     let errMsg = "Error in GA copy from " & $src.handle & " to " & $dest.handle
     raise newException(ValueError): errMsg & "; source is uninitialized"
@@ -246,7 +208,7 @@ proc getHandle*[D: static[int], T](ga: GlobalArray[D, T]): cint =
   ## The GA handle as a `cint`.
   return ga.handle
 
-proc getGlobalGrid*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
+proc getLatticeGrid*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
   ## Accessor for the lattice dimensions
   ##
   ## Returns the lattice dimensions of the GlobalArray.
@@ -256,21 +218,7 @@ proc getGlobalGrid*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
   ##
   ## Returns:
   ## An array representing the lattice dimensions.
-  return ga.globalGrid
-
-proc getLocalGrid*[D: static[int], T](
-  a: GlobalArray[D, T] | HostView[D, T]
-): array[D, int] =
-  ## Accessor for the lattice dimensions
-  ##
-  ## Returns the lattice dimensions of the GlobalArray.
-  ##
-  ## Parameters:
-  ## - `a`: The GlobalArray or HostView instance.
-  ##
-  ## Returns:
-  ## An array representing the lattice dimensions.
-  return a.localGrid
+  return ga.latticeGrid
 
 proc getMPIGrid*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
   ## Accessor for the MPI grid configuration
@@ -296,40 +244,141 @@ proc getGhostGrid*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
   ## An array representing the ghost cell widths.
   return ga.ghostGrid
 
-proc getPaddedGrid*[D: static[int], T](la: HostView[D, T]): array[D, int] =
-  ## Accessor for the padded local grid dimensions
-  ##
-  ## Returns the padded local grid dimensions of the HostView.
-  ##
-  ## Parameters:
-  ## - `la`: The HostView instance.
-  ##
-  ## Returns:
-  ## An array representing the padded local grid dimensions.
-  return la.paddedGrid
-
-proc numSites*[D: static[int], T](a: GlobalArray[D, T] | HostView[D, T]): int =
+proc numSites*[D: static[int], T](ga: GlobalArray[D, T]): int =
   ## Get the number of local sites for this process
   ##
   ## Parameters:
-  ## - `a`: The GlobalArray or HostView instance
+  ## - `ga`: The GlobalArray instance
   ##
   ## Returns:
   ## The number of local sites for the current process
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
   result = 1
-  for i in 0..<D: result *= a.hi[i] - a.lo[i] + 1
+  for i in 0..<D:
+    result *= (int(hi_c[i]) - int(lo_c[i]) + 1)
 
-proc getBounds*[D: static[int], T](
-  a: GlobalArray[D, T] | HostView[D, T]
-): (array[D, int], array[D, int]) =
-  ## Get the local bounds for this process
+proc getLo*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
+  ## Get the lower bounds of the local portion for this process
   ##
   ## Parameters:
-  ## - `a`: The GlobalArray or HostView instance
+  ## - `ga`: The GlobalArray instance
   ##
   ## Returns:
-  ## A tuple containing two arrays: the lower and upper bounds of the local segment
-  return (a.lo, a.hi)
+  ## An array representing the lower bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D: result[i] = int(lo_c[i])
+
+proc getHi*[D: static[int], T](ga: GlobalArray[D, T]): array[D, int] =
+  ## Get the upper bounds of the local portion for this process
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## An array representing the upper bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D: result[i] = int(hi_c[i])
+
+proc getBounds*[D: static[int], T](
+  ga: GlobalArray[D, T]
+): (array[D, int], array[D, int]) =
+  ## Get the lower and upper bounds of the local portion for this process
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance
+  ##
+  ## Returns:
+  ## A tuple containing two arrays: the lower bounds and upper bounds of the local portion
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  let pid = GA_Nodeid()
+  
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  
+  for i in 0..<D:
+    result[0][i] = int(lo_c[i])
+    result[1][i] = int(hi_c[i])
+
+#[ LocalData destructors, copy assignment ]#
+
+proc `=destroy`*[D: static[int], T](local: LocalData[D, T]) =
+  ## Destructor for LocalData - releases the GA access
+  if local.ga_handle > 0:
+    var lo_c: array[D, cint]
+    var hi_c: array[D, cint]
+    for i in 0..<D:
+      lo_c[i] = cint(local.lo[i])
+      hi_c[i] = cint(local.hi[i])
+    NGA_Release(local.ga_handle, addr lo_c[0], addr hi_c[0])
+
+proc `=copy`*[D: static[int], T](dest: var LocalData[D, T], src: LocalData[D, T]) {.error.}
+  ## Prevent copying of LocalData - it represents exclusive access to GA data
+
+#[ local data accession ]#
+
+proc downcast*[D: static[int], T](
+  ga: GlobalArray[D, T],
+  includeGhosts: bool = true # important default
+): LocalData[D, T] =
+  ## Access the local portion of the GlobalArray on the current process
+  ##
+  ## Returns a LocalData object containing a pointer to the local data
+  ## and its bounds. The data is automatically released when LocalData
+  ## goes out of scope.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray to access
+  ##
+  ## Returns:
+  ## LocalData containing pointer to local data, bounds, and leading dimensions
+  ##
+  ## Example:
+  ## ```nim
+  ## var myGA = newGlobalArray(lattice, mpigrid, ghostgrid, float)
+  ## let local = downcast(myGA)
+  ## # Use local.data, local.lo, local.hi, local.ld
+  ## # Automatically released when local goes out of scope
+  ## ```
+  var lo_c: array[D, cint]
+  var hi_c: array[D, cint]
+  var ld_c: array[D-1, cint]
+  var dims: array[D, cint]
+  var p: pointer
+  var local: LocalData[D, T]
+  let pid = GA_Nodeid()
+
+  if includeGhosts:
+    for i in 0..<D: dims[i] = cint(ga.latticeGrid[i] + 2*ga.ghostGrid[i])
+
+  NGA_Distribution(ga.handle, pid, addr lo_c[0], addr hi_c[0])
+  if not includeGhosts:
+    NGA_Access(ga.handle, addr lo_c[0], addr hi_c[0], addr p, addr ld_c[0])
+  else: NGA_Access_ghosts(ga.handle, addr dims[0], addr p, addr ld_c[0])
+  
+  local.ga_handle = ga.handle
+  local.data = cast[ptr UncheckedArray[T]](p)
+  for i in 0..<D:
+    local.lo[i] = int(lo_c[i])
+    local.hi[i] = int(hi_c[i])
+  for i in 0..<(D-1): local.ld[i] = int(ld_c[i])
+  local.ghostGrid = ga.ghostGrid
+  
+  return local
 
 #[ halo exchange ]#
 
@@ -446,10 +495,6 @@ when isMainModule:
     testGA1.updateGhosts()
 
     echo "GA ghost update tests passed"
-
-    var localData = testGA1.downcast()
-    
-    echo "GA downcast tests passed"
 
     finalizeGA()
     finalizeMPI()
