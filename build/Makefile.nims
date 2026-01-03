@@ -27,7 +27,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import std/[os]
+import std/[os, strutils]
 
 proc `/`*(sa, sb: string): string = sa & "/" & sb
 proc `+`*(sa, sb: string): string = sa & " " & sb
@@ -43,23 +43,29 @@ const nimArgs = [""]
 const cxxFlags = [""]
 const cxxLinks = [""]
 
+const useCuda = false
+const useHip = false
+
 ### dependency specifications: users should not touch these ###
 
 const externalDir = cwd / "external"
+const cudaRoot = "/usr/local/cuda"
 
 const 
   metaGA = externalDir / "bin" / "ga-config"
-  metaKokkos = externalDir / "bin" / "kokkos-meta"
+#  metaKokkos = externalDir / "bin" / "kokkos-meta"
 
 const
   passC_GA = staticExec(metaGA + "--cflags") + 
              staticExec(metaGA + "--cppflags") +
              staticExec(metaGA + "--network_cppflags")
-const 
-  passL_GA = staticExec(metaGA + "--ldflags") + 
-             staticExec(metaGA + "--network_ldflags") + 
-             staticExec(metaGA + "--libs") +
-             staticExec(metaGA + "--network_libs")
+
+# With the nvcc wrapper, we can use the same flags for both gcc and nvcc
+const passL_GA = staticExec(metaGA + "--ldflags") + 
+                 staticExec(metaGA + "--network_ldflags") + 
+                 staticExec(metaGA + "--libs") +
+                 staticExec(metaGA + "--network_libs")
+
 const
   passC_reliq = ""
   # Add rpath and library path to ensure we use Spack's MPI library (not system's Intel MPI)
@@ -67,8 +73,23 @@ const
   passL_reliq = "-Wl,-rpath," & externalDir / "lib" & 
                 " -L" & externalDir / "lib" & " -lmpi"
 
-const passC_Kokkos = staticExec(metaKokkos + "CXXFLAGS")
-const passL_Kokkos = staticExec(metaKokkos + "LIBFLAGS")
+when useCuda:
+  const cudaFlags = " -I" & cudaRoot & "/include"
+  const cudaLibs = " -L" & cudaRoot & "/lib64 -lcudart -lcuda"
+else:
+  const cudaFlags = ""
+  const cudaLibs = ""
+
+when useHip:
+  const rocmRoot = "/opt/rocm"
+  const hipFlags = " -I" & rocmRoot & "/include"
+  const hipLibs = " -L" & rocmRoot & "/lib -lamdhip64"
+else:
+  const hipFlags = ""
+  const hipLibs = ""
+
+#const passC_Kokkos = staticExec(metaKokkos + "CXXFLAGS")
+#const passL_Kokkos = staticExec(metaKokkos + "LIBFLAGS")
 
 ### execute compilation ###
 
@@ -83,8 +104,22 @@ task clean, "cleaning files":
 
 task build, "building file":
   var 
-    passC = "-Ofast" + passC_GA + passC_Kokkos + passC_reliq
-    passL = passL_GA + passL_Kokkos + passL_reliq
+    passC = "-Ofast" + passC_GA + passC_reliq
+    passL = ""
+  
+  when useCuda:
+    passC += cudaFlags
+  
+  when useHip:
+    passC += hipFlags
+  
+  passL = passL_GA + passL_reliq
+  when useCuda:
+    passL += cudaLibs
+  
+  when useHip:
+    passL += hipLibs
+    
   var args = newSeq[string](paramCount() - 2)
   var cmpl: string 
 
@@ -93,16 +128,34 @@ task build, "building file":
   for cxxFlag in cxxFlags: passC += cxxFlag
   for cxxLink in cxxLinks: passL += cxxLink
 
+  # Select compiler based on GPU backend
+  var compiler = "gcc"  # Default to gcc
+  when useCuda:
+    compiler = "nvcc"
+  when useHip:
+    compiler = "clang"
+
   cmpl = "external/bin/nim cpp --path:src"
   cmpl += "--nimcache:" & nimCache
   for nimArg in nimArgs: cmpl += nimArg
   cmpl += "--passC:\"" & passC & "\""
   cmpl += "--passL:\"" & passL & "\""
   cmpl += "-o:bin/" & args[^1]
+  cmpl += "--cc:" & compiler
+  when useCuda:
+    cmpl += "--define:nvidia"
+  elif useHip:
+    cmpl += "--define:amd"
+  else:
+    cmpl += "--define:cpu"
+    cmpl += "--threads:on"
+  cmpl += "--define:\"useMalloc\""
   for prmIdx in 0..<(args.len - 1): cmpl += args[prmIdx]
   cmpl += search("src", args[^1])
 
   echo "BUILD:" + cmpl
+  # Set PATH to use our wrappers (works for both nvcc and hipcc)
+  putEnv("PATH", cwd & "/build/bin:" & getEnv("PATH"))
   exec cmpl
 
 #[

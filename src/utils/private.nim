@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/utils/complex.nim
+  Source file: src/utils/private.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,15 +27,17 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import std/[complex]
+proc mapTo*[D: static[int], T, U](
+  arr: array[D, T]; 
+  targetType: typedesc[U]
+): array[D, U] =
+  var result: array[D, U]
+  for i in 0..<D: result[i] = U(arr[i])
+  result
 
-export complex
-
-template isComplex32*(T: typedesc): bool =
-  T is Complex32
-
-template isComplex64*(T: typedesc): bool =
-  T is Complex64
-
-template isComplex*(T: typedesc): bool =
-  isComplex32(T) or isComplex64(T)
+proc product*[D: static[int]](
+  arr: array[D, int]
+): int =
+  var result = 1
+  for i in 0..<D: result = result * arr[i]
+  return result

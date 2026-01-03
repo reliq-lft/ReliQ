@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/lattice.nim
+  Source file: src/device/platform.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,22 +27,30 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import lattice/[seeding]
-import lattice/[indexing]
-import lattice/[simplecubiclattice]
+when defined(nvidia):
+  const PLATFORM* = "nvidia"
+elif defined(amd):
+  const PLATFORM* = "amd"
+elif defined(cpu):
+  const PLATFORM* = "cpu"
 
-export indexing # lexicographic indexing utilities
-export seeding # site seeding utilities
-export simplecubiclattice # SimpleCubicLattice implementation
+template nvidia*(body: untyped): untyped =
+  ## Decorator to indicate that a function or proc is specific to the NVIDIA platform.
+  when PLATFORM == "nvidia": body
+  else: discard
 
-type Lattice*[D: static[int]] = concept x
-  ## Concept interface for lattice types
-  ## 
-  ## Types conforming to this concept must provide the following:
-  ## - D: static[int] - Dimensionality of the lattice
-  ## - dimensions: array[D, int] - Dimensions of the lattice in each direction
-  ## - mpiGrid: array[D, int] - MPI grid configuration
-  ## - ghostGrid: array[D, int] - Ghost cell configuration
-  x.latticeGrid is array[D, int]
-  x.mpiGrid is array[D, int]
-  x.ghostGrid is array[D, int]
+template amd*(body: untyped): untyped =
+  ## Decorator to indicate that a function or proc is specific to the AMD platform.
+  when PLATFORM == "amd": body
+  else: discard
+
+template gpu*(body: untyped): untyped =
+  ## Decorator to indicate that a function or proc is specific to GPU platforms.
+  nvidia: body
+  amd: body
+  else: discard
+
+template cpu*(body: untyped): untyped =
+  ## Decorator to indicate that a function or proc is specific to the CPU platform.
+  when PLATFORM == "cpu": body
+  else: discard
