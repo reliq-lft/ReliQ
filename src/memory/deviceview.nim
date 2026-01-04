@@ -176,7 +176,9 @@ template `[]=`*[D: static[int], T](
   ## Parameters:
   ## - `idx`: The flat index specifying the location of the element.
   ## - `value`: The value of type `T` to assign at the specified index.
-  cast[ptr UncheckedArray[T]](dv.data)[idx] = value
+  nvidia: cast[ptr UncheckedArray[T]](dv.data)[idx] = value
+  amd: cast[ptr UncheckedArray[T]](dv.data)[idx] = value
+  cpu: store(cast[ptr UncheckedArray[T]](dv.data), idx, value)
 
 template `[]=`*[D: static[int], T](
   dv: var DeviceView[D, T]; 
@@ -188,7 +190,9 @@ template `[]=`*[D: static[int], T](
   ## Parameters:
   ## - `coords`: An array of coordinates specifying the location of the element.
   ## - `value`: The value of type `T` to assign at the specified coordinates.
-  cast[ptr UncheckedArray[T]](dv.data)[coords.coordsToFlat(dv.paddedGrid)] = value
+  nvidia: cast[ptr UncheckedArray[T]](dv.data)[coords.coordsToFlat(dv.paddedGrid)] = value
+  amd: cast[ptr UncheckedArray[T]](dv.data)[coords.coordsToFlat(dv.paddedGrid)] = value
+  cpu: store(cast[ptr UncheckedArray[T]](dv.data), coords.coordsToFlat(dv.paddedGrid), value)
 
 proc numSites*[D: static[int], T](hv: DeviceView[D, T]): int =
   ## Get the number of local sites in the HostView
@@ -228,10 +232,122 @@ when isMainModule:
       var hv1 = testGA1.deviceView()
 
       cpu:
-        for n in 0..<hv1.numSites() div vectorWidth:
-          let coords = n.flatToCoords(hv1.paddedGrid)
-          discard hv1[coords]# = float(n) * 1.5
-          #assert hv1[coords] == hv1[n]
+        echo "Testing DeviceView indexing and assignment..."
+        
+        # Test 1: Basic flat indexing - set and get values
+        echo "Testing flat indexing..."
+        for n in 0..<min(hv1.numSites() div vectorWidth, 20):
+          let flatIndex = n * vectorWidth
+          
+          # Create test SIMD value
+          var testData: array[vectorWidth, float]
+          for i in 0..<vectorWidth:
+            testData[i] = float(flatIndex + i) * 1.5
+          let testValue = newSIMD(addr testData[0])
+          
+          # Set via DeviceView indexing
+          hv1[flatIndex] = testValue
+          
+          # Get via DeviceView indexing
+          let retrievedValue = hv1[flatIndex]
+          let retrievedArray = retrievedValue.toArray()
+          
+          # Verify the values match
+          for i in 0..<vectorWidth:
+            assert abs(retrievedArray[i] - testData[i]) < 1e-6, "DeviceView flat indexing failed at " & $flatIndex & " element " & $i
+        
+        # Test 2: Coordinate-based indexing
+        echo "Testing coordinate indexing..."
+        var testCount = 0
+        for z in 0..<min(hv1.localGrid[3], 2):
+          for y in 0..<min(hv1.localGrid[2], 2):
+            for x in 0..<min(hv1.localGrid[1], 2):
+              for t in 0..<min(hv1.localGrid[0], 4):
+                if testCount < 50:  # Limit for performance
+                  let coords = [t, x, y, z]
+                  
+                  # Create test SIMD value
+                  var testData: array[vectorWidth, float]
+                  for i in 0..<vectorWidth:
+                    testData[i] = float(testCount * 10 + i) + 0.5
+                  let testValue = newSIMD(addr testData[0])
+                  
+                  # Set via DeviceView coordinate indexing
+                  hv1[coords] = testValue
+                  
+                  # Get via DeviceView coordinate indexing
+                  let retrievedValue = hv1[coords]
+                  let retrievedArray = retrievedValue.toArray()
+                  
+                  # Verify the values match
+                  for i in 0..<vectorWidth:
+                    assert abs(retrievedArray[i] - testData[i]) < 1e-6, "DeviceView coord indexing failed at [" & $t & "," & $x & "," & $y & "," & $z & "] element " & $i
+                  
+                  testCount += 1
+        
+        # Test 3: Consistency between flat and coordinate indexing
+        echo "Testing flat/coordinate consistency..."
+        for n in 0..<min(hv1.numSites() div vectorWidth, 30):
+          let flatIndex = n * vectorWidth
+          let coords = flatIndex.flatToCoords(hv1.paddedGrid)
+          
+          # Create test data
+          var testData: array[vectorWidth, float]
+          for i in 0..<vectorWidth:
+            testData[i] = float(n * 100 + i) + 0.25
+          let testValue = newSIMD(addr testData[0])
+          
+          # Set via flat indexing
+          hv1[flatIndex] = testValue
+          
+          # Read via coordinate indexing - should get same values
+          let coordValue = hv1[coords]
+          let coordArray = coordValue.toArray()
+          
+          # Verify consistency
+          for i in 0..<vectorWidth:
+            assert abs(coordArray[i] - testData[i]) < 1e-6, "DeviceView flat/coord consistency failed at " & $flatIndex & " element " & $i
+          
+          # Now set via coordinates
+          for i in 0..<vectorWidth:
+            testData[i] = float(n * 200 + i) + 0.75
+          let testValue2 = newSIMD(addr testData[0])
+          hv1[coords] = testValue2
+          
+          # Read via flat indexing - should get new values
+          let flatValue = hv1[flatIndex]
+          let flatArray = flatValue.toArray()
+          
+          for i in 0..<vectorWidth:
+            assert abs(flatArray[i] - testData[i]) < 1e-6, "DeviceView coord/flat consistency failed at " & $flatIndex & " element " & $i
+        
+        # Test 4: Multiple overwrites - ensure values actually change
+        echo "Testing value overwrites..."
+        let testIndex = vectorWidth * 2
+        
+        # First value
+        var testData1: array[vectorWidth, float]
+        for i in 0..<vectorWidth:
+          testData1[i] = 100.0 + float(i)
+        hv1[testIndex] = newSIMD(addr testData1[0])
+        
+        let check1 = hv1[testIndex].toArray()
+        for i in 0..<vectorWidth:
+          assert abs(check1[i] - testData1[i]) < 1e-6, "DeviceView first write failed at element " & $i
+        
+        # Overwrite with different values
+        var testData2: array[vectorWidth, float]
+        for i in 0..<vectorWidth:
+          testData2[i] = 500.0 + float(i) * 2.0
+        hv1[testIndex] = newSIMD(addr testData2[0])
+        
+        let check2 = hv1[testIndex].toArray()
+        for i in 0..<vectorWidth:
+          assert abs(check2[i] - testData2[i]) < 1e-6, "DeviceView overwrite failed at element " & $i
+          # Make sure it's different from the first value
+          assert abs(check2[i] - testData1[i]) > 1.0, "DeviceView overwrite didn't change values at element " & $i
+        
+        echo "All DeviceView indexing tests passed!"
       
     # All GlobalArrays are now destroyed, safe to finalize
     finalizeGA()
