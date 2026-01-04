@@ -60,36 +60,37 @@ PYTHON="/usr/bin/python3"
 
 CWD="$(pwd)"
 SWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd && cd ${CWD})"
-TMP="${CWD}/cmake_tmp"
-DMY="${TMP}/hello_world.cpp"
+
+#TMP="${CWD}/cmake_tmp"
+#DMY="${TMP}/hello_world.cpp"
 
 #CMAKE="${CWD}/external/bin/cmake"
-CMAKE="cmake"
+#CMAKE="cmake"
 
-mkdir -p $TMP
+#mkdir -p $TMP
 
-echo "-- Created temporary directory for cmake: $TMP"
+#echo "-- Created temporary directory for cmake: $TMP"
 
-cp $SWD/build/hello_world.cpp $DMY
-echo "-- Copied temporary dummy file ${SWD}/build/hello_world.cpp to ${DMY}"
+#cp $SWD/build/hello_world.cpp $DMY
+#echo "-- Copied temporary dummy file ${SWD}/build/hello_world.cpp to ${DMY}"
 
-cp $SWD/build/CMakeLists.txt $CWD/CMakeLists.txt
-echo "-- Copied temporary ${SWD}/build/CMakeLists.txt to ${CWD}/CMakeLists.txt"
+#cp $SWD/build/CMakeLists.txt $CWD/CMakeLists.txt
+#echo "-- Copied temporary ${SWD}/build/CMakeLists.txt to ${CWD}/CMakeLists.txt"
 
-$CMAKE -DKokkos_DIR=$CWD/external/lib/cmake/Kokkos -B $TMP 2> $TMP/build.log
-echo "-- Finished dummy build"
+#$CMAKE -DKokkos_DIR=$CWD/external/lib/cmake/Kokkos -B $TMP 2> $TMP/build.log
+#echo "-- Finished dummy build"
 
-$PYTHON $SWD/build/configure.py --cmake_tmp=$CWD/cmake_tmp
-echo "-- Extracted compilation Kokkos flags from dummy build"
+#$PYTHON $SWD/build/configure.py --cmake_tmp=$CWD/cmake_tmp
+#echo "-- Extracted compilation Kokkos flags from dummy build"
 
-chmod u+x $CWD/external/bin/kokkos-meta
-echo "-- Saved Kokkos meta script to ${CWD}/external/bin/kokkos-meta"
+#chmod u+x $CWD/external/bin/kokkos-meta
+#echo "-- Saved Kokkos meta script to ${CWD}/external/bin/kokkos-meta"
 
-rm -r $TMP
-echo "-- Removed temporary directory: ${TMP}"
+#rm -r $TMP
+#echo "-- Removed temporary directory: ${TMP}"
 
-rm $CWD/CMakeLists.txt
-echo "-- Removed temporary: ${CWD}/CMakeLists.txt"
+#rm $CWD/CMakeLists.txt
+#echo "-- Removed temporary: ${CWD}/CMakeLists.txt"
 
 ln -sf $SWD/build $CWD/
 echo "-- Created symlink of ${SWD}/build in ${CWD}"
@@ -259,7 +260,6 @@ echo "-- Set useCuda = $USE_CUDA in Makefile.nims"
 # HIP/ROCm Detection
 ################################################################################
 
-echo ""
 echo "-- Checking for HIP/ROCm support..."
 
 if [ "$DISABLE_HIP" = true ]; then
