@@ -31,13 +31,12 @@ proc mapTo*[D: static[int], T, U](
   arr: array[D, T]; 
   targetType: typedesc[U]
 ): array[D, U] =
-  var result: array[D, U]
   for i in 0..<D: result[i] = U(arr[i])
   result
 
 proc product*[D: static[int]](
   arr: array[D, int]
 ): int =
-  var result = 1
+  result = 1
   for i in 0..<D: result = result * arr[i]
   return result

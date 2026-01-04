@@ -27,8 +27,6 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import std/[sequtils]
-
 import hostview
 
 import device/[platforms]
@@ -39,10 +37,6 @@ import lattice/[indexing]
 nvidia: import cuda/[cudawrap]
 amd: import hip/[hipwrap]
 cpu: import simd/[simdtypes]
-
-# Import vectorWidth constant
-cpu:
-  const vectorWidth* {.intdefine.} = 8  # Should match the Makefile setting
 
 when isMainModule:
   import globalarrays/[gampi, gabase, gawrap]

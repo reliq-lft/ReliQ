@@ -147,7 +147,7 @@ task build, "building file":
   when useHip:
     compiler = "clang"
 
-  cmpl = "external/bin/nim cpp --path:src"
+  cmpl = "external/bin/nim c --path:src"
   cmpl += "--nimcache:" & nimCache
   for nimArg in nimArgs: cmpl += nimArg
   cmpl += "--passC:\"" & passC & "\""

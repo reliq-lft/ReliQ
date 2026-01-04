@@ -42,7 +42,7 @@ proc newSIMD*[T](x: ptr T): auto =
       when defined(avx2): SIMD[m256i](x: mm256_loadu_si256(cast[ptr m256i](x)))
       else: SIMD[T](x: x[])
     elif T is int64: 
-      when defined(avx512): SIMD[m512i](x: mm512_loadu_epi64(cast[ptr clonglong](x)))
+      when defined(avx512): SIMD[m512i](x: mm512_loadu_si512(cast[ptr m512i](x)))
       else: SIMD[T](x: x[])
     elif T is float32: 
       when defined(avx2): SIMD[m256](x: mm256_loadu_ps(cast[ptr cfloat](x)))
@@ -53,7 +53,7 @@ proc newSIMD*[T](x: ptr T): auto =
       else: SIMD[T](x: x[])
     else: SIMD[T](x: x[])
   elif (vectorWidth == 16) and defined(avx512):
-    when T is int32: SIMD[m512i](x: mm512_loadu_epi32(cast[ptr cint](x)))
+    when T is int32: SIMD[m512i](x: mm512_loadu_si512(cast[ptr m512i](x)))
     elif T is float32: SIMD[m512](x: mm512_loadu_ps(cast[ptr cfloat](x)))
     else: SIMD[T](x: x[])
   else: SIMD[T](x: x[])
