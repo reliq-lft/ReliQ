@@ -62,7 +62,7 @@ if __name__ == '__main__':
     #cmakev = versions['cmake']
     nimv = versions['nim']
     globalarraysv = versions['globalarrays']
-    kokkosv = versions['kokkos']
+    #kokkosv = versions['kokkos']
 
     spack_path = spack.install(install_path, pathlib.Path(args.spack))
     spack.create_env(spack_path)
@@ -70,9 +70,9 @@ if __name__ == '__main__':
     #cmake.install(spack_path, cmakev)
     nim_path = nim.install(args, spack_path, pathlib.Path(args.nim), nimv)
     globalarrays_path = globalarrays.install(args, spack_path, pathlib.Path(args.globalarrays), globalarraysv)
-    kokkos_path = kokkos.install(args, spack_path, pathlib.Path(args.kokkos), kokkosv)
+    #kokkos_path = kokkos.install(args, spack_path, pathlib.Path(args.kokkos), kokkosv)
 
     spack.link(spack_path, install_path)
     nim.link(nim_path, install_path)
     globalarrays.link(globalarrays_path, install_path)
-    kokkos.link(kokkos_path, install_path)
+    #kokkos.link(kokkos_path, install_path)

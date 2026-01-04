@@ -43,7 +43,7 @@ if envThreads.len > 0:
   try: numThreads = parseInt(envThreads)
   except ValueError: numThreads = countProcessors()
 
-macro all*(x: ForLoopStmt): untyped =
+macro each*(x: ForLoopStmt): untyped =
   ## Threaded + vectorized for loop consturct
   ## 
   ## Turns a `for` loop of the form:
@@ -67,7 +67,7 @@ macro all*(x: ForLoopStmt): untyped =
       let baseChunkSize = (totalWork + numThreads - 1) div numThreads
       let chunkSize = ((baseChunkSize + vectorWidth - 1) div vectorWidth) * vectorWidth
 
-      proc worker(threadId: int) =
+      proc workerAll(threadId: int) =
         let startIdx = `lo` + threadId * chunkSize
         let endIdx = min(`lo` + (threadId + 1) * chunkSize, `hi`)
         
@@ -79,8 +79,42 @@ macro all*(x: ForLoopStmt): untyped =
       var m = createMaster()
       m.awaitAll:
         for threadId in 0..<numThreads:
-          m.spawn worker(threadId)
+          m.spawn workerAll(threadId)
+
+macro all*(x: ForLoopStmt): untyped =
+  ## Threaded for loop construct
+  ## 
+  ## Turns a `for` loop of the form:
+  ## ```
+  ## for i in every 0..10: <body>
+  ## ```
+  ## into a simple loop that iterates over the specified range.
+  let (idnt, call, body) = (x[0], x[1], x[2])
+  let (itr, rng) = (call[1], call[1][0])
+  let (lo, hi) = (itr[1], itr[^1])
+  
+  if $rng != "..<":
+    error("Only half-open ranges with '..<' are supported in 'every' loops")
+  
+  result = quote do:
+    let totalWork = `hi` - `lo`
+    let baseChunkSize = (totalWork + numThreads - 1) div numThreads
+
+    proc workerEvery(threadId: int) =
+      let startIdx = `lo` + threadId * baseChunkSize
+      let endIdx = min(`lo` + (threadId + 1) * baseChunkSize, `hi`)
+      
+      for `idnt` in startIdx..<endIdx:
+        `body`
+      
+    var m = createMaster()
+    m.awaitAll:
+      for threadId in 0..<numThreads:
+        m.spawn workerEvery(threadId)
 
 when isMainModule:
+  for n in each 0..<80:
+    echo n
+  
   for n in all 0..<80:
     echo n
