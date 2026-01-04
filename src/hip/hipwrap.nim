@@ -56,6 +56,9 @@
 # HIP runtime C++ FFI
 import std/strformat, macros
 
+# Receive vectorWidth from compile-time define (passed via --define:"vectorWidth=N")
+const vectorWidth* {.intdefine.} = 0  # Must be set via Makefile define
+
 type
   size_t* = uint64
   uint8_t* = uint8

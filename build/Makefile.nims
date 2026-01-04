@@ -43,8 +43,20 @@ const nimArgs = [""]
 const cxxFlags = [""]
 const cxxLinks = [""]
 
+const cpuIntrinsics = ["sse", "avx2", "avx512"]
+
+const cpuVectorWidth = 8
+const gpuVectorWidth = 32
+
 const useCuda = false
 const useHip = false
+
+### derived configuration specifications: users should not touch these ###
+
+when useCuda or useHip:
+  const vectorWidth = gpuVectorWidth
+else:
+  const vectorWidth = cpuVectorWidth
 
 ### dependency specifications: users should not touch these ###
 
@@ -142,6 +154,7 @@ task build, "building file":
   cmpl += "--passL:\"" & passL & "\""
   cmpl += "-o:bin/" & args[^1]
   cmpl += "--cc:" & compiler
+  cmpl += "--define:vectorWidth=" & $vectorWidth
   when useCuda:
     cmpl += "--define:nvidia"
   elif useHip:
@@ -149,6 +162,13 @@ task build, "building file":
   else:
     cmpl += "--define:cpu"
     cmpl += "--threads:on"
+    for intrin in cpuIntrinsics:
+      cmpl += "--define:" & intrin
+      # Add corresponding C++ compiler flags for each intrinsic
+      case intrin:
+      of "sse": cmpl += "--passC:\"-msse -msse2\""
+      of "avx2": cmpl += "--passC:\"-mavx -mavx2\""
+      of "avx512": cmpl += "--passC:\"-mavx512f -mavx512dq\""
   cmpl += "--define:\"useMalloc\""
   for prmIdx in 0..<(args.len - 1): cmpl += args[prmIdx]
   cmpl += search("src", args[^1])
