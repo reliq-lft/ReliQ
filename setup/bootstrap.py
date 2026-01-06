@@ -76,3 +76,8 @@ if __name__ == '__main__':
     nim.link(nim_path, install_path)
     globalarrays.link(globalarrays_path, install_path)
     #kokkos.link(kokkos_path, install_path)
+
+    # install threading library
+    nimExec = install_path / 'bin' / 'nim'
+    nimbleExec = install_path / 'bin' / 'nimble'
+    tools.exec(nimbleExec, '--nim:' + str(nimExec), 'install', 'malebolgia')
