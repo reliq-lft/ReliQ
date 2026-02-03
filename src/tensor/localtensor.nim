@@ -27,38 +27,90 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+import lattice
 import globaltensor
 
-import opencl/[nimcl]
+import globalarrays/[gatypes, gawrap]
+import utils/[private, complex]
 
-type HostStorage[T] = ptr UncheckedArray[T]
+when isMainModule:
+  import globalarrays/[gampi, gabase]
+  import utils/[commandline]
+  from lattice/simplecubiclattice import SimpleCubicLattice
 
-type DeviceStorage[T] = object
-  ## Device memory storage representation
-  ##
-  ## Represents a pointer to data stored in device memory.
-  data*: HostStorage[T]
-  tracker*: ref HostStorage[T]
+type HostStorage*[T] = ptr UncheckedArray[T]
 
-type HostTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
+type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
   ## Local tensor field on host memory
   ## 
   ## Represents a local tensor field on host memory defined on a lattice with 
   ## specified dimensions and data type.
   lattice*: L
+  localGrid*: array[D, int]
   shape*: array[R, int]
   when isComplex32(T): data*: HostStorage[float32]
   elif isComplex64(T): data*: HostStorage[float64]
   else: data*: HostStorage[T]
+  hasPadding*: bool
 
-type DeviceTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
-  ## Local tensor field on device memory
-  ## 
-  ## Represents a local tensor field on device memory defined on a lattice with 
-  ## specified dimensions and data type.
-  lattice*: L
-  shape*: array[R, int]
-  when isComplex32(T): data*: DeviceStorage[float32]
-  elif isComplex64(T): data*: DeviceStorage[float64]
-  else: data*: DeviceStorage[T]
+proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T];
+  padded: bool = false
+): LocalTensorField[D, R, L, T] =
+  ## Create a new local tensor field from a global tensor field
+  ##
+  ## Downcast global tensor to local tensor on node
+  const rank = D + R + 1
+  let handle = tensor.data.getHandle()
+  var paddedGrid: array[rank, cint]
+  var lo, hi: array[rank, cint]
+  var ld: array[rank-1, cint]
+  var p: pointer
+  let pid = GA_Nodeid()
+
+  handle.NGA_Distribution(pid, addr lo[0], addr hi[0])
+  if padded: handle.NGA_Access_ghosts(addr paddedGrid[0], addr p, addr ld[0])
+  else: 
+    handle.NGA_Access(addr lo[0], addr hi[0], addr p, addr ld[0])
+    paddedGrid = tensor.data.getLocalGrid().mapTo(cint)
+
+  # Compute local grid dimensions from lo/hi
+  var localGrid: array[D, int]
+  for i in 0..<D:
+    localGrid[i] = int(hi[i] - lo[i] + 1)
+
+  result = LocalTensorField[D, R, L, T](
+    lattice: tensor.lattice,
+    localGrid: localGrid,
+    shape: tensor.shape,
+    hasPadding: padded
+  )
+
+  when isComplex32(T): result.data = cast[HostStorage[float32]](p)
+  elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
+  else: result.data = cast[HostStorage[T]](p)
+
+when isMainModule:
+  block:
+    var argc = cargc()
+    var argv = cargv(argc)
+    
+    initMPI(addr argc, addr argv)
+    initGA()
+    
+    block:
+      let dims: array[4, int] = [8, 8, 8, 16]
+      let lattice = newSimpleCubicLattice(dims)
+
+      # create global tensor fields
+      var realTensorField1 = lattice.newTensorField([3, 3]): float64
+      var complexTensorField1 = lattice.newTensorField([3, 3]): Complex64
+
+      # create local tensor fields on host memory
+      var localRealTensorField1 = realTensorField1.newLocalTensorField()
+      var localComplexTensorField1 = complexTensorField1.newLocalTensorField()
+
+    finalizeGA()
+    finalizeMPI()
+
 

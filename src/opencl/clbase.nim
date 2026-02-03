@@ -75,7 +75,7 @@
 
 import std/[macros]
 
-import oclwrap
+import clwrap
 
 type
   PlatformNotFound = object of Exception
@@ -228,7 +228,7 @@ proc buffer*[A](context: PContext, size: int, flags: Tmem_flags = MEM_READ_WRITE
   result = createBuffer(context, flags, size * sizeof(A), nil, addr status)
   check status
 
-proc bufferLike*[A](context: PContext, xs: seq[A], flags: Tmem_flags = MEM_READ_WRITE): PMem =
+proc bufferLike*[A](context: PContext, xs: openArray[A], flags: Tmem_flags = MEM_READ_WRITE): PMem =
   buffer[A](context, xs.len, flags)
 
 proc buildErrors*(program: PProgram, devices: seq[PDeviceId]): string =
@@ -326,15 +326,72 @@ template release*(program: PProgram) = check releaseProgram(program)
 template release*(buffer: PMem) = check releaseMemObject(buffer)
 template release*(context: PContext) = check releaseContext(context)
 
+# OpenCL initialization and finalization
+
+template initCL*: untyped =
+  let (
+    clDevices {.inject.}, 
+    clContext {.inject.}, 
+    clQueues  {.inject.}
+  ) = multipleDeviceDefaults()
+
+template finalizeCL*: untyped =
+  for queue in clQueues: release(queue)
+  release(clContext)
+
 when isMainModule:
   # OpenCL initialization: assuming single platform (TODO: handle multiple platforms),
   # detect platform devices and create both context and commend queue from the 
   # available devices
-  let (devices, context, queues) = multipleDeviceDefaults()
+  initCL()
 
-  for device in devices:
+  for device in clDevices:
     echo "Device: ", device.name
     echo "  Max work groups: ", device.maxWorkGroups
     echo "  Max work items: ", device.maxWorkItems
     echo "  Local memory: ", device.localMemory div 1024, " KB"
     echo "  Global memory: ", device.globalMemory div (1024*1024), " MB"
+  
+  let
+    program = clContext.createAndBuild("""
+    __kernel void vadd(
+      __global const float* a,
+      __global const float* b,
+      __global float* c
+    ) { int gid = get_global_id(0); c[gid] = a[gid] + b[gid]; }
+    """, clDevices)
+    size = 1_000_000
+  
+  var kernel = program.createKernel("vadd")
+
+  var
+    a = newSeq[float32](size)
+    b = newSeq[float32](size)
+    c = newSeq[float32](size)
+  
+  var
+    gpuA = clContext.bufferLike(a)
+    gpuB = clContext.bufferLike(b)
+    gpuC = clContext.bufferLike(c)
+  
+  kernel.args(gpuA, gpuB, gpuC)
+
+  for i in 0..<size:
+    a[i] = float(i)
+    b[i] = float(2*i)
+  
+  clQueues[0].write(a, gpuA)
+  clQueues[0].write(b, gpuB)
+  clQueues[0].run(kernel, size)
+  clQueues[0].read(c, gpuC)
+
+  for i in 0..<size:
+    assert c[i] == a[i] + b[i], "Error at index " & $i
+  
+  release(kernel)
+  release(program)
+  release(gpuA)
+  release(gpuB)
+  release(gpuC)
+
+  finalizeCL()

@@ -37,7 +37,7 @@ when isMainModule:
   import utils/[commandline]
   from lattice/simplecubiclattice import SimpleCubicLattice
 
-type GlobalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
+type TensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
   ## Tensor field representation on a lattice
   ##
   ## Represents a distributed tensor field defined on a lattice with specified 
@@ -88,24 +88,24 @@ type GlobalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = obje
 
 #[ constructor ]#
 
-proc newGlobalTensorField*[D: static[int], R: static[int], L: Lattice[D]](
+proc newTensorField*[D: static[int], R: static[int], L: Lattice[D]](
   lattice: L,
   shape: array[R, int],
   T: typedesc
-): GlobalTensorField[D, R, L, T] =
-  ## Create a new GlobalTensorField
+): TensorField[D, R, L, T] =
+  ## Create a new TensorField
   ##
   ## Parameters:
   ## - `lattice`: The lattice on which the tensor field is defined
   ## - `shape`: The shape of the tensor field
   ##
   ## Returns:
-  ## A new GlobalTensorField instance
+  ## A new TensorField instance
   ##
   ## Example:
   ## ```nim
   ## let lattice = newSimpleCubicLattice([16, 16, 16, 16])
-  ## let GlobalTensorField = lattice.newGlobalTensorField([3, 3]): float64
+  ## let TensorField = lattice.newTensorField([3, 3]): float64
   ## ```
   const rank = D + R + 1 # +1 for tensor component type (1D for real, 2D for complex)
   var globalGrid: array[rank, int]
@@ -155,8 +155,10 @@ when isMainModule:
     block:
       let dims: array[4, int] = [8, 8, 8, 16]
       let lattice = newSimpleCubicLattice(dims)
-      var realGlobalTensorField1 = lattice.newGlobalTensorField([3, 3]): float64
-      var complexGlobalTensorField1 = lattice.newGlobalTensorField([3, 3]): Complex64
+
+      # create global tensor fields
+      var realTensorField1 = lattice.newTensorField([3, 3]): float64
+      var complexTensorField1 = lattice.newTensorField([3, 3]): Complex64
 
     # All GlobalArrays are now destroyed, safe to finalize
     finalizeGA()
