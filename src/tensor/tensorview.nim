@@ -39,7 +39,7 @@ when isMainModule:
   import utils/[commandline]
   from lattice/simplecubiclattice import SimpleCubicLattice
 
-type IOKind = enum AccRead, AccWrite, AccReadWrite
+type IOKind = enum iokRead, iokWrite, iokReadWrite
 
 type DeviceStorage*[T] = object
   ## Device memory storage representation
@@ -52,9 +52,6 @@ type DeviceStorage*[T] = object
   elementsPerSite*: int     # Elements per lattice site (tensor shape * data type size)
   hostPtr*: pointer         # Pointer to host memory for write-back
   hostOffsets*: seq[int]    # Byte offsets into host memory for each device's portion
-
-# Prevent copying of DeviceStorage to avoid double-free
-proc `=copy`*[T](dest: var DeviceStorage[T], src: DeviceStorage[T]) {.error: "DeviceStorage cannot be copied".}
 
 type TensorFieldView*[D: static[int], R: static[int], L, T] = object
   ## Local tensor field on device memory
@@ -69,12 +66,6 @@ type TensorFieldView*[D: static[int], R: static[int], L, T] = object
   elif isComplex64(T): data*: DeviceStorage[float64]
   else: data*: DeviceStorage[T]
   hasPadding: bool
-
-# Prevent copying of TensorFieldView to avoid double-free
-proc `=copy`*[D: static[int], R: static[int], L, T](
-  dest: var TensorFieldView[D, R, L, T], 
-  src: TensorFieldView[D, R, L, T]
-) {.error: "TensorFieldView cannot be copied".}
 
 #[ constructor/destructor helpers ]#
 
@@ -153,9 +144,9 @@ template newDeviceStorage*[D: static[int], R: static[int], T](
     # Copy data from host to device
     let srcPtr = cast[pointer](addr data[hostOffset])
     case io
-    of AccRead, AccReadWrite:
+    of iokRead, iokReadWrite:
       clQueues[deviceIdx].write(srcPtr, storage.buffers[deviceIdx], bufferSize)
-    of AccWrite: discard
+    of iokWrite: discard
 
     hostOffset += numElements
   
@@ -205,16 +196,26 @@ template newTensorFieldView*[D: static[int], R: static[int], L, T](
   ## Uses global variables clContext and clQueues from initCL.
   tensor.newLocalTensorField().newTensorFieldView(io)
 
+# Prevent copying of DeviceStorage to avoid double-free
+proc `=copy`*[T](dest: var DeviceStorage[T], src: DeviceStorage[T]) 
+  {.error: "DeviceStorage cannot be copied".}
+
+# Prevent copying of TensorFieldView to avoid double-free
+proc `=copy`*[D: static[int], R: static[int], L, T](
+  dest: var TensorFieldView[D, R, L, T], 
+  src: TensorFieldView[D, R, L, T]
+) {.error: "TensorFieldView cannot be copied".}
+
 template `=destroy`*[D: static[int], R: static[int], L, T](
   view: var TensorFieldView[D, R, L, T]
 ) =
   ## Destructor for TensorFieldView
   ##
-  ## Writes device data back to host memory if ioKind is AccWrite or AccReadWrite,
+  ## Writes device data back to host memory if ioKind is iokWrite or iokReadWrite,
   ## then releases all device buffers.
   if view.data.buffers.len > 0:
     case view.ioKind:
-      of AccWrite, AccReadWrite:
+      of iokWrite, iokReadWrite:
         if not view.data.hostPtr.isNil:
           for deviceIdx in 0..<view.data.buffers.len:
             let buf = view.data.buffers[deviceIdx]
@@ -223,7 +224,7 @@ template `=destroy`*[D: static[int], R: static[int], L, T](
               let bufferSize = numElements * sizeof(T)
               let destPtr = cast[pointer](cast[int](view.data.hostPtr) + view.data.hostOffsets[deviceIdx])
           clQueues[deviceIdx].read(destPtr, buf, bufferSize)
-      of AccRead: discard
+      of iokRead: discard
     
     # Release all buffers
     for buf in view.data.buffers:
@@ -250,10 +251,10 @@ when isMainModule:
       var localComplexTensorField1 = complexTensorField1.newLocalTensorField()
 
       # transfer local tensor fields to device memory
-      var deviceRealTensorView1 = localRealTensorField1.newTensorFieldView(AccRead)
-      var deviceComplexTensorView1 = localComplexTensorField1.newTensorFieldView(AccRead)
-      var deviceRealTensorView2 = realTensorField1.newTensorFieldView(AccWrite)
-      var deviceComplexTensorView2 = complexTensorField1.newTensorFieldView(AccWrite)
+      var deviceRealTensorView1 = localRealTensorField1.newTensorFieldView(iokRead)
+      var deviceComplexTensorView1 = localComplexTensorField1.newTensorFieldView(iokRead)
+      var deviceRealTensorView2 = realTensorField1.newTensorFieldView(iokWrite)
+      var deviceComplexTensorView2 = complexTensorField1.newTensorFieldView(iokWrite)
     
     # tensors created in block go out of scope here and are destroyed
 
