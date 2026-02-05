@@ -28,13 +28,11 @@
 ]#
 
 import clbase
-import clcmp
 import cldisp
 
-export clcmp
 export cldisp
 
-template parallel*(body: untyped): untyped =
+template clParallel*(body: untyped): untyped =
   initCL()
   body
   finalizeCL()
@@ -42,10 +40,10 @@ template parallel*(body: untyped): untyped =
 when isMainModule:
   import std/[unittest, random, math, times]
 
-  suite "OpenCL Parallel Dispatch":
+  suite "OpenCL clParallel Dispatch":
     
     test "Vector addition - small (1K elements)":
-      parallel:
+      clParallel:
         const size = 1_000
         var
           a = newSeq[float](size)
@@ -73,7 +71,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Vector addition - medium (100K elements)":
-      parallel:
+      clParallel:
         const size = 100_000
         var
           a = newSeq[float](size)
@@ -101,7 +99,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Vector addition - large (1M elements)":
-      parallel:
+      clParallel:
         const size = 1_000_000
         var
           a = newSeq[float](size)
@@ -129,7 +127,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Vector addition - stress test (10M elements)":
-      parallel:
+      clParallel:
         const size = 10_000_000
         var
           a = newSeq[float](size)
@@ -161,7 +159,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Random data verification":
-      parallel:
+      clParallel:
         const size = 500_000
         var rng = initRand(42)
         var
@@ -190,7 +188,7 @@ when isMainModule:
           check abs(c[i] - (a[i] + b[i])) < 1e-10
 
     test "Edge case - single element":
-      parallel:
+      clParallel:
         const size = 1
         var
           a = @[42.0]
@@ -214,7 +212,7 @@ when isMainModule:
 
     test "Edge case - power of 2 sizes":
       for power in [8, 10, 12, 14, 16]:
-        parallel:
+        clParallel:
           let size = 1 shl power
           var
             a = newSeq[float](size)
@@ -243,7 +241,7 @@ when isMainModule:
 
     test "Edge case - non-power of 2 sizes":
       for size in [17, 127, 1023, 4097, 65537]:
-        parallel:
+        clParallel:
           var
             a = newSeq[float](size)
             b = newSeq[float](size)
@@ -270,7 +268,7 @@ when isMainModule:
             check c[i] == a[i] + b[i]
 
     test "Negative and zero values":
-      parallel:
+      clParallel:
         const size = 10_000
         var
           a = newSeq[float](size)
@@ -298,7 +296,7 @@ when isMainModule:
           check c[i] == 0.0
 
     test "Large values near float limits":
-      parallel:
+      clParallel:
         const size = 1_000
         var
           a = newSeq[float](size)
@@ -326,7 +324,7 @@ when isMainModule:
           check abs(c[i] - (a[i] + b[i])) < 1e20  # Relative tolerance for large numbers
 
     test "Repeated kernel execution":
-      parallel:
+      clParallel:
         const size = 10_000
         const iterations = 10
         var
@@ -358,7 +356,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Typed GpuBuffer - float64":
-      parallel:
+      clParallel:
         const size = 1_000
         var
           a = newSeq[float64](size)
@@ -386,7 +384,7 @@ when isMainModule:
           check c[i] == a[i] + b[i]
 
     test "Typed GpuBuffer - float32":
-      parallel:
+      clParallel:
         const size = 1_000
         var
           a = newSeq[float32](size)
@@ -413,7 +411,7 @@ when isMainModule:
         for i in 0 ..< size:
           check c[i] == a[i] + b[i]
     test "Typed GpuBuffer - int32":
-      parallel:
+      clParallel:
         const size = 1_000
         var
           a = newSeq[int32](size)
@@ -443,7 +441,7 @@ when isMainModule:
     # ===== AXPY and scalar operations =====
     
     test "AXPY - y = a*x + y":
-      parallel:
+      clParallel:
         const size = 10_000
         const alpha = 2.5
         var
@@ -472,7 +470,7 @@ when isMainModule:
           check abs(y[i] - expected[i]) < 1e-10
 
     test "Scalar multiply - y = a*x":
-      parallel:
+      clParallel:
         const size = 5_000
         const alpha = 3.14159
         var
@@ -497,7 +495,7 @@ when isMainModule:
           check abs(y[i] - alpha * x[i]) < 1e-10
 
     test "Vector subtraction":
-      parallel:
+      clParallel:
         const size = 5_000
         var
           a = newSeq[float64](size)
@@ -525,7 +523,7 @@ when isMainModule:
           check c[i] == a[i] - b[i]
 
     test "Element-wise multiplication":
-      parallel:
+      clParallel:
         const size = 5_000
         var
           a = newSeq[float64](size)
@@ -553,7 +551,7 @@ when isMainModule:
           check abs(c[i] - a[i] * b[i]) < 1e-10
 
     test "Element-wise division":
-      parallel:
+      clParallel:
         const size = 5_000
         var
           a = newSeq[float64](size)
@@ -583,7 +581,7 @@ when isMainModule:
     # ===== Conditional operations =====
 
     test "If statement - conditional assignment":
-      parallel:
+      clParallel:
         const size = 10_000
         var
           a = newSeq[float64](size)
@@ -610,7 +608,7 @@ when isMainModule:
           check b[i] == abs(a[i])
 
     test "If-elif-else chain":
-      parallel:
+      clParallel:
         const size = 9_000
         var
           a = newSeq[int32](size)
@@ -642,7 +640,7 @@ when isMainModule:
           else: check b[i] == 300
 
     test "Nested if statements":
-      parallel:
+      clParallel:
         const size = 10_000
         var
           x = newSeq[int32](size)
@@ -684,7 +682,7 @@ when isMainModule:
     # ===== Complex arithmetic =====
 
     test "Polynomial evaluation - ax^2 + bx + c":
-      parallel:
+      clParallel:
         const size = 5_000
         const a_coef = 2.0
         const b_coef = -3.0
@@ -712,7 +710,7 @@ when isMainModule:
           check abs(y[i] - expected) < 1e-8
 
     test "Complex expression with multiple operators":
-      parallel:
+      clParallel:
         const size = 5_000
         var
           a = newSeq[float64](size)
@@ -747,7 +745,7 @@ when isMainModule:
     # ===== Mixed types =====
 
     test "Mixed precision - float32 AXPY":
-      parallel:
+      clParallel:
         const size = 10_000
         const alpha: float32 = 2.5
         var
@@ -776,7 +774,7 @@ when isMainModule:
           check abs(y[i] - expected[i]) < 1e-3  # float32 has ~7 decimal digits of precision
 
     test "Integer arithmetic":
-      parallel:
+      clParallel:
         const size = 10_000
         var
           a = newSeq[int32](size)

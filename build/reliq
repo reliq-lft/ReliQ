@@ -35,15 +35,31 @@ import pathlib
 
 CWD: str = pathlib.Path.cwd()
 SWD: pathlib.Path = pathlib.Path(__file__).absolute().parent
-DESCRIPTION: str = "Convenience script for executing ReliQ program"
+DESCRIPTION: str = """ReliQ: Lattice Field Theory Framework
+
+Run a compiled ReliQ executable with parallel configuration.
+
+For compile-time options, use 'make help' in the build directory."""
 
 OMP_URL: str = "https://www.openmp.org/specifications"
+
+BUILD_HELP = """
+Compile-time Options (use with make):
+  make <target> [OPTION=value ...]
+
+  VECTOR_WIDTH=N    SIMD width for AoSoA vectorization (default: 8)
+  DEBUG_KERNELS=1   Print generated OpenCL kernel source
+  USE_WORKGROUPS=1  Force work-group size = VectorWidth (for debugging)
+
+  Run 'make help' for full documentation.
+"""
 
 if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser(
         description = DESCRIPTION,
-        formatter_class = argparse.ArgumentDefaultsHelpFormatter
+        formatter_class = argparse.RawDescriptionHelpFormatter,
+        epilog = BUILD_HELP
     )
     parser.add_argument(
         '-e',
@@ -90,10 +106,15 @@ if __name__ == '__main__':
     OMP_PROC_BIND: str = args.OMP_PROC_BIND
     OMP_PLACES: str = args.OMP_PLACES
     env_vars = {
-        "KOKKOS_NUM_THREADS": XXX_NUM_THREADS,
+        # OpenMP
         "OMP_NUM_THREADS": XXX_NUM_THREADS,
         "OMP_PROC_BIND": OMP_PROC_BIND,
-        "OMP_PLACES": OMP_PLACES
+        "OMP_PLACES": OMP_PLACES,
+        # Kokkos
+        "KOKKOS_NUM_THREADS": XXX_NUM_THREADS,
+        # OpenCL CPU runtimes
+        "POCL_MAX_PTHREAD_COUNT": XXX_NUM_THREADS,  # pocl (open-source)
+        "CL_CONFIG_CPU_FORCE_MAX_MEM_ALLOC_SIZE": "2147483648",  # Intel 2GB
     }
     for var, value in env_vars.items(): os.environ[var] = value
 
@@ -102,6 +123,6 @@ if __name__ == '__main__':
 
     # execute ReliQ program
     cmd = str(SWD / 'external' / 'bin' / 'mpirun')
-    cmd += ' -np ' + str(int(args.ntasks) + 1)
+    cmd += ' -np ' + str(int(args.ntasks))
     cmd += ' ' + str(SWD / 'bin' / args.executable)
     subprocess.run(cmd, shell = True, check = True)

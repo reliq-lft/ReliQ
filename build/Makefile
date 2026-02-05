@@ -28,13 +28,96 @@
 
 NIM = external/bin/nim
 
-reliq:
-	$(NIM) build build/Makefile.nims $(ARGS) $(MAKECMDGOALS)
+# ============================================================================
+# Compile-time flags (convenience wrappers for -d:Flag:value)
+# ============================================================================
+# Usage: make <target> DEBUG_KERNELS=1 USE_WORKGROUPS=1 VECTOR_WIDTH=16
+#
+# See 'make help' for full list of options
+# ============================================================================
+
+# Build FLAGS based on user-provided variables
+FLAGS =
+
+# VectorWidth: SIMD width for AoSoA vectorization (default: 8)
+ifdef VECTOR_WIDTH
+FLAGS += -d:VectorWidth:$(VECTOR_WIDTH)
+endif
+
+# DebugKernels: Print generated OpenCL kernel source (default: false)
+ifdef DEBUG_KERNELS
+FLAGS += -d:DebugKernels:true
+endif
+
+# UseWorkGroups: Force explicit work-group size = VectorWidth (default: false)
+# Useful for debugging to see thread distribution via group_id, local_id
+ifdef USE_WORKGROUPS
+FLAGS += -d:UseWorkGroups:true
+endif
+
+# ============================================================================
+# Build targets
+# ============================================================================
+
+.PHONY: help clean
+
+# Filter out reserved targets from MAKECMDGOALS for the catch-all
+BUILD_TARGETS := $(filter-out help clean reliq,$(MAKECMDGOALS))
+
+help:
+	@echo ""
+	@echo "ReliQ Build System"
+	@echo "=================="
+	@echo ""
+	@echo "Usage: make <target> [OPTIONS]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  <filename>        Build src/<filename>.nim (e.g., make tensorview)"
+	@echo "  clean             Remove compiled binaries"
+	@echo "  help              Show this help message"
+	@echo ""
+	@echo "Compile-time Options (set to any value to enable):"
+	@echo "  VECTOR_WIDTH=N    SIMD width for AoSoA vectorization"
+	@echo "                    Default: 8 (CPU), 32 (GPU)"
+	@echo "                    Example: make tensorview VECTOR_WIDTH=16"
+	@echo ""
+	@echo "  DEBUG_KERNELS=1   Print generated OpenCL kernel source code"
+	@echo "                    Useful for inspecting kernel generation"
+	@echo "                    Example: make tensorview DEBUG_KERNELS=1"
+	@echo ""
+	@echo "  USE_WORKGROUPS=1  Force explicit OpenCL work-group size = VectorWidth"
+	@echo "                    Enables thread debugging via group_id, local_id"
+	@echo "                    Note: May impact performance; for debugging only"
+	@echo "                    Example: make tensorview USE_WORKGROUPS=1"
+	@echo ""
+	@echo "Advanced: Pass arbitrary Nim flags via ARGS:"
+	@echo "  make tensorview ARGS=\"-d:MyFlag:value --hints:off\""
+	@echo ""
+	@echo "Kernel Debug Variables (available in 'each' loops with echo):"
+	@echo "  gid           Global work item ID (0..numSites-1)"
+	@echo "  g             Alias for gid"
+	@echo "  lane          Lane within vector (gid mod VectorWidth)"
+	@echo "  local_id      Local work item ID within work-group"
+	@echo "  group_id      Work-group ID (≈ POCL pthread ID with USE_WORKGROUPS)"
+	@echo "  local_size    Size of work-group"
+	@echo "  numSites      Total number of lattice sites"
+	@echo "  VW            Alias for VectorWidth"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make tensorview"
+	@echo "  make tensorview DEBUG_KERNELS=1"
+	@echo "  make tensorview USE_WORKGROUPS=1 VECTOR_WIDTH=4"
+	@echo ""
 
 clean:
-	$(NIM) clean build/Makefile.nims $(ARGS) $(MAKECMDGOALS)
+	$(NIM) clean build/Makefile.nims $(ARGS)
 
-%: reliq
-	@
+# Build target: only runs if we have actual build targets
+ifneq ($(BUILD_TARGETS),)
+$(BUILD_TARGETS): build-impl
+	@true
 
-.PHONY: reliq
+.PHONY: build-impl
+build-impl:
+	$(NIM) build build/Makefile.nims $(FLAGS) $(ARGS) $(BUILD_TARGETS)
+endif

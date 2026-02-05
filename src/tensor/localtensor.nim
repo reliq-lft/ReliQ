@@ -90,6 +90,46 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
   else: result.data = cast[HostStorage[T]](p)
 
+proc numGlobalSites*[D: static[int], R: static[int], L: Lattice[D], T](
+  view: LocalTensorField[D, R, L, T]
+): int {.inline.} =
+  ## Returns the total number of lattice sites in the tensor field view
+  result = 1
+  for d in 0..<view.localGrid.len:
+    result *= view.localGrid[d]
+
+proc numElements*[D: static[int], R: static[int], L: Lattice[D], T](
+  view: LocalTensorField[D, R, L, T]
+): int {.inline.} =
+  ## Returns the total number of elements (sites * elements per site)
+  result = view.numGlobalSites()
+  for d in 0..<view.shape.len:
+    result *= view.shape[d]
+
+proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: LocalTensorField[D, R, L, T], idx: int
+): T {.inline.} =
+  ## Element access by flat index
+  when isComplex64(T):
+    complex64(tensor.data[idx * 2], tensor.data[idx * 2 + 1])
+  elif isComplex32(T):
+    complex32(tensor.data[idx * 2], tensor.data[idx * 2 + 1])
+  else:
+    tensor.data[idx]
+
+proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: var LocalTensorField[D, R, L, T], idx: int, value: T
+) {.inline.} =
+  ## Element assignment by flat index
+  when isComplex64(T):
+    tensor.data[idx * 2] = value.re
+    tensor.data[idx * 2 + 1] = value.im
+  elif isComplex32(T):
+    tensor.data[idx * 2] = value.re
+    tensor.data[idx * 2 + 1] = value.im
+  else:
+    tensor.data[idx] = value
+
 when isMainModule:
   block:
     var argc = cargc()
