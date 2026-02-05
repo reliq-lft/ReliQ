@@ -75,7 +75,6 @@
 ## OpenCL wrapper for Nimrod. For more convenient error checking you can
 ## use the 'check' template that turns ``TClResult`` into an exception. 
 
-{.deadCodeElim: on.}
 {.pragma: climport, stdcall, dynlib: "libOpenCL.so".}
 
 type 
@@ -839,7 +838,7 @@ proc createProgramWithSource*(context: Pcontext; count: uint32;
     importc: "clCreateProgramWithSource", climport.}
 proc createProgramWithBinary*(context: Pcontext; num_devices: uint32; 
                               device_list: ptr Pdevice_id; lengths: ptr int; 
-                              binaries: ptr ptr cuchar; 
+                              binaries: ptr ptr uint8; 
                               binary_status: ptr int32; errcode_ret: ptr TClResult): Pprogram {.
     importc: "clCreateProgramWithBinary", climport.}
 proc createProgramWithBuiltInKernels*(context: Pcontext; num_devices: uint32; 

@@ -76,10 +76,11 @@
 import std/[macros]
 
 import clwrap
+export clwrap
 
 type
-  PlatformNotFound = object of Exception
-  DeviceNotFound = object of Exception
+  PlatformNotFound = object of CatchableError
+  DeviceNotFound = object of CatchableError
 
 type CLResource = PCommandQueue | PKernel | PProgram | PMem | PContext
 
@@ -202,7 +203,7 @@ proc createProgramBinary*(context: PContext, device: PDeviceId, body: string): P
   var dev = device
   var lines = [cstring(body)]
   var L = body.len
-  result = createProgramWithBinary(context, 1, addr dev, addr L, cast[ptr ptr cuchar](addr lines), addr binaryStatus, addr status)
+  result = createProgramWithBinary(context, 1, addr dev, addr L, cast[ptr ptr uint8](addr lines), addr binaryStatus, addr status)
   check status
 
 proc buildOn*(program: PProgram, devices: seq[PDeviceId]) =
@@ -231,6 +232,47 @@ proc buffer*[A](context: PContext, size: int, flags: Tmem_flags = MEM_READ_WRITE
 proc bufferLike*[A](context: PContext, xs: openArray[A], flags: Tmem_flags = MEM_READ_WRITE): PMem =
   buffer[A](context, xs.len, flags)
 
+# Typed GPU buffer wrapper - preserves element type information
+type GpuBuffer*[T] = object
+  mem*: PMem
+  len*: int
+
+proc gpuBuffer*[T](context: PContext, size: int, flags: Tmem_flags = MEM_READ_WRITE): GpuBuffer[T] =
+  ## Creates a typed GPU buffer that preserves element type information
+  var status: TClResult
+  result.mem = createBuffer(context, flags, size * sizeof(T), nil, addr status)
+  result.len = size
+  check status
+
+proc gpuBufferLike*[T](context: PContext, xs: openArray[T], flags: Tmem_flags = MEM_READ_WRITE): GpuBuffer[T] =
+  ## Creates a typed GPU buffer with the same size as the input array
+  gpuBuffer[T](context, xs.len, flags)
+
+proc write*[T](queue: PCommandQueue, src: var seq[T], dest: GpuBuffer[T]) =
+  ## Writes data from a seq to a typed GPU buffer
+  check enqueueWriteBuffer(queue, dest.mem, CL_FALSE, 0, src.len * sizeof(T), addr src[0], 0, nil, nil)
+
+proc read*[T](queue: PCommandQueue, dest: var seq[T], src: GpuBuffer[T]) =
+  ## Reads data from a typed GPU buffer to a seq
+  check enqueueReadBuffer(queue, src.mem, CL_TRUE, 0, dest.len * sizeof(T), addr dest[0], 0, nil, nil)
+
+template release*[T](buffer: GpuBuffer[T]) = check releaseMemObject(buffer.mem)
+
+# Phantom [] operator for GpuBuffer - provides type info for the typed macro
+# These are never called at runtime; the body becomes OpenCL code
+# The implementation raises an error if somehow called
+proc `[]`*[T](buffer: GpuBuffer[T], index: int): T = 
+  raise newException(Defect, "GpuBuffer[] should not be called - this is a phantom operator for type inference")
+proc `[]=`*[T](buffer: GpuBuffer[T], index: int, value: T) = 
+  raise newException(Defect, "GpuBuffer[]= should not be called - this is a phantom operator for type inference")
+
+# Phantom [] operator for PMem - defaults to float64 (type-erased fallback)
+# These are never called at runtime; the body becomes OpenCL code
+proc `[]`*(buffer: PMem, index: int): float64 = 
+  raise newException(Defect, "PMem[] should not be called - this is a phantom operator for type inference")
+proc `[]=`*(buffer: PMem, index: int, value: float64) = 
+  raise newException(Defect, "PMem[]= should not be called - this is a phantom operator for type inference")
+
 proc buildErrors*(program: PProgram, devices: seq[PDeviceId]): string =
   var logSize: int
   check getProgramBuildInfo(program, devices[0], PROGRAM_BUILD_LOG, 0, nil, addr logSize)
@@ -246,17 +288,21 @@ type
   LocalBuffer*[A] = distinct int
   anyInt = int or int32 or int64
 
-template setArg(kernel: PKernel, item: PMem, index: int) =
+template setArg*(kernel: PKernel, item: PMem, index: int) =
   var x = item
   check setKernelArg(kernel, index.uint32, sizeof(Pmem), addr x)
 
-template setArg[A](kernel: PKernel, item: var A, index: int) =
+template setArg*[T](kernel: PKernel, item: GpuBuffer[T], index: int) =
+  var x = item.mem
+  check setKernelArg(kernel, index.uint32, sizeof(Pmem), addr x)
+
+template setArg*[A](kernel: PKernel, item: var A, index: int) =
   check setKernelArg(kernel, index.uint32, sizeof(A), addr item)
 
-template setArg[A](kernel: PKernel, item: LocalBuffer[A], index: int) =
+template setArg*[A](kernel: PKernel, item: LocalBuffer[A], index: int) =
   check setKernelArg(kernel, index.uint32, int(item) * sizeof(A), nil)
 
-template setArg(kernel: PKernel, item: anyInt, index: int) =
+template setArg*(kernel: PKernel, item: anyInt, index: int) =
   var x = item
   check setKernelArg(kernel, index.uint32, sizeof(type(item)), addr x)
 
@@ -395,3 +441,141 @@ when isMainModule:
   release(gpuC)
 
   finalizeCL()
+
+#[ ============================================================================
+   OpenCL DSL Pragmas and Stub Functions
+   ============================================================================
+   These are used by the compile-time Nim-to-OpenCL compiler.
+   The stub implementations allow typed Nim code to compile on the host,
+   while the names are preserved in the generated OpenCL C code.
+]#
+
+# Pragmas for marking kernels and memory qualifiers
+template kernel*() {.pragma.}     ## Mark proc as __kernel
+template device*() {.pragma.}     ## Helper function (no qualifier in OpenCL)
+template global*() {.pragma.}     ## __global memory qualifier
+template local*() {.pragma.}      ## __local memory qualifier
+template constant*() {.pragma.}   ## __constant memory qualifier
+template oclName*(s: string): untyped {.pragma.}  ## Custom OpenCL name
+
+# Work-item functions
+type Dim* = cint
+
+proc get_global_id_impl(dim: Dim): Dim = 0
+proc get_local_id_impl(dim: Dim): Dim = 0
+proc get_group_id_impl(dim: Dim): Dim = 0
+proc get_global_size_impl(dim: Dim): Dim = 0
+proc get_local_size_impl(dim: Dim): Dim = 0
+proc get_num_groups_impl(dim: Dim): Dim = 0
+proc get_work_dim_impl(): Dim = 0
+proc get_global_offset_impl(dim: Dim): Dim = 0
+
+template get_global_id*(dim: Dim): Dim = get_global_id_impl(dim)
+template get_local_id*(dim: Dim): Dim = get_local_id_impl(dim)
+template get_group_id*(dim: Dim): Dim = get_group_id_impl(dim)
+template get_global_size*(dim: Dim): Dim = get_global_size_impl(dim)
+template get_local_size*(dim: Dim): Dim = get_local_size_impl(dim)
+template get_num_groups*(dim: Dim): Dim = get_num_groups_impl(dim)
+template get_work_dim*(): Dim = get_work_dim_impl()
+template get_global_offset*(dim: Dim): Dim = get_global_offset_impl(dim)
+
+# Synchronization functions
+proc barrier_impl*(flags: cint) = discard
+template barrier*(flags: cint) = barrier_impl(flags)
+
+proc mem_fence_impl*(flags: cint) = discard
+template mem_fence*(flags: cint) = mem_fence_impl(flags)
+
+proc read_mem_fence_impl*(flags: cint) = discard
+template read_mem_fence*(flags: cint) = read_mem_fence_impl(flags)
+
+proc write_mem_fence_impl*(flags: cint) = discard
+template write_mem_fence*(flags: cint) = write_mem_fence_impl(flags)
+
+const CLK_LOCAL_MEM_FENCE* = 1.cint
+const CLK_GLOBAL_MEM_FENCE* = 2.cint
+
+# Atomic functions (int32)
+proc atomic_add_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_sub_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_xchg_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_inc_impl*(p: ptr int32): int32 = discard
+proc atomic_dec_impl*(p: ptr int32): int32 = discard
+proc atomic_cmpxchg_impl*(p: ptr int32, cmp, val: int32): int32 = discard
+proc atomic_min_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_max_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_and_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_or_impl*(p: ptr int32, val: int32): int32 = discard
+proc atomic_xor_impl*(p: ptr int32, val: int32): int32 = discard
+
+template atomic_add*(p: ptr int32, val: int32): int32 = atomic_add_impl(p, val)
+template atomic_sub*(p: ptr int32, val: int32): int32 = atomic_sub_impl(p, val)
+template atomic_xchg*(p: ptr int32, val: int32): int32 = atomic_xchg_impl(p, val)
+template atomic_inc*(p: ptr int32): int32 = atomic_inc_impl(p)
+template atomic_dec*(p: ptr int32): int32 = atomic_dec_impl(p)
+template atomic_cmpxchg*(p: ptr int32, cmp, val: int32): int32 = atomic_cmpxchg_impl(p, cmp, val)
+template atomic_min*(p: ptr int32, val: int32): int32 = atomic_min_impl(p, val)
+template atomic_max*(p: ptr int32, val: int32): int32 = atomic_max_impl(p, val)
+template atomic_and*(p: ptr int32, val: int32): int32 = atomic_and_impl(p, val)
+template atomic_or*(p: ptr int32, val: int32): int32 = atomic_or_impl(p, val)
+template atomic_xor*(p: ptr int32, val: int32): int32 = atomic_xor_impl(p, val)
+
+# Math functions (float32)
+proc sin*(x: float32): float32 {.importc: "sinf", nodecl.}
+proc cos*(x: float32): float32 {.importc: "cosf", nodecl.}
+proc tan*(x: float32): float32 {.importc: "tanf", nodecl.}
+proc asin*(x: float32): float32 {.importc: "asinf", nodecl.}
+proc acos*(x: float32): float32 {.importc: "acosf", nodecl.}
+proc atan*(x: float32): float32 {.importc: "atanf", nodecl.}
+proc atan2*(y, x: float32): float32 {.importc: "atan2f", nodecl.}
+proc sinh*(x: float32): float32 {.importc: "sinhf", nodecl.}
+proc cosh*(x: float32): float32 {.importc: "coshf", nodecl.}
+proc tanh*(x: float32): float32 {.importc: "tanhf", nodecl.}
+proc exp*(x: float32): float32 {.importc: "expf", nodecl.}
+proc exp2*(x: float32): float32 {.importc: "exp2f", nodecl.}
+proc log*(x: float32): float32 {.importc: "logf", nodecl.}
+proc log2*(x: float32): float32 {.importc: "log2f", nodecl.}
+proc log10*(x: float32): float32 {.importc: "log10f", nodecl.}
+proc pow*(x, y: float32): float32 {.importc: "powf", nodecl.}
+proc sqrt*(x: float32): float32 {.importc: "sqrtf", nodecl.}
+proc rsqrt_impl*(x: float32): float32 = 1.0f / sqrt(x)
+template rsqrt*(x: float32): float32 = rsqrt_impl(x)
+proc fabs*(x: float32): float32 {.importc: "fabsf", nodecl.}
+proc floor*(x: float32): float32 {.importc: "floorf", nodecl.}
+proc ceil*(x: float32): float32 {.importc: "ceilf", nodecl.}
+proc round*(x: float32): float32 {.importc: "roundf", nodecl.}
+proc trunc*(x: float32): float32 {.importc: "truncf", nodecl.}
+proc fmod*(x, y: float32): float32 {.importc: "fmodf", nodecl.}
+proc fmin*(x, y: float32): float32 {.importc: "fminf", nodecl.}
+proc fmax*(x, y: float32): float32 {.importc: "fmaxf", nodecl.}
+proc fma*(a, b, c: float32): float32 {.importc: "fmaf", nodecl.}
+
+proc clamp_impl*(x, minVal, maxVal: float32): float32 = fmin(fmax(x, minVal), maxVal)
+template clamp*(x, minVal, maxVal: float32): float32 = clamp_impl(x, minVal, maxVal)
+
+# Native (fast) math functions - stubs that call regular versions
+proc native_sin_impl*(x: float32): float32 = sin(x)
+proc native_cos_impl*(x: float32): float32 = cos(x)
+proc native_tan_impl*(x: float32): float32 = tan(x)
+proc native_exp_impl*(x: float32): float32 = exp(x)
+proc native_exp2_impl*(x: float32): float32 = exp2(x)
+proc native_log_impl*(x: float32): float32 = log(x)
+proc native_log2_impl*(x: float32): float32 = log2(x)
+proc native_log10_impl*(x: float32): float32 = log10(x)
+proc native_sqrt_impl*(x: float32): float32 = sqrt(x)
+proc native_rsqrt_impl*(x: float32): float32 = rsqrt(x)
+proc native_recip_impl*(x: float32): float32 = 1.0f / x
+proc native_powr_impl*(x, y: float32): float32 = pow(x, y)
+
+template native_sin*(x: float32): float32 = native_sin_impl(x)
+template native_cos*(x: float32): float32 = native_cos_impl(x)
+template native_tan*(x: float32): float32 = native_tan_impl(x)
+template native_exp*(x: float32): float32 = native_exp_impl(x)
+template native_exp2*(x: float32): float32 = native_exp2_impl(x)
+template native_log*(x: float32): float32 = native_log_impl(x)
+template native_log2*(x: float32): float32 = native_log2_impl(x)
+template native_log10*(x: float32): float32 = native_log10_impl(x)
+template native_sqrt*(x: float32): float32 = native_sqrt_impl(x)
+template native_rsqrt*(x: float32): float32 = native_rsqrt_impl(x)
+template native_recip*(x: float32): float32 = native_recip_impl(x)
+template native_powr*(x, y: float32): float32 = native_powr_impl(x, y)
