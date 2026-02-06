@@ -101,6 +101,9 @@ proc GA_Nnodes*(): cint {.importc: "GA_Nnodes", ga.}
 
 #[ GlobalArrays global operations ]#
 
+proc GA_Brdcst*(buf: pointer, n: cint, root: cint) 
+  {.importc: "GA_Brdcst", ga, discardable.}
+
 proc GA_Igop*(x: ptr int32, n: cint, op: cstring) 
   {.importc: "GA_Igop", ga, discardable.}
 

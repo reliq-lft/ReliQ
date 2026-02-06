@@ -40,24 +40,18 @@ const UseOpenMP* {.booldefine.} = false
 when UseOpenMP:
   import openmp/[openmp]
   export openmp
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      ompParallel:
-        body
 elif UseSycl:
   import sycl/[sycl]
   export sycl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
 else:
   import opencl/[opencl]
   export opencl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
+
+template parallel*(body: untyped): untyped =
+  gaParallel:
+    when UseOpenMP:
+      ompParallel: body
+    elif UseSycl:
+      syclParallel: body
+    else:
+      clParallel: body
