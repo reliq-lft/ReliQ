@@ -29,17 +29,19 @@
 
 ## All Macro for LocalTensorField CPU-only loops
 ##
-## This module provides the `all` iterator for CPU-only parallelized loops
-## on LocalTensorField objects. Unlike TensorFieldView which can use GPU
-## acceleration, LocalTensorField operations are always on host memory.
+## This module provides the `all` iterator for parallelized loops
+## on LocalTensorField objects. LocalTensorField operations run on
+## host memory and use CPU thread parallelization.
 ##
 ## Usage:
 ##   for n in all 0..<local.numSites():
 ##     localC[n] = localA.getSite(n) + localB.getSite(n)
 ##
 ## The `all` macro is exported by parallel.nim for general use.
+## For the corresponding GPU iterator, see `each` in ompdisp.nim.
 
 import std/macros
+import ./ompbase
 
 #[ ============================================================================
    Helper: Check for echo statements (needs serial execution)
@@ -62,50 +64,52 @@ proc hasEchoStatement*(node: NimNode): bool =
    All Macro for LocalTensorField CPU-only loops
    ============================================================================ ]#
 
+{.passC: "-fopenmp".}
+{.passL: "-fopenmp".}
+
+# Emit the OpenMP header at file level
+{.emit: """
+#include <omp.h>
+""".}
+
+# Import the C wrapper for parallel loops
+import ./ompwrap
+
 macro all*(forLoop: ForLoopStmt): untyped =
-  ## OpenMP parallel all loop for LocalTensorField
+  ## OpenMP parallel all loop for LocalTensorField (CPU threads)
   ##
-  ## This macro provides the `all` iterator for CPU-only parallelized loops
-  ## on LocalTensorField objects. Unlike TensorFieldView which can use GPU
-  ## acceleration, LocalTensorField operations are always on host memory.
+  ## Uses ompParallelFor template for actual parallelization.
   ##
   ## Usage:
   ##   for n in all 0..<local.numSites():
   ##     localC[n] = localA.getSite(n) + localB.getSite(n)
-  ##
-  ## Note: Uses getSite() to access sites - returns LocalSiteProxy
   
-  # Extract loop components
   let loopVar = forLoop[0]
   let loopRangeNode = forLoop[1][1]  # Skip 'all' wrapper
   let body = forLoop[2]
   
-  # Check if we need serial execution (echo statements)
+  # Check for echo - needs serial execution
   let needsSerial = hasEchoStatement(body)
   
-  if needsSerial:
-    # Serial fallback for debugging with echo
-    result = quote do:
-      block:
-        let rangeVal = `loopRangeNode`
-        for `loopVar` in rangeVal:
-          `body`
-    return result
-  
-  # Execute the body directly - operators handle memory access
-  # TODO: Add OpenMP parallelization with proper pragma placement
   if loopRangeNode.kind == nnkInfix and loopRangeNode[0].strVal == "..<":
     let startExpr = loopRangeNode[1]
     let endExpr = loopRangeNode[2]
-    result = quote do:
-      block:
-        let startVal = `startExpr`
-        let endVal = `endExpr`
-        for `loopVar` in startVal..<endVal:
-          `body`
+    
+    if needsSerial:
+      result = quote do:
+        block:
+          for `loopVar` in `startExpr`..<`endExpr`:
+            `body`
+    else:
+      # Use ompParallelFor for CPU thread parallelization
+      result = quote do:
+        block:
+          proc loopBody(idx: int64, ctx: pointer) {.cdecl.} =
+            let `loopVar` = int(idx)
+            `body`
+          ompParallelFor(int64(`startExpr`), int64(`endExpr`), loopBody, nil)
   else:
     result = quote do:
       block:
-        let rangeVal = `loopRangeNode`
-        for `loopVar` in rangeVal:
+        for `loopVar` in `loopRangeNode`:
           `body`

@@ -38,11 +38,14 @@
 ## - ompbase: OpenMP runtime bindings and helper functions
 ## - ompdisp: `each` macro for TensorFieldView parallel loops
 ## - omplocal: `all` macro for LocalTensorField CPU-only loops
+## - ompwrap: C wrapper bindings for proper OpenMP parallelization
 
 import ompbase
 import ompdisp
 import omplocal
+import ompwrap
 
 export ompbase
 export ompdisp
 export omplocal
+export ompwrap
