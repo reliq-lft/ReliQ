@@ -33,6 +33,13 @@
 ## known dimensions. They are designed for use with OpenCL kernel generation,
 ## where operations are translated to inline C code.
 
+import std/strformat
+import std/strutils  # for join
+
+# Backend selection - same as tensorview.nim
+const UseSycl* {.booldefine.} = false
+const UseOpenMP* {.booldefine.} = false
+
 #[ Vector type - compile-time sized ]#
 
 type Vec*[N: static[int], T] = object
@@ -233,8 +240,16 @@ type
   TensorSiteProxy*[L, T] = object
     ## Proxy type returned by TensorFieldView[] - represents site tensor at index
     ## Operations on this proxy generate appropriate OpenCL kernel code
-    view*: pointer  # Pointer to view (not used at runtime)
+    ## Also supports runtime use for printing: stores actual tensor data when accessed
+    view*: pointer  # Pointer to view
     site*: int
+    # Runtime data for printing support
+    runtimeData*: RuntimeSiteData[T]
+    # OpenMP-specific fields for direct memory access
+    when UseOpenMP:
+      hostPtr*: pointer      # Direct host memory pointer
+      shape*: seq[int]       # Tensor shape
+      elemsPerSite*: int     # Elements per site
 
   TensorElementProxy*[L, T] = object
     ## Proxy type returned by TensorSiteProxy[] - represents single element at site
@@ -243,19 +258,42 @@ type
     site*: int
     indices*: array[4, int]  # Up to 4D tensor element indices
     numIndices*: int
+    when UseOpenMP:
+      hostPtr*: pointer      # Direct host memory pointer
+      shape*: seq[int]       # Tensor shape
+      elemsPerSite*: int     # Elements per site
+
+  # Runtime-accessible proxy for CPU fallback (print support)
+  RuntimeSiteData*[T] = object
+    ## Holds actual data for a site tensor - used for CPU fallback with printing
+    data*: seq[T]           # Flat array of tensor elements  
+    shape*: seq[int]        # Tensor shape (e.g., [2,2] for 2x2 matrix)
+    rank*: int              # 0=scalar, 1=vector, 2=matrix, etc.
 
   # Operation result marker types
   MatMulResult*[L, T] = object
     ## Result of matrix-matrix multiplication: mat1[n] * mat2[n]
     proxyA*, proxyB*: TensorSiteProxy[L, T]
+    when UseOpenMP:
+      computed*: seq[T]     # Computed result for chained operations
+      hasComputed*: bool    # Whether computed buffer is populated
 
   MatAddResult*[L, T] = object
-    ## Result of matrix addition: mat1[n] + mat2[n]
+    ## Result of matrix addition/subtraction: mat1[n] +/- mat2[n]
     proxyA*, proxyB*: TensorSiteProxy[L, T]
+    isSubtraction*: bool  # true for subtraction, false for addition
+    when UseOpenMP:
+      # For chained expressions, one or both operands may be from computed results
+      computedA*, computedB*: seq[T]
+      hasComputedA*, hasComputedB*: bool
 
   VecAddResult*[L, T] = object
-    ## Result of vector addition: vec1[n] + vec2[n]
+    ## Result of vector addition/subtraction: vec1[n] +/- vec2[n]
     proxyA*, proxyB*: TensorSiteProxy[L, T]
+    isSubtraction*: bool  # true for subtraction, false for addition
+    when UseOpenMP:
+      computedA*, computedB*: seq[T]
+      hasComputedA*, hasComputedB*: bool
 
   MatVecResult*[L, T] = object
     ## Result of matrix-vector multiplication: mat[n] * vec[n]
@@ -271,145 +309,390 @@ type
     proxy*: TensorSiteProxy[L, T]
     scalar*: T
 
+  #[ LocalTensorField Site Proxy Types - for CPU-only "for all" loops ]#
+  
+  LocalSiteProxy*[D: static[int], R: static[int], L, T] = object
+    ## Proxy type returned by LocalTensorField[] for "for all" loops
+    ## Provides CPU-only access to tensor sites without GPU acceleration
+    hostPtr*: pointer        # Direct host memory pointer
+    site*: int               # Site index
+    shape*: array[R, int]    # Tensor shape
+    elemsPerSite*: int       # Elements per site
+
+  LocalAddResult*[D: static[int], R: static[int], L, T] = object
+    ## Result of local tensor addition/subtraction
+    proxyA*, proxyB*: LocalSiteProxy[D, R, L, T]
+    isSubtraction*: bool
+
+  LocalMulResult*[D: static[int], R: static[int], L, T] = object
+    ## Result of local tensor multiplication
+    proxyA*, proxyB*: LocalSiteProxy[D, R, L, T]
+
+  LocalScalarMulResult*[D: static[int], R: static[int], L, T] = object
+    ## Result of local scalar * tensor
+    proxy*: LocalSiteProxy[D, R, L, T]
+    scalar*: T
+
+  LocalScalarAddResult*[D: static[int], R: static[int], L, T] = object
+    ## Result of local tensor + scalar
+    proxy*: LocalSiteProxy[D, R, L, T]
+    scalar*: T
+
 #[ TensorSiteProxy operators for element access ]#
 
-# TensorSiteProxy[] returns element proxy for element-level access
-# For vectors: view[n][i]
-proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i: int): TensorElementProxy[L, T] =
-  raise newException(Defect, "TensorSiteProxy[i] phantom operator")
+when UseOpenMP:
+  # OpenMP backend: real implementations that access host memory directly
+  
+  proc computeElementIndex(shape: seq[int], indices: varargs[int]): int {.inline.} =
+    ## Compute flat array index from tensor indices (row-major order)
+    result = 0
+    var stride = 1
+    for i in countdown(shape.len - 1, 0):
+      if i < indices.len:
+        result += indices[i] * stride
+      stride *= shape[i]
+  
+  # TensorSiteProxy[] for vectors: view[n][i] - read element
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i: int): T {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let elemIdx = proxy.site * proxy.elemsPerSite + i
+    hostData[elemIdx]
+  
+  # TensorSiteProxy[] for matrices: view[n][i, j] - read element
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int): T {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
+    let localIdx = i * cols + j
+    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
+    hostData[elemIdx]
+  
+  # TensorSiteProxy[] for 3D tensors: view[n][i, j, k] - read element
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int): T {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let localIdx = computeElementIndex(proxy.shape, i, j, k)
+    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
+    hostData[elemIdx]
+  
+  # TensorSiteProxy[]= for vectors: view[n][i] = value
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i: int, value: T) {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let elemIdx = proxy.site * proxy.elemsPerSite + i
+    hostData[elemIdx] = value
+  
+  # TensorSiteProxy[]= for matrices: view[n][i, j] = value
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int, value: T) {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
+    let localIdx = i * cols + j
+    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
+    hostData[elemIdx] = value
+  
+  # TensorSiteProxy[]= for 3D tensors: view[n][i, j, k] = value
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int, value: T) {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let localIdx = computeElementIndex(proxy.shape, i, j, k)
+    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
+    hostData[elemIdx] = value
 
-# For matrices: view[n][i, j]
-proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int): TensorElementProxy[L, T] =
-  raise newException(Defect, "TensorSiteProxy[i,j] phantom operator")
+else:
+  # OpenCL/SYCL backend: phantom operators for kernel codegen
+  
+  # TensorSiteProxy[] returns element proxy for element-level access
+  # For vectors: view[n][i]
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i: int): TensorElementProxy[L, T] =
+    raise newException(Defect, "TensorSiteProxy[i] phantom operator")
 
-# For 3D tensors: view[n][i, j, k]
-proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int): TensorElementProxy[L, T] =
-  raise newException(Defect, "TensorSiteProxy[i,j,k] phantom operator")
+  # For matrices: view[n][i, j]
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int): TensorElementProxy[L, T] =
+    raise newException(Defect, "TensorSiteProxy[i,j] phantom operator")
 
-# TensorSiteProxy[]= for writing individual elements
-proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i: int, value: T) =
-  raise newException(Defect, "TensorSiteProxy[i]= phantom operator")
+  # For 3D tensors: view[n][i, j, k]
+  proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int): TensorElementProxy[L, T] =
+    raise newException(Defect, "TensorSiteProxy[i,j,k] phantom operator")
 
-proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int, value: T) =
-  raise newException(Defect, "TensorSiteProxy[i,j]= phantom operator")
+  # TensorSiteProxy[]= for writing individual elements
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i: int, value: T) =
+    raise newException(Defect, "TensorSiteProxy[i]= phantom operator")
 
-proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int, value: T) =
-  raise newException(Defect, "TensorSiteProxy[i,j,k]= phantom operator")
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int, value: T) =
+    raise newException(Defect, "TensorSiteProxy[i,j]= phantom operator")
+
+  proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int, value: T) =
+    raise newException(Defect, "TensorSiteProxy[i,j,k]= phantom operator")
 
 #[ Operators on TensorSiteProxy - generate marker types for codegen ]#
 
-# Matrix/tensor multiplication: mat1[n] * mat2[n] or mat[n] * vec[n]
-proc `*`*[L, T](a, b: TensorSiteProxy[L, T]): MatMulResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy * phantom operator")
+when UseOpenMP:
+  # OpenMP backend: operators return populated result types for direct execution
+  
+  proc `*`*[L, T](a, b: TensorSiteProxy[L, T]): MatMulResult[L, T] {.inline.} =
+    ## Matrix multiplication - returns result type with proxy info
+    result.proxyA = a
+    result.proxyB = b
+  
+  proc `+`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] {.inline.} =
+    ## Matrix/tensor addition
+    result.proxyA = a
+    result.proxyB = b
+    result.isSubtraction = false
+  
+  proc `-`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] {.inline.} =
+    ## Matrix/tensor subtraction
+    result.proxyA = a
+    result.proxyB = b
+    result.isSubtraction = true
+  
+  proc `*`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = scalar
+  
+  proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarMulResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = scalar
+  
+  proc `+`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = scalar
+  
+  proc `+`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarAddResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = scalar
 
-# Matrix/tensor addition: mat1[n] + mat2[n]
-proc `+`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy + phantom operator")
+  # Helper to compute matrix multiply and store result
+  proc computeMatMul*[L, T](m: var MatMulResult[L, T]) =
+    ## Compute the matrix multiply and store in computed buffer
+    let srcAData = cast[ptr UncheckedArray[T]](m.proxyA.hostPtr)
+    let srcBData = cast[ptr UncheckedArray[T]](m.proxyB.hostPtr)
+    let elemsPerSite = m.proxyA.elemsPerSite
+    let srcABase = m.proxyA.site * elemsPerSite
+    let srcBBase = m.proxyB.site * elemsPerSite
+    
+    let rows = m.proxyA.shape[0]
+    let cols = if m.proxyB.shape.len > 1: m.proxyB.shape[1] else: 1
+    let innerDim = if m.proxyA.shape.len > 1: m.proxyA.shape[1] else: 1
+    
+    m.computed = newSeq[T](elemsPerSite)
+    for i in 0..<rows:
+      for j in 0..<cols:
+        var sum: T = T(0)
+        for k in 0..<innerDim:
+          let aIdx = srcABase + i * innerDim + k
+          let bIdx = srcBBase + k * cols + j
+          sum = sum + srcAData[aIdx] * srcBData[bIdx]
+        m.computed[i * cols + j] = sum
+    m.hasComputed = true
 
-# Matrix/tensor subtraction: mat1[n] - mat2[n]
-proc `-`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy - phantom operator")
+  # Chaining operators for OpenMP
+  proc `+`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] {.inline.} =
+    ## A*B + C*D - compute both multiplications and store for later addition
+    var ma = a
+    var mb = b
+    computeMatMul(ma)
+    computeMatMul(mb)
+    result.proxyA = a.proxyA  # Keep shape info
+    result.proxyB = b.proxyA
+    result.isSubtraction = false
+    result.computedA = ma.computed
+    result.computedB = mb.computed
+    result.hasComputedA = true
+    result.hasComputedB = true
 
-# Scalar * tensor: 2.0 * mat[n]
-proc `*`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T] =
-  raise newException(Defect, "scalar * TensorSiteProxy phantom operator")
+  proc `-`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] {.inline.} =
+    ## A*B - C*D - compute both multiplications and store for later subtraction
+    var ma = a
+    var mb = b
+    computeMatMul(ma)
+    computeMatMul(mb)
+    result.proxyA = a.proxyA  # Keep shape info
+    result.proxyB = b.proxyA
+    result.isSubtraction = true
+    result.computedA = ma.computed
+    result.computedB = mb.computed
+    result.hasComputedA = true
+    result.hasComputedB = true
 
-# Tensor * scalar: mat[n] * 2.0
-proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarMulResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy * scalar phantom operator")
+  proc `-`*[L, T](a: MatAddResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] {.inline.} =
+    ## (A*B + C*D) - E[n] - first compute A+B, then subtract E
+    result.proxyA = a.proxyA  # Keep shape info
+    result.proxyB = b
+    result.isSubtraction = true
+    result.hasComputedB = false  # B (E) comes from proxy, not computed
+    
+    # If both sides of previous result were computed, combine them first
+    if a.hasComputedA and a.hasComputedB:
+      let n = a.computedA.len
+      result.computedA = newSeq[T](n)
+      if a.isSubtraction:
+        for i in 0..<n:
+          result.computedA[i] = a.computedA[i] - a.computedB[i]
+      else:
+        for i in 0..<n:
+          result.computedA[i] = a.computedA[i] + a.computedB[i]
+      result.hasComputedA = true
+    elif a.hasComputedA:
+      result.computedA = a.computedA
+      result.hasComputedA = true
+    else:
+      result.hasComputedA = false
 
-# Scalar + tensor: 2.0 + mat[n]
-proc `+`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T] =
-  raise newException(Defect, "scalar + TensorSiteProxy phantom operator")
+else:
+  # OpenCL/SYCL backend: phantom operators for kernel codegen
+  
+  # Matrix/tensor multiplication: mat1[n] * mat2[n] or mat[n] * vec[n]
+  proc `*`*[L, T](a, b: TensorSiteProxy[L, T]): MatMulResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy * phantom operator")
 
-# Tensor + scalar: mat[n] + 2.0
-proc `+`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy + scalar phantom operator")
+  # Matrix/tensor addition: mat1[n] + mat2[n]
+  proc `+`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy + phantom operator")
 
-#[ Operators for chaining result types - enables long expressions like A*B + C*D - E ]#
+  # Matrix/tensor subtraction: mat1[n] - mat2[n]
+  proc `-`*[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy - phantom operator")
 
-# MatMulResult + MatMulResult: A*B + C*D
-proc `+`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult + MatMulResult phantom operator")
+  # Scalar * tensor: 2.0 * mat[n]
+  proc `*`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "scalar * TensorSiteProxy phantom operator")
 
-# MatMulResult + TensorSiteProxy: A*B + C[n]
-proc `+`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult + TensorSiteProxy phantom operator")
+  # Tensor * scalar: mat[n] * 2.0
+  proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarMulResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy * scalar phantom operator")
 
-# TensorSiteProxy + MatMulResult: A[n] + B*C
-proc `+`*[L, T](a: TensorSiteProxy[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy + MatMulResult phantom operator")
+  # Scalar + tensor: 2.0 + mat[n]
+  proc `+`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T] =
+    raise newException(Defect, "scalar + TensorSiteProxy phantom operator")
 
-# MatMulResult - MatMulResult: A*B - C*D
-proc `-`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult - MatMulResult phantom operator")
+  # Tensor + scalar: mat[n] + 2.0
+  proc `+`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy + scalar phantom operator")
 
-# MatMulResult - TensorSiteProxy: A*B - C[n]
-proc `-`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult - TensorSiteProxy phantom operator")
+  #[ Operators for chaining result types - enables long expressions like A*B + C*D - E ]#
+  # These are phantom operators for OpenCL/SYCL kernel codegen
 
-# TensorSiteProxy - MatMulResult: A[n] - B*C
-proc `-`*[L, T](a: TensorSiteProxy[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy - MatMulResult phantom operator")
+  # MatMulResult + MatMulResult: A*B + C*D
+  proc `+`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult + MatMulResult phantom operator")
 
-# MatAddResult + TensorSiteProxy: (A+B) + C[n]
-proc `+`*[L, T](a: MatAddResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult + TensorSiteProxy phantom operator")
+  # MatMulResult + TensorSiteProxy: A*B + C[n]
+  proc `+`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult + TensorSiteProxy phantom operator")
 
-# TensorSiteProxy + MatAddResult: A[n] + (B+C)
-proc `+`*[L, T](a: TensorSiteProxy[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy + MatAddResult phantom operator")
+  # TensorSiteProxy + MatMulResult: A[n] + B*C
+  proc `+`*[L, T](a: TensorSiteProxy[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy + MatMulResult phantom operator")
 
-# MatAddResult - TensorSiteProxy: (A+B) - C[n]
-proc `-`*[L, T](a: MatAddResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult - TensorSiteProxy phantom operator")
+  # MatMulResult - MatMulResult: A*B - C*D
+  proc `-`*[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult - MatMulResult phantom operator")
 
-# TensorSiteProxy - MatAddResult: A[n] - (B+C)
-proc `-`*[L, T](a: TensorSiteProxy[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "TensorSiteProxy - MatAddResult phantom operator")
+  # MatMulResult - TensorSiteProxy: A*B - C[n]
+  proc `-`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult - TensorSiteProxy phantom operator")
 
-# MatAddResult + MatMulResult: (A+B) + C*D
-proc `+`*[L, T](a: MatAddResult[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult + MatMulResult phantom operator")
+  # TensorSiteProxy - MatMulResult: A[n] - B*C
+  proc `-`*[L, T](a: TensorSiteProxy[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy - MatMulResult phantom operator")
 
-# MatMulResult + MatAddResult: A*B + (C+D)
-proc `+`*[L, T](a: MatMulResult[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult + MatAddResult phantom operator")
+  # MatAddResult + TensorSiteProxy: (A+B) + C[n]
+  proc `+`*[L, T](a: MatAddResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult + TensorSiteProxy phantom operator")
 
-# MatAddResult - MatMulResult: (A+B) - C*D
-proc `-`*[L, T](a: MatAddResult[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult - MatMulResult phantom operator")
+  # TensorSiteProxy + MatAddResult: A[n] + (B+C)
+  proc `+`*[L, T](a: TensorSiteProxy[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy + MatAddResult phantom operator")
 
-# MatMulResult - MatAddResult: A*B - (C+D)
-proc `-`*[L, T](a: MatMulResult[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatMulResult - MatAddResult phantom operator")
+  # MatAddResult - TensorSiteProxy: (A+B) - C[n]
+  proc `-`*[L, T](a: MatAddResult[L, T], b: TensorSiteProxy[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult - TensorSiteProxy phantom operator")
 
-# MatAddResult + MatAddResult: (A+B) + (C+D)
-proc `+`*[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult + MatAddResult phantom operator")
+  # TensorSiteProxy - MatAddResult: A[n] - (B+C)
+  proc `-`*[L, T](a: TensorSiteProxy[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy - MatAddResult phantom operator")
 
-# MatAddResult - MatAddResult: (A+B) - (C+D)
-proc `-`*[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T] =
-  raise newException(Defect, "MatAddResult - MatAddResult phantom operator")
+  # MatAddResult + MatMulResult: (A+B) + C*D
+  proc `+`*[L, T](a: MatAddResult[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult + MatMulResult phantom operator")
 
-# Scalar multiplication on result types
-proc `*`*[L, T](scalar: T, res: MatMulResult[L, T]): ScalarMulResult[L, T] =
-  raise newException(Defect, "scalar * MatMulResult phantom operator")
+  # MatMulResult + MatAddResult: A*B + (C+D)
+  proc `+`*[L, T](a: MatMulResult[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult + MatAddResult phantom operator")
 
-proc `*`*[L, T](scalar: T, res: MatAddResult[L, T]): ScalarMulResult[L, T] =
-  raise newException(Defect, "scalar * MatAddResult phantom operator")
+  # MatAddResult - MatMulResult: (A+B) - C*D
+  proc `-`*[L, T](a: MatAddResult[L, T], b: MatMulResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult - MatMulResult phantom operator")
 
-proc `*`*[L, T](res: MatMulResult[L, T], scalar: T): ScalarMulResult[L, T] =
-  raise newException(Defect, "MatMulResult * scalar phantom operator")
+  # MatMulResult - MatAddResult: A*B - (C+D)
+  proc `-`*[L, T](a: MatMulResult[L, T], b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatMulResult - MatAddResult phantom operator")
 
-proc `*`*[L, T](res: MatAddResult[L, T], scalar: T): ScalarMulResult[L, T] =
-  raise newException(Defect, "MatAddResult * scalar phantom operator")
+  # MatAddResult + MatAddResult: (A+B) + (C+D)
+  proc `+`*[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult + MatAddResult phantom operator")
+
+  # MatAddResult - MatAddResult: (A+B) - (C+D)
+  proc `-`*[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T] =
+    raise newException(Defect, "MatAddResult - MatAddResult phantom operator")
+
+  # Scalar multiplication on result types
+  proc `*`*[L, T](scalar: T, res: MatMulResult[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "scalar * MatMulResult phantom operator")
+
+  proc `*`*[L, T](scalar: T, res: MatAddResult[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "scalar * MatAddResult phantom operator")
+
+  proc `*`*[L, T](res: MatMulResult[L, T], scalar: T): ScalarMulResult[L, T] =
+    raise newException(Defect, "MatMulResult * scalar phantom operator")
+
+  proc `*`*[L, T](res: MatAddResult[L, T], scalar: T): ScalarMulResult[L, T] =
+    raise newException(Defect, "MatAddResult * scalar phantom operator")
 
 # String conversion for debugging: $view[n]
 proc `$`*[L, T](proxy: TensorSiteProxy[L, T]): string =
-  ## Convert site tensor to string for debugging in OpenCL kernels.
-  ## This is a phantom operator - the `each` macro converts it to printf.
-  raise newException(Defect, "TensorSiteProxy $ phantom operator")
+  ## Convert site tensor to string for debugging.
+  ## Works both in OpenCL kernels (via macro) and at runtime (via stored data).
+  return $proxy.runtimeData
+
+# Runtime formatting for CPU fallback
+proc `$`*[T](data: RuntimeSiteData[T]): string =
+  ## Format a site tensor nicely for printing
+  ## Scalar: just the value
+  ## Vector: column format [x, y, z]
+  ## Matrix: grid format
+  
+  if data.rank == 0 or data.shape.len == 0:
+    # Scalar
+    if data.data.len > 0:
+      return $data.data[0]
+    return "[]"
+  
+  elif data.rank == 1:
+    # Vector: [v0, v1, v2, ...]
+    var parts: seq[string]
+    for i in 0..<data.data.len:
+      parts.add fmt"{data.data[i]:>10.4f}"
+    return "[" & parts.join(", ") & "]"
+  
+  elif data.rank == 2:
+    # Matrix: grid format
+    let rows = data.shape[0]
+    let cols = data.shape[1]
+    var lines: seq[string]
+    for r in 0..<rows:
+      var rowParts: seq[string]
+      for c in 0..<cols:
+        let idx = r * cols + c
+        rowParts.add fmt"{data.data[idx]:>10.4f}"
+      if r == 0:
+        lines.add "⎡" & rowParts.join("  ") & " ⎤"
+      elif r == rows - 1:
+        lines.add "⎣" & rowParts.join("  ") & " ⎦"
+      else:
+        lines.add "⎢" & rowParts.join("  ") & " ⎥"
+    return lines.join("\n")
+  
+  else:
+    # Higher rank: just show flat data with shape
+    return "Tensor" & $data.shape & ": " & $data.data
 
 #[ Tests ]#
 
@@ -516,3 +799,138 @@ when isMainModule:
       check id[2, 2] == 1.0
       check id[0, 1] == 0.0
       check id[1, 0] == 0.0
+
+#[ ============================================================================
+   LocalSiteProxy Operators for CPU-only "for all" loops
+   ============================================================================ ]#
+
+# LocalSiteProxy element access
+proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int): T {.inline.} =
+  ## Vector element read: local[n][i]
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  data[base + i]
+
+proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int): T {.inline.} =
+  ## Matrix element read: local[n][i, j]
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  let cols = proxy.shape[1]
+  data[base + i * cols + j]
+
+proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int): T {.inline.} =
+  ## 3D tensor element read: local[n][i, j, k]
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  let dim1 = proxy.shape[1]
+  let dim2 = proxy.shape[2]
+  data[base + i * dim1 * dim2 + j * dim2 + k]
+
+proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int, value: T) {.inline.} =
+  ## Vector element write: local[n][i] = value
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  data[base + i] = value
+
+proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int, value: T) {.inline.} =
+  ## Matrix element write: local[n][i, j] = value
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  let cols = proxy.shape[1]
+  data[base + i * cols + j] = value
+
+proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int, value: T) {.inline.} =
+  ## 3D tensor element write: local[n][i, j, k] = value
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  let dim1 = proxy.shape[1]
+  let dim2 = proxy.shape[2]
+  data[base + i * dim1 * dim2 + j * dim2 + k] = value
+
+# LocalSiteProxy arithmetic operators
+proc `+`*[D: static[int], R: static[int], L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[D, R, L, T] {.inline.} =
+  result.proxyA = a
+  result.proxyB = b
+  result.isSubtraction = false
+
+proc `-`*[D: static[int], R: static[int], L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[D, R, L, T] {.inline.} =
+  result.proxyA = a
+  result.proxyB = b
+  result.isSubtraction = true
+
+proc `*`*[D: static[int], R: static[int], L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalMulResult[D, R, L, T] {.inline.} =
+  result.proxyA = a
+  result.proxyB = b
+
+proc `*`*[D: static[int], R: static[int], L, T](scalar: T, proxy: LocalSiteProxy[D, R, L, T]): LocalScalarMulResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = scalar
+
+proc `*`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], scalar: T): LocalScalarMulResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = scalar
+
+proc `+`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], scalar: T): LocalScalarAddResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = scalar
+
+proc `+`*[D: static[int], R: static[int], L, T](scalar: T, proxy: LocalSiteProxy[D, R, L, T]): LocalScalarAddResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = scalar
+# LocalSiteProxy print support
+proc `$`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T]): string =
+  ## Format LocalSiteProxy tensor for printing
+  ## Scalar: just the value
+  ## Vector: row format [x, y, z]
+  ## Matrix: grid format with Unicode box drawing
+  
+  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+  let base = proxy.site * proxy.elemsPerSite
+  
+  when R == 0:
+    # Scalar (0-rank tensor)
+    return $data[base]
+  
+  elif R == 1:
+    # Vector: [v0, v1, v2, ...]
+    var parts: seq[string]
+    for i in 0..<proxy.shape[0]:
+      when T is SomeFloat:
+        parts.add fmt"{data[base + i]:>10.4f}"
+      else:
+        parts.add $data[base + i]
+    return "[" & parts.join(", ") & "]"
+  
+  elif R == 2:
+    # Matrix: grid format with Unicode box drawing
+    let rows = proxy.shape[0]
+    let cols = proxy.shape[1]
+    var lines: seq[string]
+    for r in 0..<rows:
+      var rowParts: seq[string]
+      for c in 0..<cols:
+        let idx = r * cols + c
+        when T is SomeFloat:
+          rowParts.add fmt"{data[base + idx]:>10.4f}"
+        else:
+          rowParts.add $data[base + idx]
+      if r == 0:
+        lines.add "⎡" & rowParts.join("  ") & " ⎤"
+      elif r == rows - 1:
+        lines.add "⎣" & rowParts.join("  ") & " ⎦"
+      else:
+        lines.add "⎢" & rowParts.join("  ") & " ⎥"
+    return lines.join("\n")
+  
+  else:
+    # Higher rank: show flat data with shape info
+    var vals: seq[string]
+    for i in 0..<proxy.elemsPerSite:
+      when T is SomeFloat:
+        vals.add fmt"{data[base + i]:>10.4f}"
+      else:
+        vals.add $data[base + i]
+    var shapeStr: seq[string]
+    for i in 0..<R:
+      shapeStr.add $proxy.shape[i]
+    return "Tensor[" & shapeStr.join(", ") & "]: [" & vals.join(", ") & "]"

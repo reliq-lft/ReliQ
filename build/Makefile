@@ -55,14 +55,46 @@ ifdef USE_WORKGROUPS
 FLAGS += -d:UseWorkGroups:true
 endif
 
+# Backend selection: opencl (default), sycl, or openmp
+# Usage: make tensorview BACKEND=sycl
+ifeq ($(BACKEND),sycl)
+FLAGS += -d:UseSycl:true
+# SYCL requires C++ compilation with icpx or clang++ with -fsycl
+# The SYCL wrapper library must be compiled separately:
+#   icpx -fsycl -shared -fPIC -o libreliq_sycl.so src/sycl/sycl_wrapper.cpp
+SYCL_WRAPPER_LIB := lib/libreliq_sycl.so
+SYCL_WRAPPER_SRC := ../src/sycl/sycl_wrapper.cpp
+FLAGS += --passL:-L$(PWD)/lib --passL:-lreliq_sycl --passL:-Wl,-rpath,$(PWD)/lib
+else ifeq ($(BACKEND),openmp)
+FLAGS += -d:UseOpenMP:true
+# OpenMP requires -fopenmp flag for both compilation and linking
+FLAGS += --passC:-fopenmp --passL:-fopenmp
+endif
+
 # ============================================================================
 # Build targets
 # ============================================================================
 
-.PHONY: help clean
+.PHONY: help clean sycl-lib
 
 # Filter out reserved targets from MAKECMDGOALS for the catch-all
-BUILD_TARGETS := $(filter-out help clean reliq,$(MAKECMDGOALS))
+BUILD_TARGETS := $(filter-out help clean reliq sycl-lib,$(MAKECMDGOALS))
+
+# SYCL wrapper library (build with Intel DPC++ or hipSYCL)
+sycl-lib:
+	@mkdir -p lib
+	@echo "Building SYCL wrapper library..."
+	@if command -v icpx >/dev/null 2>&1; then \
+		icpx -fsycl -shared -fPIC -O3 -o lib/libreliq_sycl.so ../src/sycl/sycl_wrapper.cpp; \
+	elif command -v clang++ >/dev/null 2>&1 && clang++ --help 2>&1 | grep -q fsycl; then \
+		clang++ -fsycl -shared -fPIC -O3 -o lib/libreliq_sycl.so ../src/sycl/sycl_wrapper.cpp; \
+	elif command -v syclcc >/dev/null 2>&1; then \
+		syclcc --hipsycl-targets=omp -shared -fPIC -O3 -o lib/libreliq_sycl.so ../src/sycl/sycl_wrapper.cpp; \
+	else \
+		echo "ERROR: No SYCL compiler found. Install Intel oneAPI (icpx) or hipSYCL (syclcc)"; \
+		exit 1; \
+	fi
+	@echo "SYCL wrapper library built: lib/libreliq_sycl.so"
 
 help:
 	@echo ""
@@ -73,6 +105,7 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  <filename>        Build src/<filename>.nim (e.g., make tensorview)"
+	@echo "  sycl-lib          Build SYCL wrapper library (required for BACKEND=sycl)"
 	@echo "  clean             Remove compiled binaries"
 	@echo "  help              Show this help message"
 	@echo ""
@@ -81,7 +114,7 @@ help:
 	@echo "                    Default: 8 (CPU), 32 (GPU)"
 	@echo "                    Example: make tensorview VECTOR_WIDTH=16"
 	@echo ""
-	@echo "  DEBUG_KERNELS=1   Print generated OpenCL kernel source code"
+	@echo "  DEBUG_KERNELS=1   Print generated OpenCL/SYCL kernel source code"
 	@echo "                    Useful for inspecting kernel generation"
 	@echo "                    Example: make tensorview DEBUG_KERNELS=1"
 	@echo ""
@@ -89,6 +122,15 @@ help:
 	@echo "                    Enables thread debugging via group_id, local_id"
 	@echo "                    Note: May impact performance; for debugging only"
 	@echo "                    Example: make tensorview USE_WORKGROUPS=1"
+	@echo ""
+	@echo "Backend Selection:"
+	@echo "  BACKEND=opencl    Use OpenCL backend (default)"
+	@echo "  BACKEND=sycl      Use SYCL backend (requires Intel oneAPI or hipSYCL)"
+	@echo "                    First run: make sycl-lib"
+	@echo "                    Then: make tensorview BACKEND=sycl"
+	@echo "  BACKEND=openmp    Use OpenMP backend (CPU-only parallelization)"
+	@echo "                    Uses host memory directly, no device transfers"
+	@echo "                    Example: make tensorview BACKEND=openmp"
 	@echo ""
 	@echo "Advanced: Pass arbitrary Nim flags via ARGS:"
 	@echo "  make tensorview ARGS=\"-d:MyFlag:value --hints:off\""
@@ -107,6 +149,7 @@ help:
 	@echo "  make tensorview"
 	@echo "  make tensorview DEBUG_KERNELS=1"
 	@echo "  make tensorview USE_WORKGROUPS=1 VECTOR_WIDTH=4"
+	@echo "  make sycl-lib && make tensorview BACKEND=sycl"
 	@echo ""
 
 clean:

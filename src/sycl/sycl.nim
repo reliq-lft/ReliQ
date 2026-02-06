@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/parallel.nim
+  Source file: src/sycl/sycl.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,37 +27,27 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import globalarrays/[globalarrays]
+## SYCL Module
+##
+## Main entry point for SYCL backend.
+## Exports all SYCL-related modules for use in tensor operations.
 
-export globalarrays
+import syclwrap
+import syclbase
+import sycldisp
 
-# Backend selection - matches tensorview.nim's UseSycl/UseOpenMP flags
-const UseSycl* {.booldefine.} = false
-const UseOpenMP* {.booldefine.} = false
+# Don't export syclwrap to avoid conflicting read/write signatures
+export syclbase
+export sycldisp
 
-when UseOpenMP:
-  import openmp/[openmp]
-  import openmp/omplocal
-  export openmp
-  export omplocal  # Export `all` macro for LocalTensorField
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      ompParallel:
-        body
-elif UseSycl:
-  import sycl/[sycl]
-  export sycl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
-else:
-  import opencl/[opencl]
-  export opencl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
+template syclParallel*(body: untyped): untyped =
+  ## SYCL parallel execution template.
+  ## Initializes SYCL, executes the body, then finalizes.
+  initSycl()
+  body
+  finalizeSycl()
+
+# Compatibility alias - allows existing code using clParallel to work with SYCL
+template clParallel*(body: untyped): untyped =
+  syclParallel:
+    body

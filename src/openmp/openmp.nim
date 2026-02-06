@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/parallel.nim
+  Source file: src/openmp/openmp.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,37 +27,22 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import globalarrays/[globalarrays]
+## OpenMP Backend for ReliQ
+##
+## This module provides OpenMP-based parallelization for TensorFieldView
+## and LocalTensorField operations. Unlike SYCL/OpenCL, OpenMP operates 
+## directly on host memory without device transfers, making it ideal for 
+## CPU-only systems.
+##
+## Modules:
+## - ompbase: OpenMP runtime bindings and helper functions
+## - ompdisp: `each` macro for TensorFieldView parallel loops
+## - omplocal: `all` macro for LocalTensorField CPU-only loops
 
-export globalarrays
+import ompbase
+import ompdisp
+import omplocal
 
-# Backend selection - matches tensorview.nim's UseSycl/UseOpenMP flags
-const UseSycl* {.booldefine.} = false
-const UseOpenMP* {.booldefine.} = false
-
-when UseOpenMP:
-  import openmp/[openmp]
-  import openmp/omplocal
-  export openmp
-  export omplocal  # Export `all` macro for LocalTensorField
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      ompParallel:
-        body
-elif UseSycl:
-  import sycl/[sycl]
-  export sycl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
-else:
-  import opencl/[opencl]
-  export opencl
-  
-  template parallel*(body: untyped): untyped =
-    gaParallel:
-      clParallel:
-        body
+export ompbase
+export ompdisp
+export omplocal

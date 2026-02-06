@@ -32,10 +32,37 @@ import localtensor
 import globaltensor
 import sitetensor
 
-import opencl/[clwrap, clbase, cldisp]
+# Backend selection via compile-time flags
+# Use -d:UseSycl for SYCL backend
+# Use -d:UseOpenMP for OpenMP backend (CPU only)
+# Default is OpenCL
+const UseSycl* {.booldefine.} = false
+const UseOpenMP* {.booldefine.} = false
+
+when UseOpenMP:
+  import openmp/[ompbase, ompdisp]
+  export ompdisp
+  # OpenMP uses host memory directly - no separate device buffers
+  type
+    BackendBuffer* = pointer
+    BackendQueue* = pointer  # Dummy type for API compatibility
+elif UseSycl:
+  import sycl/[syclbase, sycldisp]
+  export sycldisp
+  # Type aliases for backend-agnostic code
+  type
+    BackendBuffer* = SyclBuffer
+    BackendQueue* = SyclQueue
+else:
+  import opencl/[clwrap, clbase, cldisp]
+  export cldisp
+  # Type aliases for backend-agnostic code
+  type
+    BackendBuffer* = PMem
+    BackendQueue* = PCommandQueue
+
 import utils/[complex]
 
-export cldisp
 export sitetensor
 
 #[ Vectorization: AoSoA layout for SIMD efficiency ]#
@@ -54,8 +81,8 @@ type IOKind* = enum iokRead, iokWrite, iokReadWrite
 
 type DeviceStorage* = object
   ## Device memory storage representation (type-erased)
-  buffers*: seq[PMem]       
-  queues*: seq[PCommandQueue]
+  buffers*: seq[BackendBuffer]       
+  queues*: seq[BackendQueue]
   sitesPerDevice*: seq[int] 
   totalSites*: int          
   elementsPerSite*: int     ## Scalar elements per site (for OpenCL - complex counts as 2)
@@ -152,77 +179,117 @@ proc transformAoSoAtoAoS*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
 
 #[ constructors/destructors ]#
 
-template newTensorFieldView*[D: static[int], R: static[int], L, T](
-  tensor: LocalTensorField[D, R, L, T];
-  io: IOKind
-): TensorFieldView[L, T] =
-  ## Create tensor field view from local tensor field
-  ## Uses AoSoA layout on device for SIMD-friendly access patterns.
-  block:
-    let numDevices = clQueues.len
-    let totalSites = computeTotalLatticeSites(tensor.localGrid)
-    let isComplex = isComplex32(T) or isComplex64(T)
-    # elementsPerSite counts individual scalar values (floats) for OpenCL
-    let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
-    # tensorElementsPerSite counts T elements (may be Complex64)
-    let tensorElementsPerSite = computeElementsPerSite(tensor.shape, false)
-    let sitesPerDevice = splitLatticeSites(totalSites, numDevices)
-    let elemSize = sizeof(T)
-    
-    # For AoSoA, we allocate padded buffers (rounded up to VectorWidth)
-    var hostOffsets = newSeq[int](numDevices)
-    var offset = 0
-    for i in 0..<numDevices:
-      hostOffsets[i] = offset
-      # Use tensor elements (T type) for byte offset calculation (original AoS offsets for host)
-      offset += sitesPerDevice[i] * tensorElementsPerSite * elemSize
+when UseOpenMP:
+  # OpenMP backend: works directly on host memory without device transfers
+  template newTensorFieldView*[D: static[int], R: static[int], L, T](
+    tensor: LocalTensorField[D, R, L, T];
+    io: IOKind
+  ): TensorFieldView[L, T] =
+    ## Create tensor field view from local tensor field (OpenMP backend)
+    ## Works directly on host memory without device transfers
+    block:
+      let totalSites = computeTotalLatticeSites(tensor.localGrid)
+      let isComplex = isComplex32(T) or isComplex64(T)
+      let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
+      let tensorElementsPerSite = computeElementsPerSite(tensor.shape, false)
+      let elemSize = sizeof(T)
+      
+      var view = TensorFieldView[L, T](
+        ioKind: io,
+        lattice: tensor.lattice,
+        dims: D,
+        rank: R,
+        shape: @(tensor.shape),
+        hasPadding: tensor.hasPadding
+      )
+      
+      view.data = DeviceStorage(
+        buffers: @[cast[pointer](tensor.data)],  # Store host pointer directly
+        queues: @[nil.BackendQueue],
+        sitesPerDevice: @[totalSites],
+        totalSites: totalSites,
+        elementsPerSite: elementsPerSite,
+        tensorElementsPerSite: tensorElementsPerSite,
+        elementSize: elemSize,
+        hostPtr: cast[pointer](tensor.data),
+        hostOffsets: @[0]
+      )
+      
+      move(view)
 
-    var view = TensorFieldView[L, T](
-      ioKind: io,
-      lattice: tensor.lattice,
-      dims: D,
-      rank: R,
-      shape: @(tensor.shape),
-      hasPadding: tensor.hasPadding
-    )
-    
-    view.data = DeviceStorage(
-      buffers: newSeq[PMem](numDevices),
-      queues: clQueues,
-      sitesPerDevice: sitesPerDevice,
-      totalSites: totalSites,
-      elementsPerSite: elementsPerSite,  # scalar elements for OpenCL
-      tensorElementsPerSite: tensorElementsPerSite,  # T elements for memory
-      elementSize: elemSize,
-      hostPtr: cast[pointer](tensor.data),
-      hostOffsets: hostOffsets
-    )
-    
-    var hostOffset = 0
-    for deviceIdx in 0..<numDevices:
-      let numSites = sitesPerDevice[deviceIdx]
-      let numTensorElements = numSites * tensorElementsPerSite
+else:
+  # OpenCL/SYCL backend: uses device memory with AoSoA layout
+  template newTensorFieldView*[D: static[int], R: static[int], L, T](
+    tensor: LocalTensorField[D, R, L, T];
+    io: IOKind
+  ): TensorFieldView[L, T] =
+    ## Create tensor field view from local tensor field
+    ## Uses AoSoA layout on device for SIMD-friendly access patterns.
+    block:
+      let numDevices = clQueues.len
+      let totalSites = computeTotalLatticeSites(tensor.localGrid)
+      let isComplex = isComplex32(T) or isComplex64(T)
+      # elementsPerSite counts individual scalar values (floats) for OpenCL
+      let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
+      # tensorElementsPerSite counts T elements (may be Complex64)
+      let tensorElementsPerSite = computeElementsPerSite(tensor.shape, false)
+      let sitesPerDevice = splitLatticeSites(totalSites, numDevices)
+      let elemSize = sizeof(T)
       
-      # For AoSoA, allocate padded buffer (rounded up to VectorWidth)
-      let numGroups = numVectorGroups(numSites)
-      let paddedSites = numGroups * VectorWidth
-      let paddedElements = paddedSites * tensorElementsPerSite
-      let paddedBufferSize = paddedElements * elemSize
-      
-      view.data.buffers[deviceIdx] = buffer[T](clContext, paddedElements)
-      
-      case io
-      of iokRead, iokReadWrite:
-        # Transform from AoS to AoSoA before uploading
-        let srcPtr = cast[pointer](addr tensor.data[hostOffset])
-        var aosoaData = transformAoStoAoSoA[T](srcPtr, numSites, tensorElementsPerSite)
-        clQueues[deviceIdx].write(addr aosoaData[0], view.data.buffers[deviceIdx], paddedBufferSize)
-        check clwrap.finish(clQueues[deviceIdx])
-      of iokWrite: discard
+      # For AoSoA, we allocate padded buffers (rounded up to VectorWidth)
+      var hostOffsets = newSeq[int](numDevices)
+      var offset = 0
+      for i in 0..<numDevices:
+        hostOffsets[i] = offset
+        # Use tensor elements (T type) for byte offset calculation (original AoS offsets for host)
+        offset += sitesPerDevice[i] * tensorElementsPerSite * elemSize
 
-      hostOffset += numTensorElements
-    
-    move(view)
+      var view = TensorFieldView[L, T](
+        ioKind: io,
+        lattice: tensor.lattice,
+        dims: D,
+        rank: R,
+        shape: @(tensor.shape),
+        hasPadding: tensor.hasPadding
+      )
+      
+      view.data = DeviceStorage(
+        buffers: newSeq[BackendBuffer](numDevices),
+        queues: clQueues,
+        sitesPerDevice: sitesPerDevice,
+        totalSites: totalSites,
+        elementsPerSite: elementsPerSite,  # scalar elements for OpenCL
+        tensorElementsPerSite: tensorElementsPerSite,  # T elements for memory
+        elementSize: elemSize,
+        hostPtr: cast[pointer](tensor.data),
+        hostOffsets: hostOffsets
+      )
+      
+      var hostOffset = 0
+      for deviceIdx in 0..<numDevices:
+        let numSites = sitesPerDevice[deviceIdx]
+        let numTensorElements = numSites * tensorElementsPerSite
+        
+        # For AoSoA, allocate padded buffer (rounded up to VectorWidth)
+        let numGroups = numVectorGroups(numSites)
+        let paddedSites = numGroups * VectorWidth
+        let paddedElements = paddedSites * tensorElementsPerSite
+        let paddedBufferSize = paddedElements * elemSize
+        
+        view.data.buffers[deviceIdx] = buffer[T](clContext, paddedElements)
+        
+        case io
+        of iokRead, iokReadWrite:
+          # Transform from AoS to AoSoA before uploading
+          let srcPtr = cast[pointer](addr tensor.data[hostOffset])
+          var aosoaData = transformAoStoAoSoA[T](srcPtr, numSites, tensorElementsPerSite)
+          clQueues[deviceIdx].write(addr aosoaData[0], view.data.buffers[deviceIdx], paddedBufferSize)
+          check finish(clQueues[deviceIdx])
+        of iokWrite: discard
+
+        hostOffset += numTensorElements
+      
+      move(view)
 
 template newTensorFieldView*[D: static[int], R: static[int], L, T](
   tensor: TensorField[D, R, L, T];
@@ -249,13 +316,122 @@ proc totalElements*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
   ## Returns the total number of elements across all sites
   view.numSites * view.elementsPerSite
 
-proc buffers*[L, T](view: TensorFieldView[L, T]): seq[PMem] =
+proc buffers*[L, T](view: TensorFieldView[L, T]): seq[BackendBuffer] =
   ## Returns the underlying device memory buffers
   view.data.buffers
 
 proc sitesPerDevice*[L, T](view: TensorFieldView[L, T]): seq[int] =
   ## Returns the number of sites assigned to each device
   view.data.sitesPerDevice
+
+#[ CPU fallback support for printing ]#
+
+when UseOpenMP:
+  proc readSiteData*[L, T](view: TensorFieldView[L, T], site: int): RuntimeSiteData[T] =
+    ## Read tensor data for a single site (OpenMP backend).
+    ## Data is already on host, so direct access is used.
+    result.shape = view.shape
+    result.rank = view.rank
+    
+    let elemsPerSite = view.data.tensorElementsPerSite
+    result.data = newSeq[T](elemsPerSite)
+    
+    # Direct access to host memory
+    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let baseIdx = site * elemsPerSite
+    for e in 0..<elemsPerSite:
+      result.data[e] = hostData[baseIdx + e]
+
+  proc formatSiteData*[L, T](view: TensorFieldView[L, T], site: int): string =
+    ## Read and format tensor data for a single site.
+    let data = readSiteData(view, site)
+    return $data
+
+  proc writeSiteElement*[L, T](view: TensorFieldView[L, T], site: int, elementIdx: int, value: T) =
+    ## Write a single element at a specific site (OpenMP backend).
+    ## Direct host memory access.
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let idx = site * elemsPerSite + elementIdx
+    hostData[idx] = value
+
+else:
+  proc readSiteData*[L, T](view: TensorFieldView[L, T], site: int): RuntimeSiteData[T] =
+    ## Read tensor data for a single site from device memory.
+    ## Used for CPU fallback when print statements are present.
+    result.shape = view.shape
+    result.rank = view.rank
+    
+    let elemsPerSite = view.data.tensorElementsPerSite
+    result.data = newSeq[T](elemsPerSite)
+    
+    # Find which device has this site
+    var deviceIdx = 0
+    var siteOffset = site
+    for i in 0..<view.data.sitesPerDevice.len:
+      if siteOffset < view.data.sitesPerDevice[i]:
+        deviceIdx = i
+        break
+      siteOffset -= view.data.sitesPerDevice[i]
+    
+    let numSitesOnDev = view.data.sitesPerDevice[deviceIdx]
+    let numGroups = numVectorGroups(numSitesOnDev)
+    let paddedBufferSize = numGroups * VectorWidth * elemsPerSite * sizeof(T)
+    
+    # Read entire device buffer (small overhead for debug printing)
+    var aosoaData = newSeq[T](numGroups * VectorWidth * elemsPerSite)
+    read(view.data.queues[deviceIdx], addr(aosoaData[0]), 
+                view.data.buffers[deviceIdx], paddedBufferSize)
+    discard finish(view.data.queues[deviceIdx])
+    
+    # Transform back from AoSoA and extract this site's data
+    let g = siteOffset div VectorWidth
+    let lane = siteOffset mod VectorWidth
+    for e in 0..<elemsPerSite:
+      let aosoaIdx = g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
+      result.data[e] = aosoaData[aosoaIdx]
+
+  proc formatSiteData*[L, T](view: TensorFieldView[L, T], site: int): string =
+    ## Read and format tensor data for a single site.
+    ## Returns a nicely formatted string representation.
+    let data = readSiteData(view, site)
+    return $data
+
+  proc writeSiteElement*[L, T](view: TensorFieldView[L, T], site: int, elementIdx: int, value: T) =
+    ## Write a single element of a tensor at a specific site to device memory.
+    ## Used for element-level writes like view[n][i,j] = value during CPU fallback.
+    ## This is an immediate write that syncs with the device.
+    
+    # Find which device has this site
+    var deviceIdx = 0
+    var siteOffset = site
+    for i in 0..<view.data.sitesPerDevice.len:
+      if siteOffset < view.data.sitesPerDevice[i]:
+        deviceIdx = i
+        break
+      siteOffset -= view.data.sitesPerDevice[i]
+    
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let numSitesOnDev = view.data.sitesPerDevice[deviceIdx]
+    let numGroups = numVectorGroups(numSitesOnDev)
+    let paddedBufferSize = numGroups * VectorWidth * elemsPerSite * sizeof(T)
+    
+    # Read entire device buffer
+    var aosoaData = newSeq[T](numGroups * VectorWidth * elemsPerSite)
+    read(view.data.queues[deviceIdx], addr(aosoaData[0]), 
+         view.data.buffers[deviceIdx], paddedBufferSize)
+    discard finish(view.data.queues[deviceIdx])
+    
+    # Calculate AoSoA index and write the value
+    let g = siteOffset div VectorWidth
+    let lane = siteOffset mod VectorWidth
+    let aosoaIdx = g * (VectorWidth * elemsPerSite) + elementIdx * VectorWidth + lane
+    aosoaData[aosoaIdx] = value
+    
+    # Write back to device
+    write(view.data.queues[deviceIdx], addr(aosoaData[0]), 
+          view.data.buffers[deviceIdx], paddedBufferSize)
+    discard finish(view.data.queues[deviceIdx])
 
 # Phantom [] operators for TensorFieldView
 # These are never called at runtime - they provide type info for OpenCL codegen
@@ -264,38 +440,236 @@ proc sitesPerDevice*[L, T](view: TensorFieldView[L, T]): seq[int] =
 #   rank=2 → matrix field (SiteMat)  
 #   else   → scalar field (T)
 
-#[ TensorFieldView phantom operators for OpenCL codegen ]#
-# These operators interact with TensorFieldView and produce/consume proxy types
-# defined in sitetensor.nim
+#[ TensorFieldView operators ]#
+# For OpenMP: real implementations that access host memory directly
+# For OpenCL/SYCL: phantom operators for kernel codegen
 
-# TensorFieldView[] returns a proxy
-proc `[]`*[L, T](view: TensorFieldView[L, T], site: int): TensorSiteProxy[L, T] = 
-  raise newException(Defect, "TensorFieldView[] phantom operator")
+when UseOpenMP:
+  # OpenMP backend: returns TensorSiteProxy for uniform API
+  # TensorSiteProxy operators in sitetensor.nim have real implementations for OpenMP
+  
+  proc `[]`*[L, T](view: TensorFieldView[L, T], site: int): TensorSiteProxy[L, T] =
+    ## Returns a proxy for site tensor access
+    ## For OpenMP, the proxy stores view/site info for direct memory access
+    result.view = cast[pointer](unsafeAddr view)
+    result.site = site
+    result.runtimeData = readSiteData(view, site)
+    # OpenMP-specific: store info needed for direct element access
+    result.hostPtr = view.data.hostPtr
+    result.shape = view.shape
+    result.elemsPerSite = view.data.tensorElementsPerSite
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: TensorSiteProxy[L, T]) {.inline.} =
+    ## Copy site tensor from one view to another
+    ## Direct host memory copy
+    let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let srcBase = value.site * elemsPerSite
+    let dstBase = site * elemsPerSite
+    for e in 0..<elemsPerSite:
+      dstData[dstBase + e] = srcData[srcBase + e]
 
-# TensorFieldView[]= accepts proxy (copy), marker types, or scalar
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: TensorSiteProxy[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= TensorSiteProxy phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: T) {.inline.} =
+    ## Set scalar value at site (for scalar fields)
+    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    hostData[site] = value
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) {.inline.} =
+    ## Matrix/vector addition: C[n] = A[n] + B[n] or C[n] = A[n] - B[n]
+    ## Handles both direct proxy access and computed intermediate results
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    
+    # Handle computed buffers vs direct memory access
+    if value.hasComputedA and value.hasComputedB:
+      # Both operands are from computed results (e.g., A*B + C*D)
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] - value.computedB[e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] + value.computedB[e]
+    elif value.hasComputedA and not value.hasComputedB:
+      # A is computed, B is from proxy (e.g., (A*B + C*D) - E[n])
+      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] - srcBData[srcBBase + e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] + srcBData[srcBBase + e]
+    elif not value.hasComputedA and value.hasComputedB:
+      # A is from proxy, B is computed
+      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] - value.computedB[e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] + value.computedB[e]
+    else:
+      # Both from proxies (simple case: A[n] + B[n])
+      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
+      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) {.inline.} =
+    ## Vector addition: same as MatAddResult
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    
+    if value.hasComputedA and value.hasComputedB:
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] - value.computedB[e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] + value.computedB[e]
+    elif value.hasComputedA and not value.hasComputedB:
+      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] - srcBData[srcBBase + e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = value.computedA[e] + srcBData[srcBBase + e]
+    elif not value.hasComputedA and value.hasComputedB:
+      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] - value.computedB[e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] + value.computedB[e]
+    else:
+      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
+      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+      if value.isSubtraction:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
+      else:
+        for e in 0..<elemsPerSite:
+          dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) {.inline.} =
+    ## Matrix multiplication: C[n] = A[n] * B[n]
+    ## C[i,j] = sum_k(A[i,k] * B[k,j])
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+    let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
+    let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+    
+    # Get matrix dimensions from shape
+    let rows = view.shape[0]
+    let cols = if view.shape.len > 1: view.shape[1] else: 1
+    let innerDim = if value.proxyA.shape.len > 1: value.proxyA.shape[1] else: 1
+    
+    for i in 0..<rows:
+      for j in 0..<cols:
+        var sum: T = T(0)
+        for k in 0..<innerDim:
+          let aIdx = srcABase + i * innerDim + k
+          let bIdx = srcBBase + k * cols + j
+          sum += srcAData[aIdx] * srcBData[bIdx]
+        let dstIdx = dstBase + i * cols + j
+        dstData[dstIdx] = sum
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) {.inline.} =
+    ## Matrix-vector multiplication: v_out[n] = M[n] * v[n]
+    ## v_out[i] = sum_j(M[i,j] * v[j])
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let srcMData = cast[ptr UncheckedArray[T]](value.proxyMat.hostPtr)
+    let srcVData = cast[ptr UncheckedArray[T]](value.proxyVec.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    let srcMBase = value.proxyMat.site * value.proxyMat.elemsPerSite
+    let srcVBase = value.proxyVec.site * value.proxyVec.elemsPerSite
+    
+    let rows = value.proxyMat.shape[0]
+    let cols = if value.proxyMat.shape.len > 1: value.proxyMat.shape[1] else: 1
+    
+    for i in 0..<rows:
+      var sum: T = T(0)
+      for j in 0..<cols:
+        let mIdx = srcMBase + i * cols + j
+        let vIdx = srcVBase + j
+        sum += srcMData[mIdx] * srcVData[vIdx]
+      dstData[dstBase + i] = sum
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) {.inline.} =
+    ## Scalar multiplication: C[n] = scalar * A[n]
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    let srcBase = value.proxy.site * value.proxy.elemsPerSite
+    for e in 0..<elemsPerSite:
+      dstData[dstBase + e] = value.scalar * srcData[srcBase + e]
+  
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) {.inline.} =
+    ## Scalar addition: C[n] = A[n] + scalar
+    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
+    let elemsPerSite = view.data.tensorElementsPerSite
+    let dstBase = site * elemsPerSite
+    let srcBase = value.proxy.site * value.proxy.elemsPerSite
+    for e in 0..<elemsPerSite:
+      dstData[dstBase + e] = srcData[srcBase + e] + value.scalar
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: T) = 
-  raise newException(Defect, "TensorFieldView[]= scalar phantom operator")
+else:
+  # OpenCL/SYCL backend: phantom operators for kernel codegen
+  # These operators interact with TensorFieldView and produce/consume proxy types
+  # defined in sitetensor.nim
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= MatMulResult phantom operator")
+  # TensorFieldView[] returns a proxy with runtime data for printing
+  proc `[]`*[L, T](view: TensorFieldView[L, T], site: int): TensorSiteProxy[L, T] = 
+    result.view = cast[pointer](unsafeAddr view)
+    result.site = site
+    result.runtimeData = readSiteData(view, site)
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= MatAddResult phantom operator")
+  # TensorFieldView[]= accepts proxy (copy), marker types, or scalar
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: TensorSiteProxy[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= TensorSiteProxy phantom operator")
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= VecAddResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: T) = 
+    raise newException(Defect, "TensorFieldView[]= scalar phantom operator")
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= MatVecResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= MatMulResult phantom operator")
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= ScalarMulResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= MatAddResult phantom operator")
 
-proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) = 
-  raise newException(Defect, "TensorFieldView[]= ScalarAddResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= VecAddResult phantom operator")
+
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= MatVecResult phantom operator")
+
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= ScalarMulResult phantom operator")
+
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= ScalarAddResult phantom operator")
 
 #[ Legacy marker functions - still supported ]#
 
@@ -321,52 +695,63 @@ proc matvec*[L, T](mat, vec: TensorFieldView[L, T], site: int): MatVecResult[L, 
 proc `=copy`*[L, T](dest: var TensorFieldView[L, T], src: TensorFieldView[L, T]) 
   {.error: "TensorFieldView cannot be copied".}
 
-proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
-  ## Destructor for TensorFieldView
-  ## Writes device data back to host if ioKind is iokWrite or iokReadWrite,
-  ## transforms from AoSoA back to AoS layout, then releases all device buffers.
-  if view.data.destroyed:
-    return  # Already destroyed, skip
-  if view.data.buffers.len > 0:
-    case view.ioKind:
-      of iokWrite, iokReadWrite:
-        if not view.data.hostPtr.isNil:
-          for deviceIdx in 0..<view.data.buffers.len:
-            let buf = view.data.buffers[deviceIdx]
-            if not buf.isNil:
-              let numSites = view.data.sitesPerDevice[deviceIdx]
-              let tensorElementsPerSite = view.data.tensorElementsPerSite
-              
-              # Read padded AoSoA data from device
-              let numGroups = numVectorGroups(numSites)
-              let paddedSites = numGroups * VectorWidth
-              let paddedElements = paddedSites * tensorElementsPerSite
-              let paddedBufferSize = paddedElements * view.data.elementSize
-              
-              var aosoaData = newSeq[T](paddedElements)
-              view.data.queues[deviceIdx].read(addr aosoaData[0], buf, paddedBufferSize)
-              check clwrap.finish(view.data.queues[deviceIdx])
-              
-              # Transform AoSoA back to AoS
-              let aosData = transformAoSoAtoAoS[T](addr aosoaData[0], numSites, tensorElementsPerSite)
-              
-              # Copy to host buffer
-              let destPtr = cast[ptr UncheckedArray[T]](
-                cast[pointer](cast[int](view.data.hostPtr) + view.data.hostOffsets[deviceIdx])
-              )
-              for i in 0..<(numSites * tensorElementsPerSite):
-                destPtr[i] = aosData[i]
-      of iokRead: discard
+when UseOpenMP:
+  proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
+    ## Destructor for TensorFieldView (OpenMP backend)
+    ## For OpenMP, data is already on host - no device transfers needed.
+    ## Simply mark as destroyed to prevent double-destruction.
+    if view.data.destroyed:
+      return  # Already destroyed, skip
+    # No device buffers to release for OpenMP - we use host memory directly
+    view.data.destroyed = true
+
+else:
+  proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
+    ## Destructor for TensorFieldView (OpenCL/SYCL backend)
+    ## Writes device data back to host if ioKind is iokWrite or iokReadWrite,
+    ## transforms from AoSoA back to AoS layout, then releases all device buffers.
+    if view.data.destroyed:
+      return  # Already destroyed, skip
+    if view.data.buffers.len > 0:
+      case view.ioKind:
+        of iokWrite, iokReadWrite:
+          if not view.data.hostPtr.isNil:
+            for deviceIdx in 0..<view.data.buffers.len:
+              let buf = view.data.buffers[deviceIdx]
+              if not buf.isNil:
+                let numSites = view.data.sitesPerDevice[deviceIdx]
+                let tensorElementsPerSite = view.data.tensorElementsPerSite
+                
+                # Read padded AoSoA data from device
+                let numGroups = numVectorGroups(numSites)
+                let paddedSites = numGroups * VectorWidth
+                let paddedElements = paddedSites * tensorElementsPerSite
+                let paddedBufferSize = paddedElements * view.data.elementSize
+                
+                var aosoaData = newSeq[T](paddedElements)
+                view.data.queues[deviceIdx].read(addr aosoaData[0], buf, paddedBufferSize)
+                check finish(view.data.queues[deviceIdx])
+                
+                # Transform AoSoA back to AoS
+                let aosData = transformAoSoAtoAoS[T](addr aosoaData[0], numSites, tensorElementsPerSite)
+                
+                # Copy to host buffer
+                let destPtr = cast[ptr UncheckedArray[T]](
+                  cast[pointer](cast[int](view.data.hostPtr) + view.data.hostOffsets[deviceIdx])
+                )
+                for i in 0..<(numSites * tensorElementsPerSite):
+                  destPtr[i] = aosData[i]
+        of iokRead: discard
+      
+      # Release all buffers and set to nil to prevent double-free
+      for i in 0..<view.data.buffers.len:
+        let buf = view.data.buffers[i]
+        if not buf.isNil:
+          release(buf)
+          view.data.buffers[i] = nil
     
-    # Release all buffers and set to nil to prevent double-free
-    for i in 0..<view.data.buffers.len:
-      let buf = view.data.buffers[i]
-      if not buf.isNil:
-        release(buf)
-        view.data.buffers[i] = nil
-  
-  # Mark as destroyed
-  view.data.destroyed = true
+    # Mark as destroyed
+    view.data.destroyed = true
 
 proc numGlobalSites*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
   ## Returns the total number of global lattice sites across all MPI ranks
@@ -1170,6 +1555,70 @@ when isMainModule:
           echo "  numSites = ", numSites
           echo "  numVectorGroups = ", numVectorGroups(numSites)
 
+        test "Print support with echo in each loop":
+          # Test that echo statements trigger CPU fallback and $view[n] works
+          var tensorM = testLattice.newTensorField([2, 2]): float64
+          
+          var localM = tensorM.newLocalTensorField()
+          
+          let numSites = localM.localGrid[0] * localM.localGrid[1] * 
+                         localM.localGrid[2] * localM.localGrid[3]
+          
+          # Initialize to identity matrix at each site
+          for site in 0..<numSites:
+            let base = site * 4
+            localM.data[base + 0] = 1.0  # [0,0]
+            localM.data[base + 1] = 0.0  # [0,1]
+            localM.data[base + 2] = 0.0  # [1,0]
+            localM.data[base + 3] = 1.0  # [1,1]
+          
+          block:
+            var mView = localM.newTensorFieldView(iokReadWrite)
+            
+            # This triggers CPU fallback due to echo statement
+            # Only print first 2 sites to keep output manageable
+            for n in each 0..<mView.numSites():
+              if n < 2:
+                echo "  Site ", n, " matrix:\n", $mView[n]
+          
+          # Verify data is still correct after CPU fallback loop
+          for site in 0..<numSites:
+            let base = site * 4
+            check localM.data[base + 0] == 1.0
+            check localM.data[base + 1] == 0.0
+            check localM.data[base + 2] == 0.0
+            check localM.data[base + 3] == 1.0
+
+        test "Print support for vectors":
+          # Test vector printing with $vView[n]
+          var tensorV = testLattice.newTensorField([3]): float64
+          
+          var localV = tensorV.newLocalTensorField()
+          
+          let numSites = localV.localGrid[0] * localV.localGrid[1] * 
+                         localV.localGrid[2] * localV.localGrid[3]
+          
+          # Initialize vector at each site to [1, 2, 3]
+          for site in 0..<numSites:
+            let base = site * 3
+            localV.data[base + 0] = 1.0
+            localV.data[base + 1] = 2.0
+            localV.data[base + 2] = 3.0
+          
+          block:
+            var vView = localV.newTensorFieldView(iokReadWrite)
+            
+            for n in each 0..<vView.numSites():
+              if n < 2:
+                echo "  Site ", n, " vector: ", $vView[n]
+          
+          # Verify data
+          for site in 0..<numSites:
+            let base = site * 3
+            check localV.data[base + 0] == 1.0
+            check localV.data[base + 1] == 2.0
+            check localV.data[base + 2] == 3.0
+
         test "Long chain: A*B + C*D - E on single line":
           # Test complex single-line expression: R = A*B + C*D - E
           # All 2x2 matrices, computed in one kernel call
@@ -1224,5 +1673,286 @@ when isMainModule:
             check localR.data[base + 1] == 3.0
             check localR.data[base + 2] == 4.0
             check localR.data[base + 3] == 5.0
+
+        # ================================================================
+        # Multi-type tests - float32, int32, int64 support
+        # ================================================================
+
+        test "Float32 vector addition":
+          ## Test that float32 type works correctly for vector operations
+          var tensorA = testLattice.newTensorField([3]): float32
+          var tensorB = testLattice.newTensorField([3]): float32
+          var tensorC = testLattice.newTensorField([3]): float32
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          var localC = tensorC.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 3
+            localA.data[base + 0] = 1.0'f32
+            localA.data[base + 1] = 2.0'f32
+            localA.data[base + 2] = 3.0'f32
+            localB.data[base + 0] = 0.5'f32
+            localB.data[base + 1] = 1.0'f32
+            localB.data[base + 2] = 1.5'f32
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokRead)
+            var viewC = localC.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewC.numSites():
+              viewC[n] = viewA[n] + viewB[n]
+          
+          for site in 0..<numSites:
+            let base = site * 3
+            check localC.data[base + 0] == 1.5'f32
+            check localC.data[base + 1] == 3.0'f32
+            check localC.data[base + 2] == 4.5'f32
+
+        test "Float32 scalar multiplication":
+          ## Test scalar * vector with float32
+          var tensorA = testLattice.newTensorField([2]): float32
+          var tensorB = testLattice.newTensorField([2]): float32
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localA.data[base + 0] = 2.0'f32
+            localA.data[base + 1] = 4.0'f32
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewB.numSites():
+              viewB[n] = 2.5'f32 * viewA[n]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localB.data[base + 0] == 5.0'f32
+            check localB.data[base + 1] == 10.0'f32
+
+        test "Float32 2x2 matrix multiplication":
+          ## Test 2x2 matrix multiplication with float32
+          # A = [[1, 2], [3, 4]], B = [[2, 0], [0, 2]] => C = [[2, 4], [6, 8]]
+          var tensorA = testLattice.newTensorField([2, 2]): float32
+          var tensorB = testLattice.newTensorField([2, 2]): float32
+          var tensorC = testLattice.newTensorField([2, 2]): float32
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          var localC = tensorC.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 4
+            localA.data[base + 0] = 1.0'f32; localA.data[base + 1] = 2.0'f32
+            localA.data[base + 2] = 3.0'f32; localA.data[base + 3] = 4.0'f32
+            localB.data[base + 0] = 2.0'f32; localB.data[base + 1] = 0.0'f32
+            localB.data[base + 2] = 0.0'f32; localB.data[base + 3] = 2.0'f32
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokRead)
+            var viewC = localC.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewC.numSites():
+              viewC[n] = viewA[n] * viewB[n]
+          
+          for site in 0..<numSites:
+            let base = site * 4
+            check localC.data[base + 0] == 2.0'f32
+            check localC.data[base + 1] == 4.0'f32
+            check localC.data[base + 2] == 6.0'f32
+            check localC.data[base + 3] == 8.0'f32
+
+        test "Int32 vector addition":
+          ## Test int32 integer arithmetic on GPU
+          var tensorA = testLattice.newTensorField([3]): int32
+          var tensorB = testLattice.newTensorField([3]): int32
+          var tensorC = testLattice.newTensorField([3]): int32
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          var localC = tensorC.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 3
+            localA.data[base + 0] = 10'i32
+            localA.data[base + 1] = 20'i32
+            localA.data[base + 2] = 30'i32
+            localB.data[base + 0] = 5'i32
+            localB.data[base + 1] = 15'i32
+            localB.data[base + 2] = 25'i32
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokRead)
+            var viewC = localC.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewC.numSites():
+              viewC[n] = viewA[n] + viewB[n]
+          
+          for site in 0..<numSites:
+            let base = site * 3
+            check localC.data[base + 0] == 15'i32
+            check localC.data[base + 1] == 35'i32
+            check localC.data[base + 2] == 55'i32
+
+        test "Int32 vector subtraction":
+          ## Test int32 subtraction on GPU
+          var tensorA = testLattice.newTensorField([2]): int32
+          var tensorB = testLattice.newTensorField([2]): int32
+          var tensorC = testLattice.newTensorField([2]): int32
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          var localC = tensorC.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localA.data[base + 0] = 100'i32
+            localA.data[base + 1] = 50'i32
+            localB.data[base + 0] = 30'i32
+            localB.data[base + 1] = 20'i32
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokRead)
+            var viewC = localC.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewC.numSites():
+              viewC[n] = viewA[n] - viewB[n]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localC.data[base + 0] == 70'i32
+            check localC.data[base + 1] == 30'i32
+
+        test "Int64 vector addition":
+          ## Test int64 with large numbers on GPU
+          var tensorA = testLattice.newTensorField([2]): int64
+          var tensorB = testLattice.newTensorField([2]): int64
+          var tensorC = testLattice.newTensorField([2]): int64
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          var localC = tensorC.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          # Use values larger than int32 can represent
+          let bigVal1: int64 = 3_000_000_000'i64  # > 2^31
+          let bigVal2: int64 = 4_000_000_000'i64
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localA.data[base + 0] = bigVal1
+            localA.data[base + 1] = 100'i64
+            localB.data[base + 0] = bigVal2
+            localB.data[base + 1] = 200'i64
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokRead)
+            var viewC = localC.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewC.numSites():
+              viewC[n] = viewA[n] + viewB[n]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localC.data[base + 0] == bigVal1 + bigVal2  # 7_000_000_000
+            check localC.data[base + 1] == 300'i64
+
+        test "Int64 scalar multiplication":
+          ## Test int64 scalar multiply on GPU
+          var tensorA = testLattice.newTensorField([2]): int64
+          var tensorB = testLattice.newTensorField([2]): int64
+          
+          var localA = tensorA.newLocalTensorField()
+          var localB = tensorB.newLocalTensorField()
+          
+          let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                         localA.localGrid[2] * localA.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localA.data[base + 0] = 1_000_000'i64
+            localA.data[base + 1] = 2_000_000'i64
+          
+          block:
+            var viewA = localA.newTensorFieldView(iokRead)
+            var viewB = localB.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<viewB.numSites():
+              viewB[n] = 3'i64 * viewA[n]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localB.data[base + 0] == 3_000_000'i64
+            check localB.data[base + 1] == 6_000_000'i64
+
+        test "Mixed precision not supported (separate fields)":
+          ## Verify operations work with same types (no mixing)
+          ## Float64 and float32 fields should both work independently
+          var tensorF64 = testLattice.newTensorField([2]): float64
+          var tensorF32 = testLattice.newTensorField([2]): float32
+          
+          var localF64 = tensorF64.newLocalTensorField()
+          var localF32 = tensorF32.newLocalTensorField()
+          
+          let numSites = localF64.localGrid[0] * localF64.localGrid[1] * 
+                         localF64.localGrid[2] * localF64.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localF64.data[base + 0] = 1.5
+            localF64.data[base + 1] = 2.5
+            localF32.data[base + 0] = 1.5'f32
+            localF32.data[base + 1] = 2.5'f32
+          
+          # Test float64 independently
+          block:
+            var viewA = localF64.newTensorFieldView(iokRead)
+            var viewB = localF64.newTensorFieldView(iokReadWrite)
+            for site in 0..<numSites:
+              localF64.data[site * 2 + 0] = 0.0
+              localF64.data[site * 2 + 1] = 0.0
+            block:
+              var viewBWrite = localF64.newTensorFieldView(iokWrite)
+              for n in each 0..<viewBWrite.numSites():
+                viewBWrite[n] = viewA[n]
+          
+          # Test float32 independently
+          block:
+            var viewA = localF32.newTensorFieldView(iokRead)
+            var viewBWrite = localF32.newTensorFieldView(iokReadWrite)
+            for n in each 0..<viewBWrite.numSites():
+              viewBWrite[n] = 2.0'f32 * viewA[n]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localF32.data[base + 0] == 3.0'f32
+            check localF32.data[base + 1] == 5.0'f32
 
     # End of block - all tensor fields destroyed here before GA finalization

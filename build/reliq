@@ -32,6 +32,7 @@ import os
 import subprocess
 import argparse
 import pathlib
+import multiprocessing
 
 CWD: str = pathlib.Path.cwd()
 SWD: pathlib.Path = pathlib.Path(__file__).absolute().parent
@@ -39,6 +40,7 @@ DESCRIPTION: str = """ReliQ: Lattice Field Theory Framework
 
 Run a compiled ReliQ executable with parallel configuration.
 
+For OpenMP builds (BACKEND=openmp), use -t to set the number of threads.
 For compile-time options, use 'make help' in the build directory."""
 
 OMP_URL: str = "https://www.openmp.org/specifications"
@@ -47,9 +49,17 @@ BUILD_HELP = """
 Compile-time Options (use with make):
   make <target> [OPTION=value ...]
 
+  BACKEND=openmp    Use OpenMP backend for CPU parallelization
   VECTOR_WIDTH=N    SIMD width for AoSoA vectorization (default: 8)
   DEBUG_KERNELS=1   Print generated OpenCL kernel source
   USE_WORKGROUPS=1  Force work-group size = VectorWidth (for debugging)
+
+OpenMP Examples:
+  # Build with OpenMP backend
+  make tensorview BACKEND=openmp
+
+  # Run with 8 OpenMP threads
+  ./reliq -e tensorview -t 8
 
   Run 'make help' for full documentation.
 """
@@ -78,9 +88,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '-t',
         '--nthreads',
-        help = 'Number of threads per task',
+        help = 'Number of threads per task (for OpenMP/Kokkos/OpenCL CPU)',
         type = str,
-        default = "1"
+        default = None  # Will auto-detect if not specified
+    )
+    parser.add_argument(
+        '--auto-threads',
+        help = 'Auto-detect optimal thread count (default if -t not specified)',
+        action = 'store_true'
     )
     parser.add_argument(
         '--local',
@@ -101,8 +116,17 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
+    # Determine thread count
+    if args.nthreads is not None:
+        XXX_NUM_THREADS: str = args.nthreads
+    else:
+        # Auto-detect: use all available cores divided by number of tasks
+        total_cores = multiprocessing.cpu_count()
+        threads_per_task = max(1, total_cores // int(args.ntasks))
+        XXX_NUM_THREADS: str = str(threads_per_task)
+        print(f"ReliQ: Auto-detected {total_cores} cores, using {XXX_NUM_THREADS} threads per task", flush=True)
+
     # set environment variables
-    XXX_NUM_THREADS: str = args.nthreads
     OMP_PROC_BIND: str = args.OMP_PROC_BIND
     OMP_PLACES: str = args.OMP_PLACES
     env_vars = {
