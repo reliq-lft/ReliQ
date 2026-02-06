@@ -54,7 +54,7 @@ when isMainModule:
         var lcf2 = cf2.newLocalTensorField()
         var lcf3 = cf3.newLocalTensorField()
 
-        for i in 0..<lcf1.numElements():
+        for i in all 0..<lcf1.numElements():
           lcf1[i] = complex64(float64(i), 0.0)
           lcf2[i] = complex64(float64(i * 2), 0.0)
 

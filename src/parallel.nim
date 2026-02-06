@@ -28,8 +28,10 @@
 ]#
 
 import globalarrays/[globalarrays]
+import openmp/[omplocal]
 
 export globalarrays
+export omplocal 
 
 # Backend selection - matches tensorview.nim's UseSycl/UseOpenMP flags
 const UseSycl* {.booldefine.} = false
@@ -37,9 +39,7 @@ const UseOpenMP* {.booldefine.} = false
 
 when UseOpenMP:
   import openmp/[openmp]
-  import openmp/omplocal
   export openmp
-  export omplocal  # Export `all` macro for LocalTensorField
   
   template parallel*(body: untyped): untyped =
     gaParallel:
