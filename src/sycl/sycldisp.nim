@@ -44,7 +44,7 @@
 ## - Matrix multiply: C[n] = A[n] * B[n]
 ## - Matrix-vector multiply: y[n] = M[n] * x[n]
 
-import std/[macros, tables, strutils]
+import std/[macros, tables]
 
 import syclbase
 export syclbase

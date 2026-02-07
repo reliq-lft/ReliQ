@@ -75,6 +75,18 @@
   <li><a class="reference" href="#%3Ddestroy%2CGlobalArray%5BD%2CT%5D" title="`=destroy`[D: static[int]; T](ga: GlobalArray[D, T])">`=destroy`[D: static[int]; T](ga: GlobalArray[D, T])</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">accessGhosts
+  <li><a class="reference" href="#accessGhosts%2CGlobalArray%5BD%2CT%5D" title="accessGhosts[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int], array[D, int])">accessGhosts[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int], array[D, int])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">accessLocal
+  <li><a class="reference" href="#accessLocal%2CGlobalArray%5BD%2CT%5D" title="accessLocal[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int])">accessLocal[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">conformable
   <li><a class="reference" href="#conformable%2CGlobalArray%5BD%2CT%5D%2CGlobalArray%5BD%2CT%5D" title="conformable[D: static[int]; T](a, b: GlobalArray[D, T]): bool">conformable[D: static[int]; T](a, b: GlobalArray[D, T]): bool</a></li>
 
@@ -121,6 +133,10 @@
 </ul>
 <ul class="simple nested-toc-section">numSites
   <li><a class="reference" href="#numSites%2CGlobalArray%5BD%2CT%5D" title="numSites[D: static[int]; T](ga: GlobalArray[D, T]): int">numSites[D: static[int]; T](ga: GlobalArray[D, T]): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">releaseLocal
+  <li><a class="reference" href="#releaseLocal%2CGlobalArray%5BD%2CT%5D" title="releaseLocal[D: static[int]; T](ga: GlobalArray[D, T])">releaseLocal[D: static[int]; T](ga: GlobalArray[D, T])</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">updateGhostDirection
@@ -210,6 +226,42 @@
 <p>Parameters:</p>
 <ul class="simple"><li><tt class="docutils literal"><span class="pre"><span class="Identifier">ga</span></span></tt>: The GlobalArray instance to be destroyed.</li>
 </ul>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="accessGhosts-procs-all">
+  <div id="accessGhosts,GlobalArray[D,T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#accessGhosts%2CGlobalArray%5BD%2CT%5D"><span class="Identifier">accessGhosts</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">ga</span><span class="Other">:</span> <a href="gatypes.html#GlobalArray"><span class="Identifier">GlobalArray</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span>
+    <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Access local data including ghost regions</p>
+<p>Returns a pointer to the raw data (including ghosts), the padded dimensions (local + 2 x ghost in each dim), and the leading dimensions. The pointer is valid until <tt class="docutils literal"><span class="pre">releaseLocal</span></tt> is called.</p>
+<p>Parameters:</p>
+<ul class="simple"><li><tt class="docutils literal"><span class="pre">ga</span></tt>: The GlobalArray instance</li>
+</ul>
+<p>Returns: A tuple of (data pointer, padded dimensions, leading dimensions)</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="accessLocal-procs-all">
+  <div id="accessLocal,GlobalArray[D,T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#accessLocal%2CGlobalArray%5BD%2CT%5D"><span class="Identifier">accessLocal</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">ga</span><span class="Other">:</span> <a href="gatypes.html#GlobalArray"><span class="Identifier">GlobalArray</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span>
+    <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Access local data segment of the GlobalArray (no ghosts)</p>
+<p>Returns a pointer to the raw local data and the leading dimensions (strides). The pointer is valid until <tt class="docutils literal"><span class="pre">releaseLocal</span></tt> is called.</p>
+<p>Parameters:</p>
+<ul class="simple"><li><tt class="docutils literal"><span class="pre">ga</span></tt>: The GlobalArray instance</li>
+</ul>
+<p>Returns: A tuple of (data pointer, leading dimensions array)</p>
 
     
   </dd>
@@ -400,6 +452,19 @@
 </div>
 
 </div>
+<div id="releaseLocal-procs-all">
+  <div id="releaseLocal,GlobalArray[D,T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#releaseLocal%2CGlobalArray%5BD%2CT%5D"><span class="Identifier">releaseLocal</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">ga</span><span class="Other">:</span> <a href="gatypes.html#GlobalArray"><span class="Identifier">GlobalArray</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Release local data access obtained via <tt class="docutils literal"><span class="pre">accessLocal</span></tt> or <tt class="docutils literal"><span class="pre">accessGhosts</span></tt></p>
+<p>Must be called after finishing direct memory access.</p>
+
+    
+  </dd>
+</div>
+
+</div>
 <div id="updateGhostDirection-procs-all">
   <div id="updateGhostDirection,GlobalArray[D,T],SomeInteger,SomeInteger,bool">
   <dt><pre><span class="Keyword">proc</span> <a href="#updateGhostDirection%2CGlobalArray%5BD%2CT%5D%2CSomeInteger%2CSomeInteger%2Cbool"><span class="Identifier">updateGhostDirection</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">ga</span><span class="Other">:</span> <a href="gatypes.html#GlobalArray"><span class="Identifier">GlobalArray</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
@@ -447,7 +512,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:33 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:01 UTC</small>
       </div>
     </div>
   </div>

@@ -17,7 +17,8 @@ architectures.
   SIMD and GPU memory coalescing
 - **Distributed memory**: MPI-based parallelism via
   [Global Arrays](https://globalarrays.github.io/) with automatic ghost
-  region management
+  region management and distributed transport (`GlobalShifter`,
+  `discreteLaplacian`)
 - **Compile-time tensor types**: `Vec[N,T]` and `Mat[N,M,T]` with
   dimensions known at compile time for zero-overhead abstraction
 - **Unified stencil operations**: A single `LatticeStencil[D]` type that
@@ -66,6 +67,7 @@ ReliQ is organized into several layers:
 ├──────────────────────────────────────────────┤
 │             Tensor Layer                     │
 │  TensorFieldView · Stencil · Transporter     │
+│  GlobalShifter  · Discrete Laplacian         │
 ├──────────────────────────────────────────────┤
 │           Backend Dispatch                   │
 │    OpenCL    │    SYCL    │    OpenMP         │
@@ -98,17 +100,22 @@ ReliQ is organized into several layers:
 
 ### Tensor Fields
 
-- [tensor/tensor](tensor/tensor.html) — Tensor module aggregation
-- [tensor/tensorview](tensor/tensorview.html) — `TensorFieldView[L,T]`:
-  the primary type for GPU/SIMD dispatch via the `each` macro
+- [tensor/tensor](tensor/tensor.html) — Tensor module aggregation;
+  re-exports all tensor submodules
 - [tensor/globaltensor](tensor/globaltensor.html) — `TensorField[D,R,L,T]`:
-  distributed tensor field with ghost region support
+  distributed tensor field with ghost region support, coordinate utilities
+  (C row-major GA layout), `GlobalShifter` for distributed transport,
+  `discreteLaplacian`, and `LatticeStencil` integration
 - [tensor/localtensor](tensor/localtensor.html) —
-  `LocalTensorField[D,R,L,T]`: rank-local tensor data in host memory
+  `LocalTensorField[D,R,L,T]`: rank-local tensor data in host memory,
+  element/site accessors, arithmetic, and norms
+- [tensor/tensorview](tensor/tensorview.html) — `TensorFieldView[L,T]`:
+  the primary type for GPU/SIMD dispatch via the `each` macro; handles
+  AoSoA layout transformation across OpenCL, SYCL, and OpenMP backends
 - [tensor/sitetensor](tensor/sitetensor.html) — `Vec[N,T]` and
   `Mat[N,M,T]`: compile-time dimensioned site-level tensor types
 - [tensor/transporter](tensor/transporter.html) — `Shifter[D,T]` and
-  `Transporter[D,U,F]`: parallel transport with MPI halo exchange
+  `Transporter[D,U,F]`: single-rank parallel transport with MPI halo exchange
 
 ### Backend: OpenCL
 
@@ -294,6 +301,58 @@ each vDst, vSrc, stencil, n:
   # Discrete Laplacian: ψ(x+μ) + ψ(x-μ) - 2ψ(x)
   vDst[n] = vSrc[nbrFwd] + vSrc[nbrBwd] - 2.0 * vSrc[n]
 ```
+
+## Distributed Transport (GlobalShifter)
+
+For operations that span MPI boundaries at the `TensorField` level (before
+down-casting to views), `GlobalShifter` performs distributed nearest-neighbour
+shifts using Global Arrays ghost exchange.
+
+```nim
+import reliq
+
+parallel:
+  let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 4], [1, 1, 1, 1])
+  var src  = lat.newTensorField([1, 1]): float64
+  var dest = lat.newTensorField([1, 1]): float64
+
+  # Fill src ...
+
+  # Shift forward in t-dimension (crosses MPI boundaries)
+  let shifter = newGlobalShifter(src, dim = 3, len = 1)
+  shifter.apply(src, dest)   # dest[x] = src[x + e_t]
+
+  # Create shifters for all dimensions at once
+  let fwd = newGlobalShifters(src, len = 1)         # forward in all D dims
+  let bwd = newGlobalBackwardShifters(src, len = 1)  # backward in all D dims
+
+  # Discrete Laplacian: sum_mu (f[x+mu] + f[x-mu]) - 2D * f[x]
+  var lap = lat.newTensorField([1, 1]): float64
+  var tmp = lat.newTensorField([1, 1]): float64
+  discreteLaplacian(src, lap, tmp)
+```
+
+### How it works
+
+1. `updateAllGhosts()` calls `GA_Update_ghost_dir` in each lattice
+   dimension to fill ghost cells with neighbor data from adjacent ranks
+2. The source field is read via the *ghost pointer* (`accessGhosts`),
+   which sees both local and ghost data
+3. The destination is written via the *local pointer* (`accessLocal`),
+   which starts at the centre of the inner padded block
+4. For dimensions with only one MPI rank (not distributed), coordinates
+   are wrapped locally since ghost exchange has no remote data to fetch
+
+### Two transport layers
+
+| Layer | Type | Where | Communication |
+|-------|------|-------|---------------|
+| `GlobalShifter` | `TensorField` | `globaltensor.nim` | GA ghost exchange (MPI) |
+| `Shifter` / `Transporter` | `TensorFieldView` | `transporter.nim` | Halo buffers for device dispatch |
+
+Use `GlobalShifter` when working directly with distributed tensor fields
+(e.g. setup, I/O, measurement code).  Use `Shifter` / `Transporter` when
+the data is already on-device inside an `each` loop.
 
 ## License
 

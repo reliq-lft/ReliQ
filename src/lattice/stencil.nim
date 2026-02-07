@@ -47,7 +47,7 @@
 ## - SIMD-aware indexing for vectorized backends
 ## - Device buffer offsets for GPU backends
 
-import std/[sequtils, tables]
+import std/[tables]
 
 #[ ============================================================================
    Direction Types - Type-safe direction handling

@@ -39,7 +39,6 @@
 ## Reference: QEX simdWrap.nim and nimsimd for design patterns
 
 import x86wrap
-import ssewrap
 import avx2wrap
 import avx512wrap
 

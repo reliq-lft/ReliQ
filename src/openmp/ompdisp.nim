@@ -60,7 +60,6 @@ export ompbase
 """.}
 
 import ./ompwrap
-import ../simd/simdlayout
 import ../simd/simdtypes
 
 #[ ============================================================================

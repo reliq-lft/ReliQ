@@ -48,6 +48,7 @@ else:
   export opencl
 
 template parallel*(body: untyped): untyped =
+  bind UseOpenMP, UseSycl
   gaParallel:
     when UseOpenMP:
       ompParallel: body

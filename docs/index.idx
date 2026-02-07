@@ -23,4 +23,7 @@ heading	Supported Patterns	index.html#supported-patterns	   Supported Patterns		
 heading	What Happens Under the Hood	index.html#what-happens-under-the-hood	   What Happens Under the Hood		0
 heading	AoSoA Memory Layout	index.html#aosoa-memory-layout	  AoSoA Memory Layout		0
 heading	Stencil Operations	index.html#stencil-operations	  Stencil Operations		0
+heading	Distributed Transport (GlobalShifter)	index.html#distributed-transport-globalshifter	  Distributed Transport (GlobalShifter)		0
+heading	How it works	index.html#how-it-works	   How it works		0
+heading	Two transport layers	index.html#two-transport-layers	   Two transport layers		0
 heading	License	index.html#license	  License		0

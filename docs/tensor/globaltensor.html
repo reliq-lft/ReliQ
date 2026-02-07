@@ -51,14 +51,23 @@
       </select>
     </div>
     <ul class="simple simple-toc" id="toc-list">
-  <li>
+  <li><a class="reference" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays_toc" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays">GlobalTensor - Distributed Tensor Fields via Global Arrays</a></li>
+<ul class="simple"><li><a class="reference" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout_toc" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout">GA Memory Layout</a></li>
+<li><a class="reference" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-example_toc" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-example">Example</a></li>
+</ul><li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
 </li>
 <li>
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#TensorField" title="TensorField[D; R; L; T] = object
+      <li><a class="reference" href="#GlobalShifter" title="GlobalShifter[D; R; L; T] = object
+  dim*: int                  ## Shift dimension
+  len*: int                  ## Displacement (+forward, -backward)
+  ## MPI decomposition grid
+  ## Product of localGeom[]
+  ## Product of shape[]">GlobalShifter</a></li>
+<li><a class="reference" href="#TensorField" title="TensorField[D; R; L; T] = object
   lattice*: L
   shape*: array[R, int]
   when D + R == 1:
@@ -139,7 +148,55 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">ghostWidth
+      <ul class="simple nested-toc-section">accessGhosts
+  <li><a class="reference" href="#accessGhosts%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessGhosts.D%5D%2CT%5D" title="accessGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]">accessGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">accessLocal
+  <li><a class="reference" href="#accessLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessLocal.D%5D%2CT%5D" title="accessLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]">accessLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">apply
+  <li><a class="reference" href="#apply%2CGlobalShifter%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D" title="apply[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    shifter: GlobalShifter[D, R, L, T]; src: TensorField[D, R, L, T];
+    dest: var TensorField[D, R, L, T])">apply[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    shifter: GlobalShifter[D, R, L, T]; src: TensorField[D, R, L, T];
+    dest: var TensorField[D, R, L, T])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">applyStencilShift
+  <li><a class="reference" href="#applyStencilShift%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2Cint%2Cint" title="applyStencilShift[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T]; dim: int;
+    direction: int)">applyStencilShift[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T]; dim: int;
+    direction: int)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">coordsToLex
+  <li><a class="reference" href="#coordsToLex%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D" title="coordsToLex[D: static int](coords: array[D, int]; geom: array[D, int]): int">coordsToLex[D: static int](coords: array[D, int]; geom: array[D, int]): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">coordsToPaddedFlat
+  <li><a class="reference" href="#coordsToPaddedFlat%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint" title="coordsToPaddedFlat[D: static int](coords: array[D, int];
+                                  paddedGeom: array[D, int];
+                                  ghostWidth: array[D, int]; innerBlockSize: int): int">coordsToPaddedFlat[D: static int](coords: array[D, int];
+                                  paddedGeom: array[D, int];
+                                  ghostWidth: array[D, int]; innerBlockSize: int): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">discreteLaplacian
+  <li><a class="reference" href="#discreteLaplacian%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D" title="discreteLaplacian[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T];
+    scratch: var TensorField[D, R, L, T])">discreteLaplacian[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T];
+    scratch: var TensorField[D, R, L, T])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">ghostWidth
   <li><a class="reference" href="#ghostWidth%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BghostWidth.D%5D%2CT%5D" title="ghostWidth[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]">ghostWidth[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]</a></li>
@@ -151,10 +208,68 @@
     tensor: TensorField[D, R, L, T]): bool</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">innerBlockSize
+  <li><a class="reference" href="#innerBlockSize%2Cstaticint%2CopenArray%5Bint%5D%2Cbool" title="innerBlockSize(R: static int; shape: openArray[int]; isComplex: bool): int">innerBlockSize(R: static int; shape: openArray[int]; isComplex: bool): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">innerPaddedBlockSize
+  <li><a class="reference" href="#innerPaddedBlockSize%2Cstaticint%2Cint" title="innerPaddedBlockSize(R: static int; ghostWidth: int): int">innerPaddedBlockSize(R: static int; ghostWidth: int): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">innerPaddedOffset
+  <li><a class="reference" href="#innerPaddedOffset%2Cstaticint%2Cint" title="innerPaddedOffset(R: static int; ghostWidth: int): int">innerPaddedOffset(R: static int; ghostWidth: int): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">lexToCoords
+  <li><a class="reference" href="#lexToCoords%2Cint%2Carray%5BD%2Cint%5D" title="lexToCoords[D: static int](idx: int; geom: array[D, int]): array[D, int]">lexToCoords[D: static int](idx: int; geom: array[D, int]): array[D, int]</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">localGrid
   <li><a class="reference" href="#localGrid%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalGrid.D%5D%2CT%5D" title="localGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]">localGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">localIdx
+  <li><a class="reference" href="#localIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalIdx.D%5D%2CT%5D%2Carray%5BD%2Cint%5D" title="localIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; coords: array[D, int]): int">localIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; coords: array[D, int]): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">localLexIdx
+  <li><a class="reference" href="#localLexIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalLexIdx.D%5D%2CT%5D%2Cint" title="localLexIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; site: int): int">localLexIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; site: int): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">localSiteOffset
+  <li><a class="reference" href="#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint" title="localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerPaddedBlockSize: int): int">localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerPaddedBlockSize: int): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newGlobalBackwardShifters
+  <li><a class="reference" href="#newGlobalBackwardShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalBackwardShifters.D%5D%2CT%5D%2Cint" title="newGlobalBackwardShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]">newGlobalBackwardShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newGlobalShifter
+  <li><a class="reference" href="#newGlobalShifter%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifter.D%5D%2CT%5D%2Cint%2Cint" title="newGlobalShifter[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; dim: int; len: int = 1): GlobalShifter[D, R,
+    L, T]">newGlobalShifter[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; dim: int; len: int = 1): GlobalShifter[D, R,
+    L, T]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newGlobalShifters
+  <li><a class="reference" href="#newGlobalShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifters.D%5D%2CT%5D%2Cint" title="newGlobalShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]">newGlobalShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newLatticeStencil
@@ -175,6 +290,12 @@
   <li><a class="reference" href="#paddedGrid%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BpaddedGrid.D%5D%2CT%5D" title="paddedGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]">paddedGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">releaseLocal
+  <li><a class="reference" href="#releaseLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocal.D%5D%2CT%5D" title="releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T])">releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T])</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">updateAllGhosts
@@ -203,17 +324,76 @@
     
     <div id="tocRoot"></div>
     
-    <p class="module-desc"></p>
+    <p class="module-desc">
+<h1><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays">GlobalTensor - Distributed Tensor Fields via Global Arrays</a></h1><p>This module provides <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Punctuation">,</span><span class="Identifier">R</span><span class="Punctuation">,</span><span class="Identifier">L</span><span class="Punctuation">,</span><span class="Identifier">T</span><span class="Punctuation">]</span></span></tt>, the primary distributed data type in ReliQ.  Each tensor field is backed by a <a class="reference external" href="https://globalarrays.github.io/">Global Array</a> with ghost (halo) regions, enabling transparent MPI communication of boundary data.</p>
+<p>Key capabilities:</p>
+<ul class="simple"><li><strong>Construction</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">newTensorField</span></span></tt> creates a GA-backed field with automatic MPI decomposition and ghost region allocation</li>
+<li><strong>Local data access</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">accessLocal</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">accessGhosts</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">releaseLocal</span></span></tt> provide raw pointers into the local partition (with or without ghost cells)</li>
+<li><strong>Ghost exchange</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">updateGhosts</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">updateAllGhosts</span></span></tt> synchronise boundary data between MPI ranks via <tt class="docutils literal"><span class="pre"><span class="Identifier">GA_Update_ghost_dir</span></span></tt></li>
+<li><strong>Coordinate utilities</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">lexToCoords</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">coordsToLex</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">localIdx</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">localLexIdx</span></span></tt> handle the C row-major memory layout used by GA</li>
+<li><strong>Shifting / transport</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">GlobalShifter</span></span></tt> performs distributed shifts (<tt class="docutils literal"><span class="pre">dest[x] = src[x + e_mu]</span></tt>) using ghost exchange, with correct handling of periodic boundary conditions for both distributed and non-distributed dimensions</li>
+<li><strong>Stencil operations</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">applyStencilShift</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">discreteLaplacian</span></span></tt> implement common nearest-neighbour operations</li>
+<li><strong>Stencil integration</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">newLatticeStencil</span></span></tt> creates a unified <tt class="docutils literal"><span class="pre"><span class="Identifier">LatticeStencil</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Punctuation">]</span></span></tt> from a tensor field's geometry</li>
+</ul>
+
+<h2><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout">GA Memory Layout</a></h2><p>Global Arrays store data in <strong>C row-major</strong> order (last dimension fastest varying).  A <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Operator">=</span><span class="DecNumber">4</span><span class="Punctuation">,</span> <span class="Identifier">R</span><span class="Operator">=</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="Identifier">T</span><span class="Operator">=</span><span class="Identifier">float64</span><span class="Punctuation">]</span></span></tt> with <tt class="docutils literal"><span class="pre">shape = [3, 3]</span></tt> maps to a 7-dimensional GA <tt class="docutils literal"><span class="pre">[Lx, Ly, Lz, Lt, S0, S1, Cplx]</span></tt>.  The last <tt class="docutils literal"><span class="pre">R+1</span></tt> dimensions are <tt class="docutils literal"><span class="pre">inner</span></tt> (tensor shape + complex component), each ghost-padded to <tt class="docutils literal"><span class="pre">S + 2*ghostWidth</span></tt>.</p>
+<p>Two pointer types are available:</p>
+<ul class="simple"><li><strong>Local pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessLocal</span></span></tt>): starts at the centre of the inner padded block for the first local lattice site.  <tt class="docutils literal"><span class="pre">p[0]</span></tt> is the value at local coordinates <tt class="docutils literal"><span class="pre">(0,0,...,0)</span></tt>.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">localIdx</span></span></tt> to compute the correct flat index.</li>
+<li><strong>Ghost pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessGhosts</span></span></tt>): starts at the origin of the full padded 7-D array.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">coordsToPaddedFlat</span></span></tt> plus <tt class="docutils literal"><span class="pre"><span class="Identifier">innerPaddedOffset</span></span></tt> to index.</li>
+</ul>
+
+<h2><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-example" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-example">Example</a></h2><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">reliq</span>
+
+<span class="Identifier">parallel</span><span class="Punctuation">:</span>
+  <span class="Keyword">let</span> <span class="Identifier">lat</span> <span class="Operator">=</span> <span class="Identifier">newSimpleCubicLattice</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">16</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">4</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span>
+  <span class="Keyword">var</span> <span class="Identifier">src</span>  <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Keyword">var</span> <span class="Identifier">dest</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  
+  <span class="Comment"># Fill src with global lex index</span>
+  <span class="Keyword">let</span> <span class="Identifier">p</span> <span class="Operator">=</span> <span class="Identifier">src</span><span class="Operator">.</span><span class="Identifier">accessLocal</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  <span class="Keyword">for</span> <span class="Identifier">site</span> <span class="Keyword">in</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">nLocal</span><span class="Punctuation">:</span>
+    <span class="Identifier">p</span><span class="Punctuation">[</span><span class="Identifier">src</span><span class="Operator">.</span><span class="Identifier">localLexIdx</span><span class="Punctuation">(</span><span class="Identifier">site</span><span class="Punctuation">)</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">float64</span><span class="Punctuation">(</span><span class="Identifier">site</span><span class="Punctuation">)</span>
+  <span class="Identifier">src</span><span class="Operator">.</span><span class="Identifier">releaseLocal</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+  
+  <span class="Comment"># Shift forward in t-direction</span>
+  <span class="Keyword">let</span> <span class="Identifier">shifter</span> <span class="Operator">=</span> <span class="Identifier">newGlobalShifter</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">dim</span> <span class="Operator">=</span> <span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="Identifier">len</span> <span class="Operator">=</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>
+  <span class="Identifier">shifter</span><span class="Operator">.</span><span class="Identifier">apply</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">dest</span><span class="Punctuation">)</span>   <span class="Comment"># dest[x] = src[x + e_t]</span>
+  
+  <span class="Comment"># Discrete Laplacian</span>
+  <span class="Keyword">var</span> <span class="Identifier">lap</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Keyword">var</span> <span class="Identifier">tmp</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Identifier">discreteLaplacian</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">lap</span><span class="Punctuation">,</span> <span class="Identifier">tmp</span><span class="Punctuation">)</span></pre></p>
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="../lattice.html">../lattice</a>, <a class="reference external" href="../globalarrays/gatypes.html">../globalarrays/gatypes</a>, <a class="reference external" href="../utils/complex.html">../utils/complex</a>, <a class="reference external" href="../lattice/stencil.html">../lattice/stencil</a>
+    <a class="reference external" href="../lattice.html">../lattice</a>, <a class="reference external" href="../globalarrays/gatypes.html">../globalarrays/gatypes</a>, <a class="reference external" href="../globalarrays/gawrap.html">../globalarrays/gawrap</a>, <a class="reference external" href="../utils/complex.html">../utils/complex</a>, <a class="reference external" href="../lattice/stencil.html">../lattice/stencil</a>
   </dl>
 </div>
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="TensorField">
+    <div id="GlobalShifter">
+  <dt><pre><a href="globaltensor.html#GlobalShifter"><span class="Identifier">GlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">dim</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>                  <span class="Comment">## Shift dimension</span>
+  <span class="Identifier">len</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>                  <span class="Comment">## Displacement (+forward, -backward)</span>
+  <span class="Comment">## MPI decomposition grid</span>
+  <span class="Comment">## Product of localGeom[]</span>
+  <span class="Comment">## Product of shape[]</span></pre></dt>
+  <dd>
+    
+    <p>Distributed-memory field shifter backed by Global Arrays ghost exchange</p>
+<p>Unlike the single-rank <tt class="docutils literal"><span class="pre">Shifter[D,T]</span></tt> in transporter.nim, a <tt class="docutils literal"><span class="pre">GlobalShifter</span></tt> performs real MPI communication via <tt class="docutils literal"><span class="pre">GA_Update_ghost_dir</span></tt> so that neighbor lookups near partition boundaries read correct remote data.</p>
+<p>Usage:</p>
+<p><pre class="listing"><span class="Keyword">let</span> <span class="Identifier">lat</span> <span class="Operator">=</span> <span class="Identifier">newSimpleCubicLattice</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">8</span><span class="Punctuation">,</span><span class="DecNumber">8</span><span class="Punctuation">,</span><span class="DecNumber">8</span><span class="Punctuation">,</span><span class="DecNumber">16</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">4</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span>
+<span class="Keyword">var</span> <span class="Identifier">field</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+<span class="Keyword">let</span> <span class="Identifier">shifter</span> <span class="Operator">=</span> <span class="Identifier">newGlobalShifter</span><span class="Punctuation">(</span><span class="Identifier">field</span><span class="Punctuation">,</span> <span class="Identifier">dim</span><span class="Operator">=</span><span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="Identifier">len</span><span class="Operator">=</span><span class="DecNumber">1</span><span class="Punctuation">)</span>
+<span class="Keyword">var</span> <span class="Identifier">dest</span>   <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span><span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+<span class="Identifier">shifter</span><span class="Operator">.</span><span class="Identifier">apply</span><span class="Punctuation">(</span><span class="Identifier">field</span><span class="Punctuation">,</span> <span class="Identifier">dest</span><span class="Punctuation">)</span>   <span class="Comment"># dest[x] = field[x + e_3]</span></pre></p>
+
+    
+  </dd>
+</div>
+<div id="TensorField">
   <dt><pre><a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">lattice</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">L</span>
   <span class="Identifier">shape</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span>
@@ -289,8 +469,8 @@
       <span class="Identifier">data</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">GlobalArray</span><span class="Other">[</span><span class="DecNumber">11</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Tensor field representation on a lattice</p>
-<p>Represents a distributed tensor field defined on a lattice with specified dimensions and data type.</p>
+    <p>Distributed tensor field backed by a Global Array.</p>
+<p>Represents a rank-<tt class="docutils literal"><span class="pre">R</span></tt> tensor field defined on a <tt class="docutils literal"><span class="pre">D</span></tt>-dimensional lattice, stored as a distributed GA with ghost regions for MPI communication.  The element type <tt class="docutils literal"><span class="pre">T</span></tt> may be a real scalar or a complex type (<tt class="docutils literal"><span class="pre"><span class="Identifier">Complex32</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">Complex64</span></span></tt>).</p>
 
     
   </dd>
@@ -301,7 +481,123 @@
 <div class="section" id="12">
   <h1><a class="toc-backref" href="#12">Procs</a></h1>
   <dl class="item">
-    <div id="ghostWidth-procs-all">
+    <div id="accessGhosts-procs-all">
+  <div id="accessGhosts,TensorField[D,R,L: Lattice[accessGhosts.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#accessGhosts%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessGhosts.D%5D%2CT%5D"><span class="Identifier">accessGhosts</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    <p>Access local data including ghost regions</p>
+<p>Returns a raw pointer to the padded data (local + ghost regions). Ghost regions must have been updated via <tt class="docutils literal"><span class="pre">updateAllGhosts</span></tt> first. Must call <tt class="docutils literal"><span class="pre">releaseLocal</span></tt> when done.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="accessLocal-procs-all">
+  <div id="accessLocal,TensorField[D,R,L: Lattice[accessLocal.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#accessLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessLocal.D%5D%2CT%5D"><span class="Identifier">accessLocal</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    <p>Access local data segment of the tensor field (no ghosts)</p>
+<p><strong>Important</strong>: The returned pointer shares the padded memory layout. The stride between consecutive lattice sites is NOT 1 — it is determined by the padded inner dimensions (tensor shape + complex, each ghost-padded). Use <tt class="docutils literal"><span class="pre">localIdx</span></tt> to compute the correct flat index for a lattice site.</p>
+<p>Must call <tt class="docutils literal"><span class="pre">releaseLocal</span></tt> when done.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="apply-procs-all">
+  <div id="apply,GlobalShifter[D,R,L: Lattice[apply.D],T],TensorField[D,R,L: Lattice[apply.D],T],TensorField[D,R,L: Lattice[apply.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#apply%2CGlobalShifter%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D"><span class="Identifier">apply</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">shifter</span><span class="Other">:</span> <a href="globaltensor.html#GlobalShifter"><span class="Identifier">GlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">src</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
+    <span class="Identifier">dest</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Apply the shift: <tt class="docutils literal"><span class="pre">dest[x] = src[x + shift]</span></tt></p>
+<p>Performs GA ghost exchange in the shift dimension, then reads neighbor values from the ghost-padded local data.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="applyStencilShift-procs-all">
+  <div id="applyStencilShift,TensorField[D,R,L: Lattice[applyStencilShift.D],T],TensorField[D,R,L: Lattice[applyStencilShift.D],T],int,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#applyStencilShift%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2Cint%2Cint"><span class="Identifier">applyStencilShift</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">src</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">dest</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">dim</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
+    <span class="Identifier">direction</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Apply a single stencil shift using GA ghost exchange</p>
+<p>A convenience wrapper: <tt class="docutils literal"><span class="pre">dest[x] = src[x + direction*e_dim]</span></tt></p>
+<p>Parameters:</p>
+<ul class="simple"><li><tt class="docutils literal"><span class="pre">src</span></tt>: Source tensor field</li>
+<li><tt class="docutils literal"><span class="pre">dest</span></tt>: Destination tensor field (overwritten)</li>
+<li><tt class="docutils literal"><span class="pre">dim</span></tt>: Shift dimension (0..D-1)</li>
+<li><tt class="docutils literal"><span class="pre">direction</span></tt>: +1 for forward, -1 for backward</li>
+</ul>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="coordsToLex-procs-all">
+  <div id="coordsToLex,array[D,int],array[D,int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#coordsToLex%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D"><span class="Identifier">coordsToLex</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">coords</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">geom</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Convert D-dimensional coordinates to lexicographic index</p>
+<p>GA C-order: last dimension is fastest varying.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="coordsToPaddedFlat-procs-all">
+  <div id="coordsToPaddedFlat,array[D,int],array[D,int],array[D,int],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#coordsToPaddedFlat%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint"><span class="Identifier">coordsToPaddedFlat</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">coords</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
+                                       <span class="Identifier">paddedGeom</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
+                                       <span class="Identifier">ghostWidth</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
+                                       <span class="Identifier">innerBlockSize</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Convert local lattice coordinates to a flat index in the ghost-padded array</p>
+<p>The padded array has D lattice dimensions (each padded by <tt class="docutils literal"><span class="pre">2*ghostWidth</span></tt>) followed by R+1 inner dimensions (also padded). This function computes the index for the center element of the inner block at the given lattice site.</p>
+<p>Parameters:</p>
+<ul class="simple"><li>coords: Local lattice coordinates (can be negative for backward ghost)</li>
+<li>paddedGeom: Padded lattice geometry (<tt class="docutils literal"><span class="pre">localGeom + 2*ghostWidth</span></tt> per dim)</li>
+<li>ghostWidth: Ghost width per lattice dimension</li>
+<li>innerBlockSize: Product of all padded inner dimensions</li>
+</ul>
+<p>Returns: Flat index into the padded data array (not including inner offset)</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="discreteLaplacian-procs-all">
+  <div id="discreteLaplacian,TensorField[D,R,L: Lattice[discreteLaplacian.D],T],TensorField[D,R,L: Lattice[discreteLaplacian.D],T],TensorField[D,R,L: Lattice[discreteLaplacian.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#discreteLaplacian%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D"><span class="Identifier">discreteLaplacian</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">src</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">dest</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span>
+    <span class="Identifier">scratch</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Compute the discrete Laplacian: <tt class="docutils literal"><span class="pre">dest[x] = sum_mu (src[x+mu] + src[x-mu]) - 2*D * src[x]</span></tt></p>
+<p>Uses GA ghost exchange for boundary communication. <tt class="docutils literal"><span class="pre">scratch</span></tt> is used as temporary storage.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="ghostWidth-procs-all">
   <div id="ghostWidth,TensorField[D,R,L: Lattice[ghostWidth.D],T]">
   <dt><pre><span class="Keyword">proc</span> <a href="#ghostWidth%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BghostWidth.D%5D%2CT%5D"><span class="Identifier">ghostWidth</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
     <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span></pre></dt>
@@ -325,6 +621,58 @@
 </div>
 
 </div>
+<div id="innerBlockSize-procs-all">
+  <div id="innerBlockSize,staticint,openArray[int],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#innerBlockSize%2Cstaticint%2CopenArray%5Bint%5D%2Cbool"><span class="Identifier">innerBlockSize</span></a><span class="Other">(</span><span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">shape</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">isComplex</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Compute the number of contiguous elements per lattice site</p>
+<p>This is the product of all tensor shape entries times the complex factor.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="innerPaddedBlockSize-procs-all">
+  <div id="innerPaddedBlockSize,staticint,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#innerPaddedBlockSize%2Cstaticint%2Cint"><span class="Identifier">innerPaddedBlockSize</span></a><span class="Other">(</span><span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">ghostWidth</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Compute the padded inner block size for ghost-padded arrays</p>
+<p>Each inner dimension of size S gets padded to <tt class="docutils literal"><span class="pre">S + 2*ghostWidth</span></tt>. For scalar real with S=1, ghost=1: padded = 3, so block = 3^(R+1). But we only want to access the CENTER element, so the block size for stride computation is the full product.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="innerPaddedOffset-procs-all">
+  <div id="innerPaddedOffset,staticint,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#innerPaddedOffset%2Cstaticint%2Cint"><span class="Identifier">innerPaddedOffset</span></a><span class="Other">(</span><span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">ghostWidth</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Compute the flat offset to the center element of the padded inner block</p>
+<p>For each inner dimension of padded size P, the center is at index ghostWidth. The offset is: <tt class="docutils literal"><span class="pre">sum_{i=0..R} ghostWidth * stride_i</span></tt> where stride_i = product of P for dims i+1..R</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="lexToCoords-procs-all">
+  <div id="lexToCoords,int,array[D,int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#lexToCoords%2Cint%2Carray%5BD%2Cint%5D"><span class="Identifier">lexToCoords</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">idx</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">geom</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    <p>Convert lexicographic index to D-dimensional coordinates</p>
+<p>Uses GA C-order convention: last dimension is fastest varying. <tt class="docutils literal"><span class="pre">idx = coords[0] * stride0 + coords[1] * stride1 + ... + coords[D-1]</span></tt></p>
+
+    
+  </dd>
+</div>
+
+</div>
 <div id="localGrid-procs-all">
   <div id="localGrid,TensorField[D,R,L: Lattice[localGrid.D],T]">
   <dt><pre><span class="Keyword">proc</span> <a href="#localGrid%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalGrid.D%5D%2CT%5D"><span class="Identifier">localGrid</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
@@ -332,6 +680,106 @@
   <dd>
     
     Get local grid dimensions (excluding ghosts)
+    
+  </dd>
+</div>
+
+</div>
+<div id="localIdx-procs-all">
+  <div id="localIdx,TensorField[D,R,L: Lattice[localIdx.D],T],array[D,int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#localIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalIdx.D%5D%2CT%5D%2Carray%5BD%2Cint%5D"><span class="Identifier">localIdx</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">coords</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Compute the flat index into the local data pointer for a lattice site</p>
+<p>GA stores data in C row-major order with padded inner dimensions. The local pointer from <tt class="docutils literal"><span class="pre">accessLocal</span></tt> shares this padded layout, so sequential indexing <tt class="docutils literal"><span class="pre">p[site]</span></tt> does NOT work. Use this function to compute the correct flat index.</p>
+<p>For a scalar real field (shape <a class="reference internal" href="#1,1">1,1</a>, not complex), the inner padded block size is 3^(R+1) with ghost width 1 in all inner dims. The stride between consecutive lattice sites in the fastest dim equals the inner padded block size.</p>
+<p>Parameters:</p>
+<ul class="simple"><li><tt class="docutils literal"><span class="pre">tensor</span></tt>: The tensor field (used for shape and padding info)</li>
+<li><tt class="docutils literal"><span class="pre">coords</span></tt>: Local lattice coordinates</li>
+</ul>
+<p>Returns: Flat index into the local data pointer for the center element of the inner block at the given lattice site.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="localLexIdx-procs-all">
+  <div id="localLexIdx,TensorField[D,R,L: Lattice[localLexIdx.D],T],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#localLexIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalLexIdx.D%5D%2CT%5D%2Cint"><span class="Identifier">localLexIdx</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">site</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Compute the flat index into the local data pointer for a lex-ordered site</p>
+<p>Converts a lexicographic site index to proper flat index in the padded local memory, accounting for the inner block structure.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="localSiteOffset-procs-all">
+  <div id="localSiteOffset,array[D,int],array[D,int],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint"><span class="Identifier">localSiteOffset</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">coords</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
+                                    <span class="Identifier">paddedGeom</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
+                                    <span class="Identifier">innerPaddedBlockSize</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    <p>Convert local lattice coordinates to a flat offset in the local data pointer</p>
+<p>The local pointer from NGA_Access points into the padded memory at the start of the local region. The memory layout still uses padded strides (the inner block is interleaved). This computes the offset from p<a class="reference internal" href="#0">0</a> to reach the start of the inner block for a given lattice site.</p>
+<p>Parameters:</p>
+<ul class="simple"><li>coords: Local lattice coordinates</li>
+<li>paddedGeom: Padded lattice geometry (<tt class="docutils literal"><span class="pre">localGeom + 2*ghostWidth</span></tt> per dim)</li>
+<li>innerPaddedBlockSize: Product of all padded inner dimensions (<tt class="docutils literal"><span class="pre">3^(R+1)</span></tt> for ghost=1)</li>
+</ul>
+<p>Returns: Flat offset from local pointer p<a class="reference internal" href="#0">0</a>. Add innerPaddedOffset to reach the center element of the inner block.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="newGlobalBackwardShifters-procs-all">
+  <div id="newGlobalBackwardShifters,TensorField[D,R,L: Lattice[newGlobalBackwardShifters.D],T],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newGlobalBackwardShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalBackwardShifters.D%5D%2CT%5D%2Cint"><span class="Identifier">newGlobalBackwardShifters</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">field</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span>
+    <a href="globaltensor.html#GlobalShifter"><span class="Identifier">GlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    Create backward shifters for all D dimensions
+    
+  </dd>
+</div>
+
+</div>
+<div id="newGlobalShifter-procs-all">
+  <div id="newGlobalShifter,TensorField[D,R,L: Lattice[newGlobalShifter.D],T],int,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newGlobalShifter%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifter.D%5D%2CT%5D%2Cint%2Cint"><span class="Identifier">newGlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">field</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">dim</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span><span class="Other">:</span> <a href="globaltensor.html#GlobalShifter"><span class="Identifier">GlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span>
+    <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    <p>Create a global shifter for a tensor field in a given dimension</p>
+<p>Parameters:</p>
+<ul class="simple"><li><tt class="docutils literal"><span class="pre">field</span></tt>: The tensor field (used only for geometry, not mutated)</li>
+<li><tt class="docutils literal"><span class="pre">dim</span></tt>: Dimension to shift along (0..D-1)</li>
+<li><tt class="docutils literal"><span class="pre">len</span></tt>: Displacement (+1 = forward, -1 = backward)</li>
+</ul>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="newGlobalShifters-procs-all">
+  <div id="newGlobalShifters,TensorField[D,R,L: Lattice[newGlobalShifters.D],T],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newGlobalShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifters.D%5D%2CT%5D%2Cint"><span class="Identifier">newGlobalShifters</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">field</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span>
+    <a href="globaltensor.html#GlobalShifter"><span class="Identifier">GlobalShifter</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">]</span></pre></dt>
+  <dd>
+    
+    Create forward shifters for all D dimensions
     
   </dd>
 </div>
@@ -401,6 +849,18 @@
 </div>
 
 </div>
+<div id="releaseLocal-procs-all">
+  <div id="releaseLocal,TensorField[D,R,L: Lattice[releaseLocal.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#releaseLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocal.D%5D%2CT%5D"><span class="Identifier">releaseLocal</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    Release local data access obtained via <tt class="docutils literal"><span class="pre">accessLocal</span></tt> or <tt class="docutils literal"><span class="pre">accessGhosts</span></tt>
+    
+  </dd>
+</div>
+
+</div>
 <div id="updateAllGhosts-procs-all">
   <div id="updateAllGhosts,TensorField[D,R,L: Lattice[updateAllGhosts.D],T],bool">
   <dt><pre><span class="Keyword">proc</span> <a href="#updateAllGhosts%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BupdateAllGhosts.D%5D%2CT%5D%2Cbool"><span class="Identifier">updateAllGhosts</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
@@ -451,7 +911,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:33 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
       </div>
     </div>
   </div>

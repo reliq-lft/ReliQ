@@ -49,8 +49,6 @@
 ##
 ## Inspired by QEX's transporters but with a cleaner API for LGT.
 
-import std/[sequtils]
-
 import lattice/stencil
 export stencil  # Export direction types etc.
 

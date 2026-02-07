@@ -265,6 +265,68 @@ proc getBounds*[D: static[int], T](
   ## A tuple containing two arrays: the lower and upper bounds of the local segment
   return (ga.lo, ga.hi)
 
+#[ local data access ]#
+
+proc accessLocal*[D: static[int], T](
+  ga: GlobalArray[D, T]
+): (ptr UncheckedArray[T], array[D, int]) =
+  ## Access local data segment of the GlobalArray (no ghosts)
+  ##
+  ## Returns a pointer to the raw local data and the leading dimensions (strides).
+  ## The pointer is valid until ``releaseLocal`` is called.
+  ##
+  ## Parameters:
+  ## - ``ga``: The GlobalArray instance
+  ##
+  ## Returns:
+  ## A tuple of (data pointer, leading dimensions array)
+  var p: pointer
+  var ld: array[D, cint]
+  var lo: array[D, cint]
+  var hi: array[D, cint]
+  for i in 0..<D:
+    lo[i] = cint(ga.lo[i])
+    hi[i] = cint(ga.hi[i])
+  NGA_Access(ga.handle, addr lo[0], addr hi[0], addr p, addr ld[0])
+  var ldInt: array[D, int]
+  for i in 0..<D: ldInt[i] = int(ld[i])
+  result = (cast[ptr UncheckedArray[T]](p), ldInt)
+
+proc accessGhosts*[D: static[int], T](
+  ga: GlobalArray[D, T]
+): (ptr UncheckedArray[T], array[D, int], array[D, int]) =
+  ## Access local data including ghost regions
+  ##
+  ## Returns a pointer to the raw data (including ghosts), the padded dimensions
+  ## (local + 2 x ghost in each dim), and the leading dimensions.
+  ## The pointer is valid until ``releaseLocal`` is called.
+  ##
+  ## Parameters:
+  ## - ``ga``: The GlobalArray instance
+  ##
+  ## Returns:
+  ## A tuple of (data pointer, padded dimensions, leading dimensions)
+  var p: pointer
+  var dims: array[D, cint]
+  var ld: array[D, cint]
+  NGA_Access_ghosts(ga.handle, addr dims[0], addr p, addr ld[0])
+  var dimsInt, ldInt: array[D, int]
+  for i in 0..<D:
+    dimsInt[i] = int(dims[i])
+    ldInt[i] = int(ld[i])
+  result = (cast[ptr UncheckedArray[T]](p), dimsInt, ldInt)
+
+proc releaseLocal*[D: static[int], T](ga: GlobalArray[D, T]) =
+  ## Release local data access obtained via ``accessLocal`` or ``accessGhosts``
+  ##
+  ## Must be called after finishing direct memory access.
+  var lo: array[D, cint]
+  var hi: array[D, cint]
+  for i in 0..<D:
+    lo[i] = cint(ga.lo[i])
+    hi[i] = cint(ga.hi[i])
+  NGA_Release(ga.handle, addr lo[0], addr hi[0])
+
 #[ halo exchange ]#
 
 proc updateGhostDirection*[D: static[int], T](

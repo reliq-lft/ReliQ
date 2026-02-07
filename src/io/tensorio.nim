@@ -55,7 +55,7 @@
 ## writeTensorField(gaugeField, "output.lime", "<info>My config</info>")
 ## ```
 
-import std/[math, strformat, endians]
+import std/[math, strformat]
 
 import qio
 import scidac

@@ -32,11 +32,9 @@
 ## Main entry point for SYCL backend.
 ## Exports all SYCL-related modules for use in tensor operations.
 
-import syclwrap
 import syclbase
 import sycldisp
 
-# Don't export syclwrap to avoid conflicting read/write signatures
 export syclbase
 export sycldisp
 

@@ -233,8 +233,9 @@ proc raiseEOpenCL*(x: TClResult) {.noinline.} =
   raise newException(EOpenCL, $x & " " & $int(x))
 
 template check*(a: TClResult) =
-  let y = a # ensure we only evaluate once even if the expression has side effects
-  if y != TClResult.Success: raiseEOpenCL(y)
+  {.cast(raises: []).}:
+    let y = a # ensure we only evaluate once even if the expression has side effects
+    if y != TClResult.Success: raiseEOpenCL(y)
 
 #  OpenCL Version 
 

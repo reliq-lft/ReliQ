@@ -1,29 +1,29 @@
 nimTitle	transporter	tensor/transporter.html	module tensor/transporter		0
-nim	ShiftDir	tensor/transporter.html#ShiftDir	object ShiftDir		62
-nim	shift	tensor/transporter.html#shift,int,int	proc shift(dim: int; len: int = 1): ShiftDir		67
-nim	forward	tensor/transporter.html#forward,int	proc forward(dim: int): ShiftDir		71
-nim	backward	tensor/transporter.html#backward,int	proc backward(dim: int): ShiftDir		75
-nim	`$`	tensor/transporter.html#$,ShiftDir	proc `$`(sd: ShiftDir): string		79
-nim	HaloRegion	tensor/transporter.html#HaloRegion	object HaloRegion		88
-nim	newHaloRegion	tensor/transporter.html#newHaloRegion,int,int,int,array[D,int]	proc newHaloRegion[D: static int](dim: int; direction: int; thickness: int;\n                             localGeom: array[D, int]): HaloRegion[D]		99
-nim	ShiftIndices	tensor/transporter.html#ShiftIndices	object ShiftIndices		134
-nim	newShiftIndices	tensor/transporter.html#newShiftIndices,int,int,array[D,int]	proc newShiftIndices[D: static int](dim: int; len: int; localGeom: array[D, int]): ShiftIndices[\n    D]		170
-nim	Shifter	tensor/transporter.html#Shifter	object Shifter		242
-nim	newShifter	tensor/transporter.html#newShifter,array[D,int],int,int	proc newShifter[D: static int; T](localGeom: array[D, int]; dim: int; len: int = 1): Shifter[\n    D, T]		254
-nim	newShifters	tensor/transporter.html#newShifters,array[D,int],int	proc newShifters[D: static int; T](localGeom: array[D, int]; len: int = 1): array[D,\n    Shifter[D, T]]		270
-nim	newBackwardShifters	tensor/transporter.html#newBackwardShifters,array[D,int],int	proc newBackwardShifters[D: static int; T](localGeom: array[D, int]; len: int = 1): array[\n    D, Shifter[D, T]]		278
-nim	Transporter	tensor/transporter.html#Transporter	object Transporter		291
-nim	newTransporter	tensor/transporter.html#newTransporter,array[D,int],ptr.U,int,int	proc newTransporter[D: static int; U, F](localGeom: array[D, int]; gaugeField: ptr U;\n                                    dim: int; len: int = 1): Transporter[D, U, F]		305
-nim	applyShiftLocal	tensor/transporter.html#applyShiftLocal,Shifter[D,T],openArray[T],openArray[T]	proc applyShiftLocal[D: static int; T](shifter: Shifter[D, T]; source: openArray[T];\n                                  dest: var openArray[T])		326
-nim	`^*`	tensor/transporter.html#^*.t,Shifter[D,T],openArray[T]	template `^*`[D: static int; T](shifter: Shifter[D, T]; source: openArray[T]): seq[T]		339
-nim	cdForward	tensor/transporter.html#cdForward	CovariantDerivativeDir.cdForward		353
-nim	cdBackward	tensor/transporter.html#cdBackward	CovariantDerivativeDir.cdBackward		353
-nim	cdSymmetric	tensor/transporter.html#cdSymmetric	CovariantDerivativeDir.cdSymmetric		353
-nim	CovariantDerivativeDir	tensor/transporter.html#CovariantDerivativeDir	enum CovariantDerivativeDir		353
-nim	covariantShiftForward	tensor/transporter.html#covariantShiftForward,T,T	proc covariantShiftForward[T](gaugeLink: T; psiShifted: T): T		359
-nim	covariantShiftBackward	tensor/transporter.html#covariantShiftBackward,T,T	proc covariantShiftBackward[T](gaugeLinkShifted: T; psiShifted: T): T		373
-nim	TransportPattern	tensor/transporter.html#TransportPattern	object TransportPattern		390
-nim	newTransportPattern	tensor/transporter.html#newTransportPattern,array[D,int],int	proc newTransportPattern[D: static int](localGeom: array[D, int]; len: int = 1): TransportPattern[\n    D]		398
-nim	forwardShiftIdx	tensor/transporter.html#forwardShiftIdx,TransportPattern,int	proc forwardShiftIdx(pattern: TransportPattern; dim: int): int		410
-nim	backwardShiftIdx	tensor/transporter.html#backwardShiftIdx,TransportPattern,int	proc backwardShiftIdx(pattern: TransportPattern; dim: int): int		414
+nim	ShiftDir	tensor/transporter.html#ShiftDir	object ShiftDir		60
+nim	shift	tensor/transporter.html#shift,int,int	proc shift(dim: int; len: int = 1): ShiftDir		65
+nim	forward	tensor/transporter.html#forward,int	proc forward(dim: int): ShiftDir		69
+nim	backward	tensor/transporter.html#backward,int	proc backward(dim: int): ShiftDir		73
+nim	`$`	tensor/transporter.html#$,ShiftDir	proc `$`(sd: ShiftDir): string		77
+nim	HaloRegion	tensor/transporter.html#HaloRegion	object HaloRegion		86
+nim	newHaloRegion	tensor/transporter.html#newHaloRegion,int,int,int,array[D,int]	proc newHaloRegion[D: static int](dim: int; direction: int; thickness: int;\n                             localGeom: array[D, int]): HaloRegion[D]		97
+nim	ShiftIndices	tensor/transporter.html#ShiftIndices	object ShiftIndices		132
+nim	newShiftIndices	tensor/transporter.html#newShiftIndices,int,int,array[D,int]	proc newShiftIndices[D: static int](dim: int; len: int; localGeom: array[D, int]): ShiftIndices[\n    D]		168
+nim	Shifter	tensor/transporter.html#Shifter	object Shifter		240
+nim	newShifter	tensor/transporter.html#newShifter,array[D,int],int,int	proc newShifter[D: static int; T](localGeom: array[D, int]; dim: int; len: int = 1): Shifter[\n    D, T]		252
+nim	newShifters	tensor/transporter.html#newShifters,array[D,int],int	proc newShifters[D: static int; T](localGeom: array[D, int]; len: int = 1): array[D,\n    Shifter[D, T]]		268
+nim	newBackwardShifters	tensor/transporter.html#newBackwardShifters,array[D,int],int	proc newBackwardShifters[D: static int; T](localGeom: array[D, int]; len: int = 1): array[\n    D, Shifter[D, T]]		276
+nim	Transporter	tensor/transporter.html#Transporter	object Transporter		289
+nim	newTransporter	tensor/transporter.html#newTransporter,array[D,int],ptr.U,int,int	proc newTransporter[D: static int; U, F](localGeom: array[D, int]; gaugeField: ptr U;\n                                    dim: int; len: int = 1): Transporter[D, U, F]		303
+nim	applyShiftLocal	tensor/transporter.html#applyShiftLocal,Shifter[D,T],openArray[T],openArray[T]	proc applyShiftLocal[D: static int; T](shifter: Shifter[D, T]; source: openArray[T];\n                                  dest: var openArray[T])		324
+nim	`^*`	tensor/transporter.html#^*.t,Shifter[D,T],openArray[T]	template `^*`[D: static int; T](shifter: Shifter[D, T]; source: openArray[T]): seq[T]		337
+nim	cdForward	tensor/transporter.html#cdForward	CovariantDerivativeDir.cdForward		351
+nim	cdBackward	tensor/transporter.html#cdBackward	CovariantDerivativeDir.cdBackward		351
+nim	cdSymmetric	tensor/transporter.html#cdSymmetric	CovariantDerivativeDir.cdSymmetric		351
+nim	CovariantDerivativeDir	tensor/transporter.html#CovariantDerivativeDir	enum CovariantDerivativeDir		351
+nim	covariantShiftForward	tensor/transporter.html#covariantShiftForward,T,T	proc covariantShiftForward[T](gaugeLink: T; psiShifted: T): T		357
+nim	covariantShiftBackward	tensor/transporter.html#covariantShiftBackward,T,T	proc covariantShiftBackward[T](gaugeLinkShifted: T; psiShifted: T): T		371
+nim	TransportPattern	tensor/transporter.html#TransportPattern	object TransportPattern		388
+nim	newTransportPattern	tensor/transporter.html#newTransportPattern,array[D,int],int	proc newTransportPattern[D: static int](localGeom: array[D, int]; len: int = 1): TransportPattern[\n    D]		396
+nim	forwardShiftIdx	tensor/transporter.html#forwardShiftIdx,TransportPattern,int	proc forwardShiftIdx(pattern: TransportPattern; dim: int): int		408
+nim	backwardShiftIdx	tensor/transporter.html#backwardShiftIdx,TransportPattern,int	proc backwardShiftIdx(pattern: TransportPattern; dim: int): int		412
 heading	Transporter - Parallel Transport with MPI Halo Exchange	tensor/transporter.html#transporter-minus-parallel-transport-with-mpi-halo-exchange	 Transporter - Parallel Transport with MPI Halo Exchange		0

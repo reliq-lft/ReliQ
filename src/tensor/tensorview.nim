@@ -27,6 +27,50 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+## TensorFieldView - Device-Side Views for Backend Dispatch
+## ===========================================================
+##
+## This module provides `TensorFieldView[L,T]`, the type that the
+## `each` macro operates on.  A view wraps a `LocalTensorField` in
+## device-side buffers (OpenCL `cl_mem`, SYCL buffers, or raw host
+## pointers for OpenMP) and handles the AoSoA layout transformation
+## needed for efficient SIMD / GPU execution.
+##
+## Key capabilities:
+##
+## - **Construction**: `newTensorFieldView(local, ioKind)` allocates
+##   device buffers and optionally synchronises data from the parent
+##   local tensor (read/readwrite) or just allocates (write)
+## - **AoSoA layout**: `transformToAoSoA` / `transformFromAoSoA` convert
+##   between natural Array-of-Structures order and the blocked
+##   Array-of-Structures-of-Arrays layout used by kernels
+## - **Backend dispatch**: the `each` macro inspects view arguments at
+##   compile time and emits OpenCL, SYCL, or OpenMP code accordingly
+## - **Stencil integration**: views can be passed to `each` together
+##   with a `LatticeStencil` for neighbor access in kernels
+## - **Destruction**: on scope exit, write/readwrite views synchronise
+##   data back to the parent local tensor field
+##
+## The backend is selected at compile time:
+##
+## ==========  ==========================  ====================
+## Backend     Compile flag                Buffer type
+## ==========  ==========================  ====================
+## OpenCL      *(default)*                 ``cl_mem``
+## SYCL        ``-d:UseSycl``              ``SyclBuffer``
+## OpenMP      ``-d:UseOpenMP``            raw ``pointer``
+## ==========  ==========================  ====================
+##
+## Example
+## ^^^^^^^
+##
+## .. code-block:: nim
+##   var local = field.newLocalTensorField()
+##   var vSrc = local.newTensorFieldView(iokRead)
+##   var vDst = local.newTensorFieldView(iokWrite)
+##   each vDst, vSrc, n:
+##     vDst[n] = 2.0 * vSrc[n]
+
 import lattice
 import localtensor
 import globaltensor
@@ -1046,8 +1090,11 @@ else:
                 let paddedBufferSize = paddedElements * view.data.elementSize
                 
                 var aosoaData = newSeq[T](paddedElements)
-                view.data.queues[deviceIdx].read(addr aosoaData[0], buf, paddedBufferSize)
-                check finish(view.data.queues[deviceIdx])
+                try:
+                  view.data.queues[deviceIdx].read(addr aosoaData[0], buf, paddedBufferSize)
+                  check finish(view.data.queues[deviceIdx])
+                except CatchableError:
+                  discard  # Best-effort read-back during destruction
                 
                 # Transform AoSoA back to AoS
                 let aosData = transformAoSoAtoAoS[T](addr aosoaData[0], numSites, tensorElementsPerSite)

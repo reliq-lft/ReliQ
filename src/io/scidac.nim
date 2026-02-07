@@ -42,7 +42,7 @@
 ##
 ## Reference: QIO library (https://github.com/usqcd-software/qio)
 
-import std/[xmlparser, xmltree, strutils, strformat, tables, endians, times]
+import std/[xmlparser, xmltree, strutils, strformat, tables, times]
 import lime
 
 export lime

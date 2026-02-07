@@ -1,3 +1,3 @@
 nimTitle	ompdisp	openmp/ompdisp.html	module openmp/ompdisp		0
-nim	eachImpl	openmp/ompdisp.html#eachImpl.m,untyped,typed,typed,typed	macro eachImpl(loopVar: untyped; lo: typed; hi: typed; body: typed): untyped		388
-nim	each	openmp/ompdisp.html#each.m,ForLoopStmt	macro each(forLoop: ForLoopStmt): untyped		684
+nim	eachImpl	openmp/ompdisp.html#eachImpl.m,untyped,typed,typed,typed	macro eachImpl(loopVar: untyped; lo: typed; hi: typed; body: typed): untyped		387
+nim	each	openmp/ompdisp.html#each.m,ForLoopStmt	macro each(forLoop: ForLoopStmt): untyped		683

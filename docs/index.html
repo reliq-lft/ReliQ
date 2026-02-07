@@ -32,7 +32,7 @@
 
 <h3 id="key-features">Key Features</h3><ul class="simple"><li><strong>Multi-backend dispatch</strong>: OpenCL (GPU JIT), SYCL (pre-compiled GPU/CPU), OpenMP (SIMD-vectorized CPU) — all sharing the same user-facing API</li>
 <li><strong>AoSoA memory layout</strong>: Array of Structures of Arrays for optimal SIMD and GPU memory coalescing</li>
-<li><strong>Distributed memory</strong>: MPI-based parallelism via <a class="reference external" href="https://globalarrays.github.io/">Global Arrays</a> with automatic ghost region management</li>
+<li><strong>Distributed memory</strong>: MPI-based parallelism via <a class="reference external" href="https://globalarrays.github.io/">Global Arrays</a> with automatic ghost region management and distributed transport (<tt class="docutils literal"><span class="pre">GlobalShifter</span></tt>, <tt class="docutils literal"><span class="pre">discreteLaplacian</span></tt>)</li>
 <li><strong>Compile-time tensor types</strong>: <tt class="docutils literal"><span class="pre">Vec[N,T]</span></tt> and <tt class="docutils literal"><span class="pre">Mat[N,M,T]</span></tt> with dimensions known at compile time for zero-overhead abstraction</li>
 <li><strong>Unified stencil operations</strong>: A single <tt class="docutils literal"><span class="pre">LatticeStencil[D]</span></tt> type that works identically across all backends, handling periodic boundary conditions and ghost regions automatically</li>
 <li><strong>Macro-based dispatch</strong>: The <tt class="docutils literal"><span class="pre">each</span></tt> macro analyzes loop bodies at compile time and generates optimized backend-specific code</li>
@@ -70,6 +70,7 @@
 ├──────────────────────────────────────────────┤
 │             Tensor Layer                     │
 │  TensorFieldView · Stencil · Transporter     │
+│  GlobalShifter  · Discrete Laplacian         │
 ├──────────────────────────────────────────────┤
 │           Backend Dispatch                   │
 │    OpenCL    │    SYCL    │    OpenMP         │
@@ -91,12 +92,12 @@
 <li><a class="reference external" href="lattice/indexing.html">lattice/indexing</a> — Coordinate ↔ flat index conversion utilities</li>
 </ul>
 
-<h3 id="tensor-fields">Tensor Fields</h3><ul class="simple"><li><a class="reference external" href="tensor/tensor.html">tensor/tensor</a> — Tensor module aggregation</li>
-<li><a class="reference external" href="tensor/tensorview.html">tensor/tensorview</a> — <tt class="docutils literal"><span class="pre">TensorFieldView[L,T]</span></tt>: the primary type for GPU/SIMD dispatch via the <tt class="docutils literal"><span class="pre">each</span></tt> macro</li>
-<li><a class="reference external" href="tensor/globaltensor.html">tensor/globaltensor</a> — <tt class="docutils literal"><span class="pre">TensorField[D,R,L,T]</span></tt>: distributed tensor field with ghost region support</li>
-<li><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a> — <tt class="docutils literal"><span class="pre">LocalTensorField[D,R,L,T]</span></tt>: rank-local tensor data in host memory</li>
+<h3 id="tensor-fields">Tensor Fields</h3><ul class="simple"><li><a class="reference external" href="tensor/tensor.html">tensor/tensor</a> — Tensor module aggregation; re-exports all tensor submodules</li>
+<li><a class="reference external" href="tensor/globaltensor.html">tensor/globaltensor</a> — <tt class="docutils literal"><span class="pre">TensorField[D,R,L,T]</span></tt>: distributed tensor field with ghost region support, coordinate utilities (C row-major GA layout), <tt class="docutils literal"><span class="pre">GlobalShifter</span></tt> for distributed transport, <tt class="docutils literal"><span class="pre">discreteLaplacian</span></tt>, and <tt class="docutils literal"><span class="pre">LatticeStencil</span></tt> integration</li>
+<li><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a> — <tt class="docutils literal"><span class="pre">LocalTensorField[D,R,L,T]</span></tt>: rank-local tensor data in host memory, element/site accessors, arithmetic, and norms</li>
+<li><a class="reference external" href="tensor/tensorview.html">tensor/tensorview</a> — <tt class="docutils literal"><span class="pre">TensorFieldView[L,T]</span></tt>: the primary type for GPU/SIMD dispatch via the <tt class="docutils literal"><span class="pre">each</span></tt> macro; handles AoSoA layout transformation across OpenCL, SYCL, and OpenMP backends</li>
 <li><a class="reference external" href="tensor/sitetensor.html">tensor/sitetensor</a> — <tt class="docutils literal"><span class="pre">Vec[N,T]</span></tt> and <tt class="docutils literal"><span class="pre">Mat[N,M,T]</span></tt>: compile-time dimensioned site-level tensor types</li>
-<li><a class="reference external" href="tensor/transporter.html">tensor/transporter</a> — <tt class="docutils literal"><span class="pre">Shifter[D,T]</span></tt> and <tt class="docutils literal"><span class="pre">Transporter[D,U,F]</span></tt>: parallel transport with MPI halo exchange</li>
+<li><a class="reference external" href="tensor/transporter.html">tensor/transporter</a> — <tt class="docutils literal"><span class="pre">Shifter[D,T]</span></tt> and <tt class="docutils literal"><span class="pre">Transporter[D,U,F]</span></tt>: single-rank parallel transport with MPI halo exchange</li>
 </ul>
 
 <h3 id="backendcolon-opencl">Backend: OpenCL</h3><ul class="simple"><li><a class="reference external" href="opencl/cldisp.html">opencl/cldisp</a> — <tt class="docutils literal"><span class="pre">each</span></tt> macro: compile-time expression analysis → OpenCL kernel generation (JIT)</li>
@@ -223,6 +224,40 @@ index = group * (elemsPerSite * VW) + i * VW + lane</pre></p>
   <span class="Comment"># Discrete Laplacian: ψ(x+μ) + ψ(x-μ) - 2ψ(x)</span>
   <span class="Identifier">vDst</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">vSrc</span><span class="Punctuation">[</span><span class="Identifier">nbrFwd</span><span class="Punctuation">]</span> <span class="Operator">+</span> <span class="Identifier">vSrc</span><span class="Punctuation">[</span><span class="Identifier">nbrBwd</span><span class="Punctuation">]</span> <span class="Operator">-</span> <span class="FloatNumber">2.0</span> <span class="Operator">*</span> <span class="Identifier">vSrc</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span></pre></p>
 
+<h2 id="distributed-transport-globalshifter">Distributed Transport (GlobalShifter)</h2><p>For operations that span MPI boundaries at the <tt class="docutils literal"><span class="pre">TensorField</span></tt> level (before down-casting to views), <tt class="docutils literal"><span class="pre">GlobalShifter</span></tt> performs distributed nearest-neighbour shifts using Global Arrays ghost exchange.</p>
+<p><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">reliq</span>
+
+<span class="Identifier">parallel</span><span class="Punctuation">:</span>
+  <span class="Keyword">let</span> <span class="Identifier">lat</span> <span class="Operator">=</span> <span class="Identifier">newSimpleCubicLattice</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">16</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">4</span><span class="Punctuation">]</span><span class="Punctuation">,</span> <span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span>
+  <span class="Keyword">var</span> <span class="Identifier">src</span>  <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Keyword">var</span> <span class="Identifier">dest</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  
+  <span class="Comment"># Fill src ...</span>
+  
+  <span class="Comment"># Shift forward in t-dimension (crosses MPI boundaries)</span>
+  <span class="Keyword">let</span> <span class="Identifier">shifter</span> <span class="Operator">=</span> <span class="Identifier">newGlobalShifter</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">dim</span> <span class="Operator">=</span> <span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="Identifier">len</span> <span class="Operator">=</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>
+  <span class="Identifier">shifter</span><span class="Operator">.</span><span class="Identifier">apply</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">dest</span><span class="Punctuation">)</span>   <span class="Comment"># dest[x] = src[x + e_t]</span>
+  
+  <span class="Comment"># Create shifters for all dimensions at once</span>
+  <span class="Keyword">let</span> <span class="Identifier">fwd</span> <span class="Operator">=</span> <span class="Identifier">newGlobalShifters</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">len</span> <span class="Operator">=</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>         <span class="Comment"># forward in all D dims</span>
+  <span class="Keyword">let</span> <span class="Identifier">bwd</span> <span class="Operator">=</span> <span class="Identifier">newGlobalBackwardShifters</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">len</span> <span class="Operator">=</span> <span class="DecNumber">1</span><span class="Punctuation">)</span>  <span class="Comment"># backward in all D dims</span>
+  
+  <span class="Comment"># Discrete Laplacian: sum_mu (f[x+mu] + f[x-mu]) - 2D * f[x]</span>
+  <span class="Keyword">var</span> <span class="Identifier">lap</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Keyword">var</span> <span class="Identifier">tmp</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">1</span><span class="Punctuation">,</span> <span class="DecNumber">1</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
+  <span class="Identifier">discreteLaplacian</span><span class="Punctuation">(</span><span class="Identifier">src</span><span class="Punctuation">,</span> <span class="Identifier">lap</span><span class="Punctuation">,</span> <span class="Identifier">tmp</span><span class="Punctuation">)</span></pre></p>
+
+<h3 id="how-it-works">How it works</h3><ol class="simple"><li><tt class="docutils literal"><span class="pre">updateAllGhosts()</span></tt> calls <tt class="docutils literal"><span class="pre">GA_Update_ghost_dir</span></tt> in each lattice dimension to fill ghost cells with neighbor data from adjacent ranks</li>
+<li>The source field is read via the <em>ghost pointer</em> (<tt class="docutils literal"><span class="pre">accessGhosts</span></tt>), which sees both local and ghost data</li>
+<li>The destination is written via the <em>local pointer</em> (<tt class="docutils literal"><span class="pre">accessLocal</span></tt>), which starts at the centre of the inner padded block</li>
+<li>For dimensions with only one MPI rank (not distributed), coordinates are wrapped locally since ghost exchange has no remote data to fetch</li>
+</ol>
+
+<h3 id="two-transport-layers">Two transport layers</h3><table border="1" class="docutils"><tr><th>Layer</th><th>Type</th><th>Where</th><th>Communication</th></tr>
+<tr><td><tt class="docutils literal"><span class="pre">GlobalShifter</span></tt></td><td><tt class="docutils literal"><span class="pre">TensorField</span></tt></td><td><tt class="docutils literal"><span class="pre">globaltensor.nim</span></tt></td><td>GA ghost exchange (MPI)</td></tr>
+<tr><td><tt class="docutils literal"><span class="pre">Shifter</span></tt> / <tt class="docutils literal"><span class="pre">Transporter</span></tt></td><td><tt class="docutils literal"><span class="pre">TensorFieldView</span></tt></td><td><tt class="docutils literal"><span class="pre">transporter.nim</span></tt></td><td>Halo buffers for device dispatch</td></tr>
+</table><p>Use <tt class="docutils literal"><span class="pre">GlobalShifter</span></tt> when working directly with distributed tensor fields (e.g. setup, I/O, measurement code).  Use <tt class="docutils literal"><span class="pre">Shifter</span></tt> / <tt class="docutils literal"><span class="pre">Transporter</span></tt> when the data is already on-device inside an <tt class="docutils literal"><span class="pre">each</span></tt> loop.</p>
+
 <h2 id="license">License</h2><p>MIT License — Copyright (c) 2025 reliq-lft</p>
 <p>See <a class="reference external" href="https://github.com/reliq-lft/ReliQ/blob/main/LICENSE">LICENSE</a> for details. </p>
 
@@ -231,7 +266,7 @@ index = group * (elemsPerSite * VW) + i * VW + lane</pre></p>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:32 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:01 UTC</small>
       </div>
     </div>
   </div>

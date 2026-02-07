@@ -27,6 +27,39 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+## LocalTensorField - Rank-Local Host-Memory Tensor Fields
+## ==========================================================
+##
+## This module provides `LocalTensorField[D,R,L,T]`, which represents
+## the portion of a distributed `TensorField` that resides in host memory
+## on the current MPI rank.  It is created by down-casting a global
+## tensor via `newLocalTensorField`.
+##
+## Local tensor fields are the bridge between the distributed GA layer
+## and the device-side `TensorFieldView`: data flows
+## ``TensorField → LocalTensorField → TensorFieldView``
+## on the way to a compute kernel and back again on return.
+##
+## Key operations:
+##
+## - **Construction**: `newLocalTensorField` copies rank-local data from
+##   the parent `TensorField` into a contiguous host buffer
+## - **Element access**: `[]` / `[]=` for per-element and per-site reads
+##   and writes
+## - **Arithmetic**: site-level ``+``, ``-``, ``*``, compound ``+=``, ``-=`` on
+##   vector and matrix payloads
+## - **Copy / zero**: `copy`, `zero` for bulk operations
+## - **Norm**: `norm2` computes the local Euclidean norm
+##
+## Example
+## ^^^^^^^
+##
+## .. code-block:: nim
+##   var field = lat.newTensorField([3, 3]): Complex64
+##   var local = field.newLocalTensorField()
+##   for i in all 0..<local.numElements():
+##     local[i] = complex64(float64(i), 0.0)
+
 import lattice
 import globaltensor
 import sitetensor

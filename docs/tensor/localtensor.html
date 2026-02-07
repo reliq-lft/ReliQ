@@ -51,7 +51,9 @@
       </select>
     </div>
     <ul class="simple simple-toc" id="toc-list">
-  <li>
+  <li><a class="reference" id="localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields_toc" href="#localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields">LocalTensorField - Rank-Local Host-Memory Tensor Fields</a></li>
+<ul class="simple"><li><a class="reference" id="localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example_toc" href="#localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example">Example</a></li>
+</ul><li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
 </li>
 <li>
@@ -165,7 +167,21 @@
     
     <div id="tocRoot"></div>
     
-    <p class="module-desc"></p>
+    <p class="module-desc">
+<h1><a class="toc-backref" id="localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields" href="#localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields">LocalTensorField - Rank-Local Host-Memory Tensor Fields</a></h1><p>This module provides <tt class="docutils literal"><span class="pre"><span class="Identifier">LocalTensorField</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Punctuation">,</span><span class="Identifier">R</span><span class="Punctuation">,</span><span class="Identifier">L</span><span class="Punctuation">,</span><span class="Identifier">T</span><span class="Punctuation">]</span></span></tt>, which represents the portion of a distributed <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span></span></tt> that resides in host memory on the current MPI rank.  It is created by down-casting a global tensor via <tt class="docutils literal"><span class="pre"><span class="Identifier">newLocalTensorField</span></span></tt>.</p>
+<p>Local tensor fields are the bridge between the distributed GA layer and the device-side <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorFieldView</span></span></tt>: data flows <tt class="docutils literal"><span class="pre">TensorField → LocalTensorField → TensorFieldView</span></tt> on the way to a compute kernel and back again on return.</p>
+<p>Key operations:</p>
+<ul class="simple"><li><strong>Construction</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">newLocalTensorField</span></span></tt> copies rank-local data from the parent <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span></span></tt> into a contiguous host buffer</li>
+<li><strong>Element access</strong>: <tt class="docutils literal"><span class="pre"><span class="Punctuation">[</span><span class="Punctuation">]</span></span></tt> / <tt class="docutils literal"><span class="pre"><span class="Punctuation">[</span><span class="Punctuation">]</span><span class="Operator">=</span></span></tt> for per-element and per-site reads and writes</li>
+<li><strong>Arithmetic</strong>: site-level <tt class="docutils literal"><span class="pre">+</span></tt>, <tt class="docutils literal"><span class="pre">-</span></tt>, <tt class="docutils literal"><span class="pre">*</span></tt>, compound <tt class="docutils literal"><span class="pre">+=</span></tt>, <tt class="docutils literal"><span class="pre">-=</span></tt> on vector and matrix payloads</li>
+<li><strong>Copy / zero</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">copy</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">zero</span></span></tt> for bulk operations</li>
+<li><strong>Norm</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">norm2</span></span></tt> computes the local Euclidean norm</li>
+</ul>
+
+<h2><a class="toc-backref" id="localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example" href="#localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example">Example</a></h2><pre class="listing"><span class="Keyword">var</span> <span class="Identifier">field</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="DecNumber">3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">Complex64</span>
+<span class="Keyword">var</span> <span class="Identifier">local</span> <span class="Operator">=</span> <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">newLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="Identifier">all</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">numElements</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
+  <span class="Identifier">local</span><span class="Punctuation">[</span><span class="Identifier">i</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">complex64</span><span class="Punctuation">(</span><span class="Identifier">float64</span><span class="Punctuation">(</span><span class="Identifier">i</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="FloatNumber">0.0</span><span class="Punctuation">)</span></pre></p>
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
@@ -369,7 +385,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:33 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
       </div>
     </div>
   </div>

@@ -40,7 +40,7 @@
 ##
 ## Reference: https://github.com/usqcd-software/qio
 
-import std/[endians, strformat, hashes]
+import std/[strformat]
 import scidac
 export scidac
 

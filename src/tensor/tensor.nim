@@ -27,6 +27,32 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+## Tensor Module - Aggregation of Tensor Field Infrastructure
+## =============================================================
+##
+## This module re-exports all tensor-related submodules, providing a
+## single import point for the full tensor field stack:
+##
+## - `globaltensor <globaltensor.html>`_ — `TensorField[D,R,L,T]`:
+##   distributed fields with ghost regions, GlobalShifter transport,
+##   and discrete Laplacian
+## - `localtensor <localtensor.html>`_ — `LocalTensorField[D,R,L,T]`:
+##   rank-local host-memory views of global fields
+## - `tensorview <tensorview.html>`_ — `TensorFieldView[L,T]`:
+##   device-side views for the `each` macro (OpenCL / SYCL / OpenMP)
+## - `stencil <../lattice/stencil.html>`_ — `LatticeStencil[D]`:
+##   unified stencil operations across all backends
+##
+## Data flows through the stack as:
+##
+## .. code-block::
+##   TensorField  →  LocalTensorField  →  TensorFieldView  →  Kernels
+##     (GA/MPI)          (host RAM)          (device buffers)    (each macro)
+##
+## For distributed-memory shifting and stencil operations that do not
+## require device dispatch, use `GlobalShifter` and `discreteLaplacian`
+## from `globaltensor` directly.
+
 import globaltensor
 import localtensor
 import tensorview

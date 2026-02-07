@@ -292,6 +292,26 @@
     L, T]" href="tensor/tensorview.html#%5B%5D%2CTensorFieldView%5BL%2CT%5D%2CStencilShift%5BD%5D">tensorview: proc `[]`[L, T, D: static int](view: TensorFieldView[L, T]; shift: StencilShift[D]): TensorSiteProxy[
     L, T]</a></li>
           </ul></dd>
+<dt><a name="accessGhosts" href="#accessGhosts"><span>accessGhosts:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gatypes: proc accessGhosts[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int], array[D, int])" href="globalarrays/gatypes.html#accessGhosts%2CGlobalArray%5BD%2CT%5D">gatypes: proc accessGhosts[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int], array[D, int])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc accessGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]" href="tensor/globaltensor.html#accessGhosts%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessGhosts.D%5D%2CT%5D">globaltensor: proc accessGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]</a></li>
+          </ul></dd>
+<dt><a name="accessLocal" href="#accessLocal"><span>accessLocal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gatypes: proc accessLocal[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int])" href="globalarrays/gatypes.html#accessLocal%2CGlobalArray%5BD%2CT%5D">gatypes: proc accessLocal[D: static[int]; T](ga: GlobalArray[D, T]): (ptr UncheckedArray[T],
+    array[D, int])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc accessLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]" href="tensor/globaltensor.html#accessLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BaccessLocal.D%5D%2CT%5D">globaltensor: proc accessLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]): ptr UncheckedArray[T]</a></li>
+          </ul></dd>
 <dt><a name="acos" href="#acos"><span>acos:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="clbase: proc acos(x: float32): float32" href="opencl/clbase.html#acos%2Cfloat32">clbase: proc acos(x: float32): float32</a></li>
@@ -365,6 +385,22 @@
           data-doc-search-tag="simdlayout: proc aosoaIndexFromLocal(localIdx, elemIdx, elemsPerSite: int;
                     layout: SimdLatticeLayout): int" href="simd/simdlayout.html#aosoaIndexFromLocal%2Cint%2Cint%2Cint%2CSimdLatticeLayout">simdlayout: proc aosoaIndexFromLocal(localIdx, elemIdx, elemsPerSite: int;
                     layout: SimdLatticeLayout): int</a></li>
+          </ul></dd>
+<dt><a name="apply" href="#apply"><span>apply:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc apply[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    shifter: GlobalShifter[D, R, L, T]; src: TensorField[D, R, L, T];
+    dest: var TensorField[D, R, L, T])" href="tensor/globaltensor.html#apply%2CGlobalShifter%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5Bapply.D%5D%2CT%5D">globaltensor: proc apply[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    shifter: GlobalShifter[D, R, L, T]; src: TensorField[D, R, L, T];
+    dest: var TensorField[D, R, L, T])</a></li>
+          </ul></dd>
+<dt><a name="applyStencilShift" href="#applyStencilShift"><span>applyStencilShift:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc applyStencilShift[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T]; dim: int;
+    direction: int)" href="tensor/globaltensor.html#applyStencilShift%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BapplyStencilShift.D%5D%2CT%5D%2Cint%2Cint">globaltensor: proc applyStencilShift[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T]; dim: int;
+    direction: int)</a></li>
           </ul></dd>
 <dt><a name="args" href="#args"><span>args:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -954,9 +990,21 @@
 <li><a class="reference external"
           data-doc-search-tag="clwrap: const CONTEXT_REFERENCE_COUNT" href="opencl/clwrap.html#CONTEXT_REFERENCE_COUNT">clwrap: const CONTEXT_REFERENCE_COUNT</a></li>
           </ul></dd>
+<dt><a name="coordsToLex" href="#coordsToLex"><span>coordsToLex:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc coordsToLex[D: static int](coords: array[D, int]; geom: array[D, int]): int" href="tensor/globaltensor.html#coordsToLex%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D">globaltensor: proc coordsToLex[D: static int](coords: array[D, int]; geom: array[D, int]): int</a></li>
+          </ul></dd>
 <dt><a name="coordsToLexicographic" href="#coordsToLexicographic"><span>coordsToLexicographic:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="simdlayout: proc coordsToLexicographic(coords: seq[int]; strides: seq[int]): int" href="simd/simdlayout.html#coordsToLexicographic%2Cseq%5Bint%5D%2Cseq%5Bint%5D">simdlayout: proc coordsToLexicographic(coords: seq[int]; strides: seq[int]): int</a></li>
+          </ul></dd>
+<dt><a name="coordsToPaddedFlat" href="#coordsToPaddedFlat"><span>coordsToPaddedFlat:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc coordsToPaddedFlat[D: static int](coords: array[D, int];
+                                  paddedGeom: array[D, int];
+                                  ghostWidth: array[D, int]; innerBlockSize: int): int" href="tensor/globaltensor.html#coordsToPaddedFlat%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint">globaltensor: proc coordsToPaddedFlat[D: static int](coords: array[D, int];
+                                  paddedGeom: array[D, int];
+                                  ghostWidth: array[D, int]; innerBlockSize: int): int</a></li>
           </ul></dd>
 <dt><a name="cos" href="#cos"><span>cos:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1539,6 +1587,14 @@
 <dt><a name="directions" href="#directions"><span>directions:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="stencil: iterator directions(nDim: int): Direction" href="lattice/stencil.html#directions.i%2Cint">stencil: iterator directions(nDim: int): Direction</a></li>
+          </ul></dd>
+<dt><a name="discreteLaplacian" href="#discreteLaplacian"><span>discreteLaplacian:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc discreteLaplacian[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T];
+    scratch: var TensorField[D, R, L, T])" href="tensor/globaltensor.html#discreteLaplacian%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BdiscreteLaplacian.D%5D%2CT%5D">globaltensor: proc discreteLaplacian[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    src: TensorField[D, R, L, T]; dest: var TensorField[D, R, L, T];
+    scratch: var TensorField[D, R, L, T])</a></li>
           </ul></dd>
 <dt><a name="dot" href="#dot"><span>dot:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -2388,6 +2444,10 @@
 <li><a class="reference external"
           data-doc-search-tag="clbase: proc globalMemory(id: Pdevice_id): uint64" href="opencl/clbase.html#globalMemory%2CPdevice_id">clbase: proc globalMemory(id: Pdevice_id): uint64</a></li>
           </ul></dd>
+<dt><a name="GlobalShifter" href="#GlobalShifter"><span>GlobalShifter:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: object GlobalShifter" href="tensor/globaltensor.html#GlobalShifter">globaltensor: object GlobalShifter</a></li>
+          </ul></dd>
 <dt><a name="GpuBuffer" href="#GpuBuffer"><span>GpuBuffer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="clbase: object GpuBuffer" href="opencl/clbase.html#GpuBuffer">clbase: object GpuBuffer</a></li>
@@ -2527,6 +2587,18 @@
 <dt><a name="initSciDACChecksum" href="#initSciDACChecksum"><span>initSciDACChecksum:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="scidac: proc initSciDACChecksum(): SciDACChecksum" href="io/scidac.html#initSciDACChecksum">scidac: proc initSciDACChecksum(): SciDACChecksum</a></li>
+          </ul></dd>
+<dt><a name="innerBlockSize" href="#innerBlockSize"><span>innerBlockSize:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc innerBlockSize(R: static int; shape: openArray[int]; isComplex: bool): int" href="tensor/globaltensor.html#innerBlockSize%2Cstaticint%2CopenArray%5Bint%5D%2Cbool">globaltensor: proc innerBlockSize(R: static int; shape: openArray[int]; isComplex: bool): int</a></li>
+          </ul></dd>
+<dt><a name="innerPaddedBlockSize" href="#innerPaddedBlockSize"><span>innerPaddedBlockSize:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc innerPaddedBlockSize(R: static int; ghostWidth: int): int" href="tensor/globaltensor.html#innerPaddedBlockSize%2Cstaticint%2Cint">globaltensor: proc innerPaddedBlockSize(R: static int; ghostWidth: int): int</a></li>
+          </ul></dd>
+<dt><a name="innerPaddedOffset" href="#innerPaddedOffset"><span>innerPaddedOffset:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc innerPaddedOffset(R: static int; ghostWidth: int): int" href="tensor/globaltensor.html#innerPaddedOffset%2Cstaticint%2Cint">globaltensor: proc innerPaddedOffset(R: static int; ghostWidth: int): int</a></li>
           </ul></dd>
 <dt><a name="INTENSITY" href="#INTENSITY"><span>INTENSITY:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -2734,6 +2806,10 @@
 <li><a class="reference external"
           data-doc-search-tag="qio: proc lexIndex(coords: openArray[int]; dims: openArray[int]): int" href="io/qio.html#lexIndex%2CopenArray%5Bint%5D%2CopenArray%5Bint%5D">qio: proc lexIndex(coords: openArray[int]; dims: openArray[int]): int</a></li>
           </ul></dd>
+<dt><a name="lexToCoords" href="#lexToCoords"><span>lexToCoords:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc lexToCoords[D: static int](idx: int; geom: array[D, int]): array[D, int]" href="tensor/globaltensor.html#lexToCoords%2Cint%2Carray%5BD%2Cint%5D">globaltensor: proc lexToCoords[D: static int](idx: int; geom: array[D, int]): array[D, int]</a></li>
+          </ul></dd>
 <dt><a name="LimeHeaderSize" href="#LimeHeaderSize"><span>LimeHeaderSize:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lime: const LimeHeaderSize" href="io/lime.html#LimeHeaderSize">lime: const LimeHeaderSize</a></li>
@@ -2806,9 +2882,21 @@
     tensor: TensorField[D, R, L, T]): array[D, int]" href="tensor/globaltensor.html#localGrid%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalGrid.D%5D%2CT%5D">globaltensor: proc localGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T]): array[D, int]</a></li>
           </ul></dd>
+<dt><a name="localIdx" href="#localIdx"><span>localIdx:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc localIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; coords: array[D, int]): int" href="tensor/globaltensor.html#localIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalIdx.D%5D%2CT%5D%2Carray%5BD%2Cint%5D">globaltensor: proc localIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; coords: array[D, int]): int</a></li>
+          </ul></dd>
 <dt><a name="localIndices" href="#localIndices"><span>localIndices:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="gawrap: proc localIndices[D: static[int]](handle: cint; lo, hi: var array[D, cint])" href="globalarrays/gawrap.html#localIndices%2Ccint%2Carray%5BD%2Ccint%5D%2Carray%5BD%2Ccint%5D">gawrap: proc localIndices[D: static[int]](handle: cint; lo, hi: var array[D, cint])</a></li>
+          </ul></dd>
+<dt><a name="localLexIdx" href="#localLexIdx"><span>localLexIdx:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc localLexIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; site: int): int" href="tensor/globaltensor.html#localLexIdx%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BlocalLexIdx.D%5D%2CT%5D%2Cint">globaltensor: proc localLexIdx[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T]; site: int): int</a></li>
           </ul></dd>
 <dt><a name="localMemory" href="#localMemory"><span>localMemory:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -2825,6 +2913,12 @@
 <dt><a name="LocalScalarMulResult" href="#LocalScalarMulResult"><span>LocalScalarMulResult:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="sitetensor: object LocalScalarMulResult" href="tensor/sitetensor.html#LocalScalarMulResult">sitetensor: object LocalScalarMulResult</a></li>
+          </ul></dd>
+<dt><a name="localSiteOffset" href="#localSiteOffset"><span>localSiteOffset:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerPaddedBlockSize: int): int" href="tensor/globaltensor.html#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint">globaltensor: proc localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerPaddedBlockSize: int): int</a></li>
           </ul></dd>
 <dt><a name="LocalSiteProxy" href="#LocalSiteProxy"><span>LocalSiteProxy:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -3319,6 +3413,30 @@
                                mpiGrid: array[D, SomeInteger];
                                ghostGrid: array[D, SomeInteger]; T: typedesc): GlobalArray[
     D, T]</a></li>
+          </ul></dd>
+<dt><a name="newGlobalBackwardShifters" href="#newGlobalBackwardShifters"><span>newGlobalBackwardShifters:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc newGlobalBackwardShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]" href="tensor/globaltensor.html#newGlobalBackwardShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalBackwardShifters.D%5D%2CT%5D%2Cint">globaltensor: proc newGlobalBackwardShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]</a></li>
+          </ul></dd>
+<dt><a name="newGlobalShifter" href="#newGlobalShifter"><span>newGlobalShifter:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc newGlobalShifter[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; dim: int; len: int = 1): GlobalShifter[D, R,
+    L, T]" href="tensor/globaltensor.html#newGlobalShifter%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifter.D%5D%2CT%5D%2Cint%2Cint">globaltensor: proc newGlobalShifter[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; dim: int; len: int = 1): GlobalShifter[D, R,
+    L, T]</a></li>
+          </ul></dd>
+<dt><a name="newGlobalShifters" href="#newGlobalShifters"><span>newGlobalShifters:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc newGlobalShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]" href="tensor/globaltensor.html#newGlobalShifters%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BnewGlobalShifters.D%5D%2CT%5D%2Cint">globaltensor: proc newGlobalShifters[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    field: TensorField[D, R, L, T]; len: int = 1): array[D,
+    GlobalShifter[D, R, L, T]]</a></li>
           </ul></dd>
 <dt><a name="newHandle" href="#newHandle"><span>newHandle:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -3969,6 +4087,14 @@
 <dt><a name="releaseKernel" href="#releaseKernel"><span>releaseKernel:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="clwrap: proc releaseKernel(kernel: Pkernel): TClResult" href="opencl/clwrap.html#releaseKernel%2CPkernel">clwrap: proc releaseKernel(kernel: Pkernel): TClResult</a></li>
+          </ul></dd>
+<dt><a name="releaseLocal" href="#releaseLocal"><span>releaseLocal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gatypes: proc releaseLocal[D: static[int]; T](ga: GlobalArray[D, T])" href="globalarrays/gatypes.html#releaseLocal%2CGlobalArray%5BD%2CT%5D">gatypes: proc releaseLocal[D: static[int]; T](ga: GlobalArray[D, T])</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="globaltensor: proc releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T])" href="tensor/globaltensor.html#releaseLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocal.D%5D%2CT%5D">globaltensor: proc releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: TensorField[D, R, L, T])</a></li>
           </ul></dd>
 <dt><a name="releaseMemObject" href="#releaseMemObject"><span>releaseMemObject:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -4942,7 +5068,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:33 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
       </div>
     </div>
   </div>

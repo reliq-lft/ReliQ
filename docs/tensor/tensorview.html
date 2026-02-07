@@ -51,7 +51,9 @@
       </select>
     </div>
     <ul class="simple simple-toc" id="toc-list">
-  <li>
+  <li><a class="reference" id="tensorfieldview-minus-deviceminusside-views-for-backend-dispatch_toc" href="#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch">TensorFieldView - Device-Side Views for Backend Dispatch</a></li>
+<ul class="simple"><li><a class="reference" id="tensorfieldview-minus-deviceminusside-views-for-backend-dispatch-example_toc" href="#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch-example">Example</a></li>
+</ul><li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
 </li>
 <li>
@@ -278,7 +280,26 @@
     
     <div id="tocRoot"></div>
     
-    <p class="module-desc"></p>
+    <p class="module-desc">
+<h1><a class="toc-backref" id="tensorfieldview-minus-deviceminusside-views-for-backend-dispatch" href="#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch">TensorFieldView - Device-Side Views for Backend Dispatch</a></h1><p>This module provides <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorFieldView</span><span class="Punctuation">[</span><span class="Identifier">L</span><span class="Punctuation">,</span><span class="Identifier">T</span><span class="Punctuation">]</span></span></tt>, the type that the <tt class="docutils literal"><span class="pre"><span class="Identifier">each</span></span></tt> macro operates on.  A view wraps a <tt class="docutils literal"><span class="pre"><span class="Identifier">LocalTensorField</span></span></tt> in device-side buffers (OpenCL <tt class="docutils literal"><span class="pre"><span class="Identifier">cl_mem</span></span></tt>, SYCL buffers, or raw host pointers for OpenMP) and handles the AoSoA layout transformation needed for efficient SIMD / GPU execution.</p>
+<p>Key capabilities:</p>
+<ul class="simple"><li><strong>Construction</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">newTensorFieldView</span><span class="Punctuation">(</span><span class="Identifier">local</span><span class="Punctuation">,</span> <span class="Identifier">ioKind</span><span class="Punctuation">)</span></span></tt> allocates device buffers and optionally synchronises data from the parent local tensor (read/readwrite) or just allocates (write)</li>
+<li><strong>AoSoA layout</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">transformToAoSoA</span></span></tt> / <tt class="docutils literal"><span class="pre"><span class="Identifier">transformFromAoSoA</span></span></tt> convert between natural Array-of-Structures order and the blocked Array-of-Structures-of-Arrays layout used by kernels</li>
+<li><strong>Backend dispatch</strong>: the <tt class="docutils literal"><span class="pre"><span class="Identifier">each</span></span></tt> macro inspects view arguments at compile time and emits OpenCL, SYCL, or OpenMP code accordingly</li>
+<li><strong>Stencil integration</strong>: views can be passed to <tt class="docutils literal"><span class="pre"><span class="Identifier">each</span></span></tt> together with a <tt class="docutils literal"><span class="pre"><span class="Identifier">LatticeStencil</span></span></tt> for neighbor access in kernels</li>
+<li><strong>Destruction</strong>: on scope exit, write/readwrite views synchronise data back to the parent local tensor field</li>
+</ul>
+<p>The backend is selected at compile time:</p>
+<table border="1" class="docutils"><tr><th>Backend</th><th>Compile flag</th><th>Buffer type</th></tr>
+<tr><td>OpenCL</td><td><em>(default)</em></td><td><tt class="docutils literal"><span class="pre">cl_mem</span></tt></td></tr>
+<tr><td>SYCL</td><td><tt class="docutils literal"><span class="pre">-d:UseSycl</span></tt></td><td><tt class="docutils literal"><span class="pre">SyclBuffer</span></tt></td></tr>
+<tr><td>OpenMP</td><td><tt class="docutils literal"><span class="pre">-d:UseOpenMP</span></tt></td><td>raw <tt class="docutils literal"><span class="pre">pointer</span></tt></td></tr>
+</table>
+<h2><a class="toc-backref" id="tensorfieldview-minus-deviceminusside-views-for-backend-dispatch-example" href="#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch-example">Example</a></h2><pre class="listing"><span class="Keyword">var</span> <span class="Identifier">local</span> <span class="Operator">=</span> <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">newLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+<span class="Keyword">var</span> <span class="Identifier">vSrc</span> <span class="Operator">=</span> <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">newTensorFieldView</span><span class="Punctuation">(</span><span class="Identifier">iokRead</span><span class="Punctuation">)</span>
+<span class="Keyword">var</span> <span class="Identifier">vDst</span> <span class="Operator">=</span> <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">newTensorFieldView</span><span class="Punctuation">(</span><span class="Identifier">iokWrite</span><span class="Punctuation">)</span>
+<span class="Identifier">each</span> <span class="Identifier">vDst</span><span class="Punctuation">,</span> <span class="Identifier">vSrc</span><span class="Punctuation">,</span> <span class="Identifier">n</span><span class="Punctuation">:</span>
+  <span class="Identifier">vDst</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="FloatNumber">2.0</span> <span class="Operator">*</span> <span class="Identifier">vSrc</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span></pre></p>
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
@@ -890,7 +911,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 04:08:33 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
       </div>
     </div>
   </div>
