@@ -1,0 +1,2 @@
+nimTitle	opencl	opencl/opencl.html	module opencl/opencl		0
+nim	clParallel	opencl/opencl.html#clParallel.t,untyped	template clParallel(body: untyped): untyped		35

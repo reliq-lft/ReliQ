@@ -73,6 +73,13 @@ type
     shape: seq[int]    # Tensor shape
     elemType: ElementType  # Element type for kernel dispatch
   
+  # Stencil neighbor variable binding:
+  # Maps variable name (e.g. "nbrIdx") to its stencil point index
+  StencilBinding = object
+    varName: string     # The let-bound variable name
+    stencilSym: NimNode # The stencil symbol from the AST
+    pointIdx: int       # The stencil point index (e.g. 0 for fwd-x)
+  
   ExprKind* = enum
     ekSiteProxy,       # view[n] - direct site access (copy)
     ekMatMul,          # A * B - matrix multiplication (both rank 2)
@@ -89,6 +96,7 @@ type
     viewName*: string  # For ekSiteProxy
     viewRank*: int     # Tensor rank (1=vector, 2=matrix)
     isComplex*: bool   # Whether this involves complex numbers
+    isNeighborAccess*: bool  # True if this accesses a neighbor via stencil
     scalar*: float64   # For scalar ops
     scalarIm*: float64 # For complex scalar ops (imaginary part)
     left*, right*: ref ExprInfo  # For binary ops
@@ -103,6 +111,8 @@ type
     outputCols*: int
     isComplex*: bool
     elemType*: ElementType  # Element type for kernel dispatch
+    stencilBindings*: seq[StencilBinding]  # Stencil neighbor variables
+    hasStencil*: bool   # True if stencil neighbor access detected
 
 proc getElementTypeFromNode(typeNode: NimNode): ElementType =
   ## Extract element type from a type node (compile-time)
@@ -241,8 +251,9 @@ proc isSimpleBinaryOp(expr: ExprInfo): bool =
   else:
     return false
 
-proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
+proc analyzeExpr*(n: NimNode, viewNames: seq[string], nbrVarNames: seq[string] = @[]): ExprInfo =
   ## Analyze an expression to determine its type and structure
+  ## nbrVarNames: variable names that are stencil neighbor indices
   
   case n.kind
   of nnkCall:
@@ -251,19 +262,30 @@ proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
       
       # view[site] access
       if opName == "[]":
+        var viewName = ""
         if n[1].kind == nnkSym:
-          return ExprInfo(kind: ekSiteProxy, viewName: n[1].strVal)
-        let viewSym = extractViewSym(n[1])
-        if viewSym != nil:
-          return ExprInfo(kind: ekSiteProxy, viewName: viewSym.strVal)
-        return ExprInfo(kind: ekSiteProxy, viewName: "unknown")
+          viewName = n[1].strVal
+        else:
+          let viewSym = extractViewSym(n[1])
+          if viewSym != nil:
+            viewName = viewSym.strVal
+          else:
+            viewName = "unknown"
+        
+        # Check if the index argument is a stencil neighbor variable
+        var isNbr = false
+        if n.len >= 3 and n[2].kind == nnkSym:
+          let idxName = n[2].strVal
+          if idxName in nbrVarNames:
+            isNbr = true
+        return ExprInfo(kind: ekSiteProxy, viewName: viewName, isNeighborAccess: isNbr)
       
       # Binary operators
       if opName == "+" and n.len >= 3:
         var leftInfo = new ExprInfo
         var rightInfo = new ExprInfo
-        leftInfo[] = analyzeExpr(n[1], viewNames)
-        rightInfo[] = analyzeExpr(n[2], viewNames)
+        leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+        rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
         
         # Check if left is scalar
         if leftInfo.kind == ekLiteral:
@@ -276,15 +298,15 @@ proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
       if opName == "-" and n.len >= 3:
         var leftInfo = new ExprInfo
         var rightInfo = new ExprInfo
-        leftInfo[] = analyzeExpr(n[1], viewNames)
-        rightInfo[] = analyzeExpr(n[2], viewNames)
+        leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+        rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
         return ExprInfo(kind: ekMatSub, left: leftInfo, right: rightInfo)
       
       if opName == "*" and n.len >= 3:
         var leftInfo = new ExprInfo
         var rightInfo = new ExprInfo
-        leftInfo[] = analyzeExpr(n[1], viewNames)
-        rightInfo[] = analyzeExpr(n[2], viewNames)
+        leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+        rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
         
         let leftIsScalar = leftInfo.kind == ekLiteral
         let rightIsScalar = rightInfo.kind == ekLiteral
@@ -307,8 +329,8 @@ proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
       
       var leftInfo = new ExprInfo
       var rightInfo = new ExprInfo
-      leftInfo[] = analyzeExpr(n[1], viewNames)
-      rightInfo[] = analyzeExpr(n[2], viewNames)
+      leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+      rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
       
       if opName == "+":
         if leftInfo.kind == ekLiteral:
@@ -349,7 +371,7 @@ proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
   
   of nnkHiddenStdConv, nnkHiddenDeref, nnkConv:
     if n.len > 0:
-      return analyzeExpr(n[^1], viewNames)
+      return analyzeExpr(n[^1], viewNames, nbrVarNames)
   
   else:
     discard
@@ -357,7 +379,7 @@ proc analyzeExpr*(n: NimNode, viewNames: seq[string]): ExprInfo =
   return ExprInfo(kind: ekUnknown)
 
 proc gatherViewInfo(body: NimNode, loopVar: NimNode): KernelInfo =
-  ## Analyze body to find all TensorFieldView accesses
+  ## Analyze body to find all TensorFieldView accesses and stencil bindings
   result = KernelInfo(
     loopVar: loopVar,
     loopVarStr: loopVar.strVal,
@@ -365,7 +387,8 @@ proc gatherViewInfo(body: NimNode, loopVar: NimNode): KernelInfo =
     outputRows: 0,
     outputCols: 0,
     isComplex: false,
-    elemType: etFloat64  # Default
+    elemType: etFloat64,  # Default
+    hasStencil: false
   )
   result.viewRanks = initTable[string, int]()
   var viewTable = initTable[string, ViewInfo]()
@@ -409,6 +432,29 @@ proc gatherViewInfo(body: NimNode, loopVar: NimNode): KernelInfo =
         analyzeNode(child, isLHS)
   
   analyzeNode(body)
+  
+  # Detect stencil let-bindings
+  # Pattern: LetSection(IdentDefs(Sym "nbrIdx", Empty, Call(Sym "neighbor", stencil, n, IntLit N)))
+  if body.kind == nnkStmtList:
+    for child in body:
+      if child.kind == nnkLetSection:
+        for identDef in child:
+          if identDef.kind == nnkIdentDefs and identDef.len >= 3:
+            let varName = if identDef[0].kind == nnkSym: identDef[0].strVal else: ""
+            let valueExpr = identDef[2]
+            # Check for Call(neighbor, stencil, loopVar, pointIdx)
+            if valueExpr.kind == nnkCall and valueExpr.len >= 4 and
+               valueExpr[0].kind == nnkSym and valueExpr[0].strVal == "neighbor":
+              let stencilSym = valueExpr[1]
+              let pointIdxNode = valueExpr[3]
+              if pointIdxNode.kind in {nnkIntLit..nnkInt64Lit}:
+                let pointIdx = pointIdxNode.intVal.int
+                result.stencilBindings.add StencilBinding(
+                  varName: varName,
+                  stencilSym: stencilSym,
+                  pointIdx: pointIdx
+                )
+                result.hasStencil = true
   
   for name, info in viewTable:
     result.views.add info
@@ -571,6 +617,9 @@ type
     dkMatVec,       # y = M * x (matrix-vector)
     dkMatAdd,       # C = A + B (for matrices)
     dkVecAdd,       # C = A + B (for vectors)
+    dkStencilCopy,  # C[n] = A[neighbor(n)]  (gather)
+    dkStencilScalarMul, # C[n] = s * A[neighbor(n)]  (gather + scalar)
+    dkStencilAdd,   # C[n] = A[n] + B[neighbor(n)]  (add with gather)
     dkUnknown
 
 #[ ============================================================================
@@ -746,22 +795,47 @@ proc determineDispatch(expr: ExprInfo, lhsView: string): DispatchInfo =
   
   case expr.kind
   of ekSiteProxy:
-    # Simple copy: C[n] = A[n]
-    result.kind = dkCopy
+    # Simple copy or stencil gather copy
+    if expr.isNeighborAccess:
+      result.kind = dkStencilCopy
+    else:
+      result.kind = dkCopy
     result.rhsViews = @[expr.viewName]
   
   of ekMatAdd:
-    # Addition: C[n] = A[n] + B[n] - only if both operands are simple views
+    # Addition: C[n] = A[n] + B[n] or stencil add C[n] = A[n] + B[neighbor(n)]
     let leftIsSimple = expr.left == nil or expr.left[].kind == ekSiteProxy
     let rightIsSimple = expr.right == nil or expr.right[].kind == ekSiteProxy
     if leftIsSimple and rightIsSimple:
-      result.kind = dkAdd
-      if expr.left != nil:
-        let lv = getViewFromExpr(expr.left[])
-        if lv != "": result.rhsViews.add lv
-      if expr.right != nil:
-        let rv = getViewFromExpr(expr.right[])
-        if rv != "": result.rhsViews.add rv
+      # Check if either side has a neighbor access
+      let leftIsNbr = expr.left != nil and expr.left[].isNeighborAccess
+      let rightIsNbr = expr.right != nil and expr.right[].isNeighborAccess
+      if leftIsNbr or rightIsNbr:
+        result.kind = dkStencilAdd
+        # Put non-neighbor view first (srcA = direct, srcB = neighbor)
+        if rightIsNbr:
+          if expr.left != nil:
+            let lv = getViewFromExpr(expr.left[])
+            if lv != "": result.rhsViews.add lv
+          if expr.right != nil:
+            let rv = getViewFromExpr(expr.right[])
+            if rv != "": result.rhsViews.add rv
+        else:
+          # Left is neighbor, right is direct - swap order
+          if expr.right != nil:
+            let rv = getViewFromExpr(expr.right[])
+            if rv != "": result.rhsViews.add rv
+          if expr.left != nil:
+            let lv = getViewFromExpr(expr.left[])
+            if lv != "": result.rhsViews.add lv
+      else:
+        result.kind = dkAdd
+        if expr.left != nil:
+          let lv = getViewFromExpr(expr.left[])
+          if lv != "": result.rhsViews.add lv
+        if expr.right != nil:
+          let rv = getViewFromExpr(expr.right[])
+          if rv != "": result.rhsViews.add rv
     else:
       result.kind = dkUnknown
   
@@ -781,15 +855,26 @@ proc determineDispatch(expr: ExprInfo, lhsView: string): DispatchInfo =
       result.kind = dkUnknown
   
   of ekScalarMul:
-    # Scalar multiply: C[n] = s * A[n]
-    result.kind = dkScalarMul
+    # Scalar multiply: C[n] = s * A[n] or C[n] = s * A[neighbor(n)]
     result.scalar = expr.scalar
-    if expr.left != nil:
-      let lv = getViewFromExpr(expr.left[])
-      if lv != "": result.rhsViews.add lv
-    if expr.right != nil:
-      let rv = getViewFromExpr(expr.right[])
-      if rv != "": result.rhsViews.add rv
+    # Check if the view operand is a neighbor access
+    var viewExpr: ref ExprInfo = nil
+    if expr.left != nil and expr.left[].kind == ekSiteProxy:
+      viewExpr = expr.left
+    elif expr.right != nil and expr.right[].kind == ekSiteProxy:
+      viewExpr = expr.right
+    
+    if viewExpr != nil and viewExpr[].isNeighborAccess:
+      result.kind = dkStencilScalarMul
+      result.rhsViews.add viewExpr[].viewName
+    else:
+      result.kind = dkScalarMul
+      if expr.left != nil:
+        let lv = getViewFromExpr(expr.left[])
+        if lv != "": result.rhsViews.add lv
+      if expr.right != nil:
+        let rv = getViewFromExpr(expr.right[])
+        if rv != "": result.rhsViews.add rv
   
   of ekScalarAdd:
     # Scalar add: C[n] = s + A[n]
@@ -957,9 +1042,15 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
       
       return result
   
-  var stmt: NimNode
-  if body.kind == nnkStmtList and body.len > 0:
-    stmt = body[0]
+  # Find the assignment statement (skip LetSection and other non-assignment stmts)
+  var stmt: NimNode = nil
+  if body.kind == nnkStmtList:
+    for child in body:
+      if child.kind == nnkCall and child.len >= 4 and child[0].kind == nnkSym and child[0].strVal == "[]=":
+        stmt = child
+        break
+    if stmt == nil and body.len > 0:
+      stmt = body[0]
   else:
     stmt = body
   
@@ -967,6 +1058,11 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
   var viewNames: seq[string]
   for v in info.views:
     viewNames.add v.nameStr
+  
+  # Collect stencil neighbor variable names for expression analysis
+  var nbrVarNames: seq[string]
+  for sb in info.stencilBindings:
+    nbrVarNames.add sb.varName
   
   # Find output (LHS) view
   var lhsViewSym: NimNode = nil
@@ -983,8 +1079,8 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
   
   # Analyze RHS expression
   var rhsExpr: ExprInfo
-  if stmt.kind == nnkCall and stmt.len >= 4 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
-    rhsExpr = analyzeExpr(stmt[3], viewNames)
+  if stmt != nil and stmt.kind == nnkCall and stmt.len >= 4 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
+    rhsExpr = analyzeExpr(stmt[3], viewNames, nbrVarNames)
   else:
     rhsExpr = ExprInfo(kind: ekUnknown)
   
@@ -1198,6 +1294,115 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
     # Handled above in dkMatMul case
     result = quote do:
       discard
+  
+  of dkStencilCopy:
+    # C[n] = A[neighbor(n, pointIdx)] - gather copy
+    if rhsView1Sym == nil:
+      error("Could not find source view for stencil copy operation")
+    if info.stencilBindings.len == 0:
+      error("Stencil copy detected but no stencil binding found")
+    
+    let stencilSym = info.stencilBindings[0].stencilSym
+    let pointIdxLit = newLit(info.stencilBindings[0].pointIdx)
+    
+    result = quote do:
+      block:
+        let numDevices = syclQueues.len
+        let sitesPerDev = `lhsViewSym`.data.sitesPerDevice
+        let elemsPerSite = `lhsViewSym`.data.elementsPerSite
+        let nPoints = `stencilSym`.nPoints
+        let offsetBufSize = `stencilSym`.nLocalSites * nPoints * sizeof(int32)
+        
+        for devIdx in 0..<numDevices:
+          let devSites = sitesPerDev[devIdx]
+          if devSites > 0:
+            # Upload stencil offset table to device
+            let offsetBuf = allocate(syclQueues[devIdx], offsetBufSize)
+            write(syclQueues[devIdx], cast[pointer](`stencilSym`.getOffsetBuffer()), offsetBuf, offsetBufSize)
+            
+            kernelStencilCopy(syclQueues[devIdx],
+                              `rhsView1Sym`.data.buffers[devIdx],
+                              `lhsViewSym`.data.buffers[devIdx],
+                              offsetBuf,
+                              `pointIdxLit`, nPoints,
+                              devSites, elemsPerSite, `vwLit`,
+                              `elemTypeIdent`)
+            
+            discard finish(syclQueues[devIdx])
+            deallocate(syclQueues[devIdx], offsetBuf)
+  
+  of dkStencilScalarMul:
+    # C[n] = scalar * A[neighbor(n, pointIdx)]
+    if rhsView1Sym == nil:
+      error("Could not find source view for stencil scalar mul operation")
+    if info.stencilBindings.len == 0:
+      error("Stencil scalar mul detected but no stencil binding found")
+    
+    let stencilSym = info.stencilBindings[0].stencilSym
+    let pointIdxLit = newLit(info.stencilBindings[0].pointIdx)
+    
+    result = quote do:
+      block:
+        let numDevices = syclQueues.len
+        let sitesPerDev = `lhsViewSym`.data.sitesPerDevice
+        let elemsPerSite = `lhsViewSym`.data.elementsPerSite
+        let nPoints = `stencilSym`.nPoints
+        let offsetBufSize = `stencilSym`.nLocalSites * nPoints * sizeof(int32)
+        
+        for devIdx in 0..<numDevices:
+          let devSites = sitesPerDev[devIdx]
+          if devSites > 0:
+            let offsetBuf = allocate(syclQueues[devIdx], offsetBufSize)
+            write(syclQueues[devIdx], cast[pointer](`stencilSym`.getOffsetBuffer()), offsetBuf, offsetBufSize)
+            
+            kernelStencilScalarMul(syclQueues[devIdx],
+                                   `rhsView1Sym`.data.buffers[devIdx],
+                                   `scalarLit`,
+                                   `lhsViewSym`.data.buffers[devIdx],
+                                   offsetBuf,
+                                   `pointIdxLit`, nPoints,
+                                   devSites, elemsPerSite, `vwLit`,
+                                   `elemTypeIdent`)
+            
+            discard finish(syclQueues[devIdx])
+            deallocate(syclQueues[devIdx], offsetBuf)
+  
+  of dkStencilAdd:
+    # C[n] = A[n] + B[neighbor(n, pointIdx)]
+    # rhsView1 = A (direct access), rhsView2 = B (neighbor access)
+    if rhsView1Sym == nil or rhsView2Sym == nil:
+      error("Could not find views for stencil add operation")
+    if info.stencilBindings.len == 0:
+      error("Stencil add detected but no stencil binding found")
+    
+    let stencilSym = info.stencilBindings[0].stencilSym
+    let pointIdxLit = newLit(info.stencilBindings[0].pointIdx)
+    
+    result = quote do:
+      block:
+        let numDevices = syclQueues.len
+        let sitesPerDev = `lhsViewSym`.data.sitesPerDevice
+        let elemsPerSite = `lhsViewSym`.data.elementsPerSite
+        let nPoints = `stencilSym`.nPoints
+        let offsetBufSize = `stencilSym`.nLocalSites * nPoints * sizeof(int32)
+        
+        for devIdx in 0..<numDevices:
+          let devSites = sitesPerDev[devIdx]
+          if devSites > 0:
+            let offsetBuf = allocate(syclQueues[devIdx], offsetBufSize)
+            write(syclQueues[devIdx], cast[pointer](`stencilSym`.getOffsetBuffer()), offsetBuf, offsetBufSize)
+            
+            kernelStencilAdd(syclQueues[devIdx],
+                             `rhsView1Sym`.data.buffers[devIdx],
+                             `rhsView2Sym`.data.buffers[devIdx],
+                             `lhsViewSym`.data.buffers[devIdx],
+                             offsetBuf,
+                             `pointIdxLit`, nPoints,
+                             devSites, elemsPerSite, `vwLit`,
+                             `elemTypeIdent`)
+            
+            discard finish(syclQueues[devIdx])
+            deallocate(syclQueues[devIdx], offsetBuf)
   
   of dkUnknown:
     # Complex expression - use execution plan with temporary buffers

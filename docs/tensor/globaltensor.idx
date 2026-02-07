@@ -1,0 +1,10 @@
+nimTitle	globaltensor	tensor/globaltensor.html	module tensor/globaltensor		0
+nim	TensorField	tensor/globaltensor.html#TensorField	object TensorField		40
+nim	newTensorField	tensor/globaltensor.html#newTensorField,L,array[R,int],typedesc	proc newTensorField[D: static[int]; R: static[int]; L: Lattice[D]](lattice: L;\n    shape: array[R, int]; T: typedesc): TensorField[D, R, L, T]		91
+nim	updateGhosts	tensor/globaltensor.html#updateGhosts,TensorField[D,R,L: Lattice[updateGhosts.D],T],int,int,bool	proc updateGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]; dim: int; direction: int = 0;\n    updateCorners: bool = false)		148
+nim	updateAllGhosts	tensor/globaltensor.html#updateAllGhosts,TensorField[D,R,L: Lattice[updateAllGhosts.D],T],bool	proc updateAllGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]; updateCorners: bool = false)		183
+nim	hasGhosts	tensor/globaltensor.html#hasGhosts,TensorField[D,R,L: Lattice[hasGhosts.D],T]	proc hasGhosts[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]): bool		201
+nim	ghostWidth	tensor/globaltensor.html#ghostWidth,TensorField[D,R,L: Lattice[ghostWidth.D],T]	proc ghostWidth[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]): array[D, int]		210
+nim	localGrid	tensor/globaltensor.html#localGrid,TensorField[D,R,L: Lattice[localGrid.D],T]	proc localGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]): array[D, int]		216
+nim	paddedGrid	tensor/globaltensor.html#paddedGrid,TensorField[D,R,L: Lattice[paddedGrid.D],T]	proc paddedGrid[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]): array[D, int]		224
+nim	newLatticeStencil	tensor/globaltensor.html#newLatticeStencil,TensorField[D,R,L: Lattice[newLatticeStencil.D],T],StencilPattern[D]	proc newLatticeStencil[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]; pattern: StencilPattern[D]): LatticeStencil[\n    D]		240

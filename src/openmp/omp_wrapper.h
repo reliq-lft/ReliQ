@@ -17,14 +17,27 @@
 extern "C" {
 #endif
 
-/* Callback function type for loop body execution */
+/* Callback function type for loop body execution (per-iteration) */
 typedef void (*omp_loop_callback)(int64_t idx, void* context);
 
-/* CPU parallel for loop with static scheduling */
+/* Callback function type for chunked loop body (range per thread) */
+typedef void (*omp_chunk_callback)(int64_t start, int64_t end, void* context);
+
+/* CPU parallel for loop with static scheduling (per-iteration callback) */
 void omp_parallel_for(
     int64_t start,
     int64_t end,
     omp_loop_callback callback,
+    void* context
+);
+
+/* CPU parallel for loop with chunked dispatch (range per thread)
+ * Each thread receives a contiguous [chunk_start, chunk_end) range,
+ * allowing the callback to use SIMD within its chunk. */
+void omp_parallel_for_chunked(
+    int64_t start,
+    int64_t end,
+    omp_chunk_callback callback,
     void* context
 );
 

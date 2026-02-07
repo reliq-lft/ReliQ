@@ -1,0 +1,26 @@
+markupTitle	index.md	index.html	index.md		0
+heading	ReliQ Lattice Field Theory Framework	index.html#reliq-lattice-field-theory-framework	 ReliQ Lattice Field Theory Framework		0
+heading	Overview	index.html#overview	  Overview		0
+heading	Key Features	index.html#key-features	   Key Features		0
+heading	Quick Start	index.html#quick-start	  Quick Start		0
+heading	Architecture	index.html#architecture	  Architecture		0
+heading	Module Reference	index.html#module-reference	  Module Reference		0
+heading	Core Modules	index.html#core-modules	   Core Modules		0
+heading	Lattice	index.html#lattice	   Lattice		0
+heading	Tensor Fields	index.html#tensor-fields	   Tensor Fields		0
+heading	Backend: OpenCL	index.html#backendcolon-opencl	   Backend: OpenCL		0
+heading	Backend: SYCL	index.html#backendcolon-sycl	   Backend: SYCL		0
+heading	Backend: OpenMP	index.html#backendcolon-openmp	   Backend: OpenMP		0
+heading	SIMD Infrastructure	index.html#simd-infrastructure	   SIMD Infrastructure		0
+heading	Distributed Memory	index.html#distributed-memory	   Distributed Memory		0
+heading	I/O	index.html#islasho	   I/O		0
+heading	Utilities	index.html#utilities	   Utilities		0
+heading	Backend Selection	index.html#backend-selection	  Backend Selection		0
+heading	Building	index.html#building	   Building		0
+heading	Running Tests	index.html#running-tests	   Running Tests		0
+heading	The each Macro	index.html#the-each-macro	  The <tt class="docutils literal"><span class="pre">each</span></tt> Macro		0
+heading	Supported Patterns	index.html#supported-patterns	   Supported Patterns		0
+heading	What Happens Under the Hood	index.html#what-happens-under-the-hood	   What Happens Under the Hood		0
+heading	AoSoA Memory Layout	index.html#aosoa-memory-layout	  AoSoA Memory Layout		0
+heading	Stencil Operations	index.html#stencil-operations	  Stencil Operations		0
+heading	License	index.html#license	  License		0

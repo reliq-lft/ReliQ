@@ -1,0 +1,123 @@
+nimTitle	sitetensor	tensor/sitetensor.html	module tensor/sitetensor		0
+nim	UseSycl	tensor/sitetensor.html#UseSycl	const UseSycl		40
+nim	UseOpenMP	tensor/sitetensor.html#UseOpenMP	const UseOpenMP		41
+nim	Vec	tensor/sitetensor.html#Vec	object Vec		48
+nim	`[]`	tensor/sitetensor.html#[],Vec[N,T],int	proc `[]`[N: static[int]; T](v: Vec[N, T]; i: int): T		53
+nim	`[]=`	tensor/sitetensor.html#[]=,Vec[N,T],int,T	proc `[]=`[N: static[int]; T](v: var Vec[N, T]; i: int; val: T)		57
+nim	`+`	tensor/sitetensor.html#+,Vec[N,T],Vec[N,T]	proc `+`[N: static[int]; T](a, b: Vec[N, T]): Vec[N, T]		61
+nim	`-`	tensor/sitetensor.html#-,Vec[N,T],Vec[N,T]	proc `-`[N: static[int]; T](a, b: Vec[N, T]): Vec[N, T]		66
+nim	`*`	tensor/sitetensor.html#*,T,Vec[N,T]	proc `*`[N: static[int]; T](a: T; v: Vec[N, T]): Vec[N, T]		71
+nim	`*`	tensor/sitetensor.html#*,Vec[N,T],T	proc `*`[N: static[int]; T](v: Vec[N, T]; a: T): Vec[N, T]		76
+nim	dot	tensor/sitetensor.html#dot,Vec[N,T],Vec[N,T]	proc dot[N: static[int]; T](a, b: Vec[N, T]): T		81
+nim	Mat	tensor/sitetensor.html#Mat	object Mat		89
+nim	`[]`	tensor/sitetensor.html#[],Mat[N,M,T],int,int	proc `[]`[N: static[int]; M: static[int]; T](m: Mat[N, M, T]; i, j: int): T		94
+nim	`[]=`	tensor/sitetensor.html#[]=,Mat[N,M,T],int,int,T	proc `[]=`[N: static[int]; M: static[int]; T](m: var Mat[N, M, T]; i, j: int; val: T)		98
+nim	`+`	tensor/sitetensor.html#+,Mat[N,M,T],Mat[N,M,T]	proc `+`[N: static[int]; M: static[int]; T](a, b: Mat[N, M, T]): Mat[N, M, T]		102
+nim	`-`	tensor/sitetensor.html#-,Mat[N,M,T],Mat[N,M,T]	proc `-`[N: static[int]; M: static[int]; T](a, b: Mat[N, M, T]): Mat[N, M, T]		107
+nim	`*`	tensor/sitetensor.html#*,T,Mat[N,M,T]	proc `*`[N: static[int]; M: static[int]; T](a: T; m: Mat[N, M, T]): Mat[N, M, T]		112
+nim	`*`	tensor/sitetensor.html#*,Mat[N,M,T],T	proc `*`[N: static[int]; M: static[int]; T](m: Mat[N, M, T]; a: T): Mat[N, M, T]		117
+nim	`*`	tensor/sitetensor.html#*,Mat[N,K,T],Mat[K,M,T]	proc `*`[N: static[int]; K: static[int]; M: static[int]; T](a: Mat[N, K, T];\n    b: Mat[K, M, T]): Mat[N, M, T]		122
+nim	`*`	tensor/sitetensor.html#*,Mat[N,M,T],Vec[M,T]	proc `*`[N: static[int]; M: static[int]; T](m: Mat[N, M, T]; v: Vec[M, T]): Vec[N, T]		132
+nim	transpose	tensor/sitetensor.html#transpose,Mat[N,M,T]	proc transpose[N: static[int]; M: static[int]; T](m: Mat[N, M, T]): Mat[M, N, T]		140
+nim	trace	tensor/sitetensor.html#trace,Mat[N,N,T]	proc trace[N: static[int]; T](m: Mat[N, N, T]): T		146
+nim	identity	tensor/sitetensor.html#identity	proc identity[N: static[int]; T](): Mat[N, N, T]		152
+nim	isVec	tensor/sitetensor.html#isVec.t,typedesc	template isVec(T: typedesc): bool		159
+nim	isMat	tensor/sitetensor.html#isMat.t,typedesc	template isMat(T: typedesc): bool		163
+nim	isSiteTensor	tensor/sitetensor.html#isSiteTensor.t,typedesc	template isSiteTensor(T: typedesc): bool		167
+nim	elementType	tensor/sitetensor.html#elementType.t,typedesc[Vec[N,T]]	template elementType[N: static[int]; T](v: typedesc[Vec[N, T]]): typedesc		171
+nim	elementType	tensor/sitetensor.html#elementType.t,typedesc[Mat[N,M,T]]	template elementType[N: static[int]; M: static[int]; T](m: typedesc[Mat[N, M, T]]): typedesc		175
+nim	numElements	tensor/sitetensor.html#numElements.t,typedesc[Vec[N,T]]	template numElements[N: static[int]; T](v: typedesc[Vec[N, T]]): int		179
+nim	numElements	tensor/sitetensor.html#numElements.t,typedesc[Mat[N,M,T]]	template numElements[N: static[int]; M: static[int]; T](m: typedesc[Mat[N, M, T]]): int		183
+nim	vecSize	tensor/sitetensor.html#vecSize.t,typedesc[Vec[N,T]]	template vecSize[N: static[int]; T](v: typedesc[Vec[N, T]]): int		188
+nim	matRows	tensor/sitetensor.html#matRows.t,typedesc[Mat[N,M,T]]	template matRows[N: static[int]; M: static[int]; T](m: typedesc[Mat[N, M, T]]): int		192
+nim	matCols	tensor/sitetensor.html#matCols.t,typedesc[Mat[N,M,T]]	template matCols[N: static[int]; M: static[int]; T](m: typedesc[Mat[N, M, T]]): int		196
+nim	storageType	tensor/sitetensor.html#storageType.t,typedesc	template storageType(T: typedesc): typedesc		201
+nim	Vec2	tensor/sitetensor.html#Vec2	type Vec2		214
+nim	Vec3	tensor/sitetensor.html#Vec3	type Vec3		215
+nim	Vec4	tensor/sitetensor.html#Vec4	type Vec4		216
+nim	Mat2	tensor/sitetensor.html#Mat2	type Mat2		218
+nim	Mat3	tensor/sitetensor.html#Mat3	type Mat3		219
+nim	Mat4	tensor/sitetensor.html#Mat4	type Mat4		220
+nim	Vec2f	tensor/sitetensor.html#Vec2f	type Vec2f		223
+nim	Vec3f	tensor/sitetensor.html#Vec3f	type Vec3f		224
+nim	Vec4f	tensor/sitetensor.html#Vec4f	type Vec4f		225
+nim	Vec2d	tensor/sitetensor.html#Vec2d	type Vec2d		226
+nim	Vec3d	tensor/sitetensor.html#Vec3d	type Vec3d		227
+nim	Vec4d	tensor/sitetensor.html#Vec4d	type Vec4d		228
+nim	Mat2f	tensor/sitetensor.html#Mat2f	type Mat2f		230
+nim	Mat3f	tensor/sitetensor.html#Mat3f	type Mat3f		231
+nim	Mat4f	tensor/sitetensor.html#Mat4f	type Mat4f		232
+nim	Mat2d	tensor/sitetensor.html#Mat2d	type Mat2d		233
+nim	Mat3d	tensor/sitetensor.html#Mat3d	type Mat3d		234
+nim	Mat4d	tensor/sitetensor.html#Mat4d	type Mat4d		235
+nim	TensorSiteProxy	tensor/sitetensor.html#TensorSiteProxy	object TensorSiteProxy		243
+nim	TensorElementProxy	tensor/sitetensor.html#TensorElementProxy	object TensorElementProxy		261
+nim	RuntimeSiteData	tensor/sitetensor.html#RuntimeSiteData	object RuntimeSiteData		274
+nim	MatMulResult	tensor/sitetensor.html#MatMulResult	object MatMulResult		281
+nim	MatAddResult	tensor/sitetensor.html#MatAddResult	object MatAddResult		288
+nim	VecAddResult	tensor/sitetensor.html#VecAddResult	object VecAddResult		297
+nim	MatVecResult	tensor/sitetensor.html#MatVecResult	object MatVecResult		305
+nim	ScalarMulResult	tensor/sitetensor.html#ScalarMulResult	object ScalarMulResult		309
+nim	ScalarAddResult	tensor/sitetensor.html#ScalarAddResult	object ScalarAddResult		314
+nim	LocalSiteProxy	tensor/sitetensor.html#LocalSiteProxy	object LocalSiteProxy		321
+nim	LocalAddResult	tensor/sitetensor.html#LocalAddResult	object LocalAddResult		329
+nim	LocalMulResult	tensor/sitetensor.html#LocalMulResult	object LocalMulResult		334
+nim	LocalScalarMulResult	tensor/sitetensor.html#LocalScalarMulResult	object LocalScalarMulResult		338
+nim	LocalScalarAddResult	tensor/sitetensor.html#LocalScalarAddResult	object LocalScalarAddResult		343
+nim	`[]`	tensor/sitetensor.html#[],TensorSiteProxy[L,T],int	proc `[]`[L, T](proxy: TensorSiteProxy[L, T]; i: int): TensorElementProxy[L, T]		413
+nim	`[]`	tensor/sitetensor.html#[],TensorSiteProxy[L,T],int,int	proc `[]`[L, T](proxy: TensorSiteProxy[L, T]; i, j: int): TensorElementProxy[L, T]		417
+nim	`[]`	tensor/sitetensor.html#[],TensorSiteProxy[L,T],int,int,int	proc `[]`[L, T](proxy: TensorSiteProxy[L, T]; i, j, k: int): TensorElementProxy[L, T]		421
+nim	`[]=`	tensor/sitetensor.html#[]=,TensorSiteProxy[L,T],int,T	proc `[]=`[L, T](proxy: TensorSiteProxy[L, T]; i: int; value: T)		425
+nim	`[]=`	tensor/sitetensor.html#[]=,TensorSiteProxy[L,T],int,int,T	proc `[]=`[L, T](proxy: TensorSiteProxy[L, T]; i, j: int; value: T)		428
+nim	`[]=`	tensor/sitetensor.html#[]=,TensorSiteProxy[L,T],int,int,int,T	proc `[]=`[L, T](proxy: TensorSiteProxy[L, T]; i, j, k: int; value: T)		431
+nim	`*`	tensor/sitetensor.html#*,TensorSiteProxy[L,T],TensorSiteProxy[L,T]	proc `*`[L, T](a, b: TensorSiteProxy[L, T]): MatMulResult[L, T]		551
+nim	`+`	tensor/sitetensor.html#+,TensorSiteProxy[L,T],TensorSiteProxy[L,T]	proc `+`[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T]		555
+nim	`-`	tensor/sitetensor.html#-,TensorSiteProxy[L,T],TensorSiteProxy[L,T]	proc `-`[L, T](a, b: TensorSiteProxy[L, T]): MatAddResult[L, T]		559
+nim	`*`	tensor/sitetensor.html#*,T,TensorSiteProxy[L,T]	proc `*`[L, T](scalar: T; proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T]		563
+nim	`*`	tensor/sitetensor.html#*,TensorSiteProxy[L,T],T	proc `*`[L, T](proxy: TensorSiteProxy[L, T]; scalar: T): ScalarMulResult[L, T]		567
+nim	`+`	tensor/sitetensor.html#+,T,TensorSiteProxy[L,T]	proc `+`[L, T](scalar: T; proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T]		571
+nim	`+`	tensor/sitetensor.html#+,TensorSiteProxy[L,T],T	proc `+`[L, T](proxy: TensorSiteProxy[L, T]; scalar: T): ScalarAddResult[L, T]		575
+nim	`+`	tensor/sitetensor.html#+,MatMulResult[L,T],MatMulResult[L,T]	proc `+`[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T]		582
+nim	`+`	tensor/sitetensor.html#+,MatMulResult[L,T],TensorSiteProxy[L,T]	proc `+`[L, T](a: MatMulResult[L, T]; b: TensorSiteProxy[L, T]): MatAddResult[L, T]		586
+nim	`+`	tensor/sitetensor.html#+,TensorSiteProxy[L,T],MatMulResult[L,T]	proc `+`[L, T](a: TensorSiteProxy[L, T]; b: MatMulResult[L, T]): MatAddResult[L, T]		590
+nim	`-`	tensor/sitetensor.html#-,MatMulResult[L,T],MatMulResult[L,T]	proc `-`[L, T](a, b: MatMulResult[L, T]): MatAddResult[L, T]		594
+nim	`-`	tensor/sitetensor.html#-,MatMulResult[L,T],TensorSiteProxy[L,T]	proc `-`[L, T](a: MatMulResult[L, T]; b: TensorSiteProxy[L, T]): MatAddResult[L, T]		598
+nim	`-`	tensor/sitetensor.html#-,TensorSiteProxy[L,T],MatMulResult[L,T]	proc `-`[L, T](a: TensorSiteProxy[L, T]; b: MatMulResult[L, T]): MatAddResult[L, T]		602
+nim	`+`	tensor/sitetensor.html#+,MatAddResult[L,T],TensorSiteProxy[L,T]	proc `+`[L, T](a: MatAddResult[L, T]; b: TensorSiteProxy[L, T]): MatAddResult[L, T]		606
+nim	`+`	tensor/sitetensor.html#+,TensorSiteProxy[L,T],MatAddResult[L,T]	proc `+`[L, T](a: TensorSiteProxy[L, T]; b: MatAddResult[L, T]): MatAddResult[L, T]		610
+nim	`-`	tensor/sitetensor.html#-,MatAddResult[L,T],TensorSiteProxy[L,T]	proc `-`[L, T](a: MatAddResult[L, T]; b: TensorSiteProxy[L, T]): MatAddResult[L, T]		614
+nim	`-`	tensor/sitetensor.html#-,TensorSiteProxy[L,T],MatAddResult[L,T]	proc `-`[L, T](a: TensorSiteProxy[L, T]; b: MatAddResult[L, T]): MatAddResult[L, T]		618
+nim	`+`	tensor/sitetensor.html#+,MatAddResult[L,T],MatMulResult[L,T]	proc `+`[L, T](a: MatAddResult[L, T]; b: MatMulResult[L, T]): MatAddResult[L, T]		622
+nim	`+`	tensor/sitetensor.html#+,MatMulResult[L,T],MatAddResult[L,T]	proc `+`[L, T](a: MatMulResult[L, T]; b: MatAddResult[L, T]): MatAddResult[L, T]		626
+nim	`-`	tensor/sitetensor.html#-,MatAddResult[L,T],MatMulResult[L,T]	proc `-`[L, T](a: MatAddResult[L, T]; b: MatMulResult[L, T]): MatAddResult[L, T]		630
+nim	`-`	tensor/sitetensor.html#-,MatMulResult[L,T],MatAddResult[L,T]	proc `-`[L, T](a: MatMulResult[L, T]; b: MatAddResult[L, T]): MatAddResult[L, T]		634
+nim	`+`	tensor/sitetensor.html#+,MatAddResult[L,T],MatAddResult[L,T]	proc `+`[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T]		638
+nim	`-`	tensor/sitetensor.html#-,MatAddResult[L,T],MatAddResult[L,T]	proc `-`[L, T](a, b: MatAddResult[L, T]): MatAddResult[L, T]		642
+nim	`*`	tensor/sitetensor.html#*,T,MatMulResult[L,T]	proc `*`[L, T](scalar: T; res: MatMulResult[L, T]): ScalarMulResult[L, T]		646
+nim	`*`	tensor/sitetensor.html#*,T,MatAddResult[L,T]	proc `*`[L, T](scalar: T; res: MatAddResult[L, T]): ScalarMulResult[L, T]		649
+nim	`*`	tensor/sitetensor.html#*,MatMulResult[L,T],T	proc `*`[L, T](res: MatMulResult[L, T]; scalar: T): ScalarMulResult[L, T]		652
+nim	`*`	tensor/sitetensor.html#*,MatAddResult[L,T],T	proc `*`[L, T](res: MatAddResult[L, T]; scalar: T): ScalarMulResult[L, T]		655
+nim	`$`	tensor/sitetensor.html#$,TensorSiteProxy[L,T]	proc `$`[L, T](proxy: TensorSiteProxy[L, T]): string		659
+nim	`$`	tensor/sitetensor.html#$,RuntimeSiteData[T]	proc `$`[T](data: RuntimeSiteData[T]): string		665
+nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i: int): T		817
+nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int): T		823
+nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int): T		830
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i: int; value: T)		838
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int; value: T)		844
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int; value: T)		851
+nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		860
+nim	`-`	tensor/sitetensor.html#-,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `-`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		865
+nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalMulResult[\n    D, R, L, T]		870
+nim	`*`	tensor/sitetensor.html#*,T,LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarMulResult[D, R, L, T]		874
+nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],T	proc `*`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarMulResult[D, R, L, T]		878
+nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],T	proc `+`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarAddResult[D, R, L, T]		882
+nim	`+`	tensor/sitetensor.html#+,T,LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarAddResult[D, R, L, T]		886
+nim	`$`	tensor/sitetensor.html#$,LocalSiteProxy[D,R,L,T]	proc `$`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T]): string		890
+nimgrp	+	tensor/sitetensor.html#+-procs-all	proc		61
+nimgrp	-	tensor/sitetensor.html#--procs-all	proc		66
+nimgrp	$	tensor/sitetensor.html#$-procs-all	proc		659
+nimgrp	[]=	tensor/sitetensor.html#[]=-procs-all	proc		57
+nimgrp	*	tensor/sitetensor.html#*-procs-all	proc		71
+nimgrp	[]	tensor/sitetensor.html#[]-procs-all	proc		53
+nimgrp	numelements	tensor/sitetensor.html#numElements-templates-all	template		179
+nimgrp	elementtype	tensor/sitetensor.html#elementType-templates-all	template		171

@@ -1,0 +1,40 @@
+nimTitle	gawrap	globalarrays/gawrap.html	module globalarrays/gawrap		0
+nim	C_INT	globalarrays/gawrap.html#C_INT	var C_INT		35
+nim	C_LONGLONG	globalarrays/gawrap.html#C_LONGLONG	var C_LONGLONG		36
+nim	C_FLOAT	globalarrays/gawrap.html#C_FLOAT	var C_FLOAT		37
+nim	C_DBL	globalarrays/gawrap.html#C_DBL	var C_DBL		38
+nim	GA_Create_handle	globalarrays/gawrap.html#GA_Create_handle	proc GA_Create_handle(): cint		42
+nim	GA_Allocate	globalarrays/gawrap.html#GA_Allocate,cint	proc GA_Allocate(g_a: cint): cint		44
+nim	GA_Set_name	globalarrays/gawrap.html#GA_Set_name,cint,ptr.cchar	proc GA_Set_name(g_a: cint; name: ptr cchar)		46
+nim	GA_Set_data	globalarrays/gawrap.html#GA_Set_data,cint,cint,ptr.cint,cint	proc GA_Set_data(g_a: cint; array_ndim: cint; array_dims: ptr cint; data_type: cint)		48
+nim	GA_Set_chunk	globalarrays/gawrap.html#GA_Set_chunk,cint,ptr.cint	proc GA_Set_chunk(g_a: cint; chunk_dims: ptr cint)		55
+nim	GA_Set_ghosts	globalarrays/gawrap.html#GA_Set_ghosts,cint,ptr.cint	proc GA_Set_ghosts(g_a: cint; widths: ptr cint)		57
+nim	GA_Destroy	globalarrays/gawrap.html#GA_Destroy,cint	proc GA_Destroy(g_a: cint)		59
+nim	GA_Copy	globalarrays/gawrap.html#GA_Copy,cint,cint	proc GA_Copy(g_a: cint; g_b: cint)		61
+nim	NGA_Distribution	globalarrays/gawrap.html#NGA_Distribution,cint,cint,ptr.cint,ptr.cint	proc NGA_Distribution(g_a: cint; pid: cint; lo: ptr cint; hi: ptr cint)		65
+nim	NGA_Access	globalarrays/gawrap.html#NGA_Access,cint,ptr.cint,ptr.cint,ptr.pointer,ptr.cint	proc NGA_Access(g_a: cint; lo: ptr cint; hi: ptr cint; p: ptr pointer; ld: ptr cint)		68
+nim	NGA_Access_ghosts	globalarrays/gawrap.html#NGA_Access_ghosts,cint,ptr.cint,ptr.pointer,ptr.cint	proc NGA_Access_ghosts(g_a: cint; dims: ptr cint; p: ptr pointer; ld: ptr cint)		71
+nim	NGA_Release	globalarrays/gawrap.html#NGA_Release,cint,ptr.cint,ptr.cint	proc NGA_Release(g_a: cint; lo: ptr cint; hi: ptr cint)		76
+nim	GA_Update_ghost_dir	globalarrays/gawrap.html#GA_Update_ghost_dir,cint,cint,cint,cint	proc GA_Update_ghost_dir(g_a: cint; dir: cint; side: cint; update_corners: cint)		81
+nim	GA_Init_fence	globalarrays/gawrap.html#GA_Init_fence	proc GA_Init_fence()		90
+nim	GA_Fence	globalarrays/gawrap.html#GA_Fence	proc GA_Fence()		92
+nim	GA_Sync	globalarrays/gawrap.html#GA_Sync	proc GA_Sync()		94
+nim	GA_Nodeid	globalarrays/gawrap.html#GA_Nodeid	proc GA_Nodeid(): cint		98
+nim	GA_Nnodes	globalarrays/gawrap.html#GA_Nnodes	proc GA_Nnodes(): cint		100
+nim	GA_Brdcst	globalarrays/gawrap.html#GA_Brdcst,pointer,cint,cint	proc GA_Brdcst(buf: pointer; n: cint; root: cint)		104
+nim	GA_Igop	globalarrays/gawrap.html#GA_Igop,ptr.int32,cint,cstring	proc GA_Igop(x: ptr int32; n: cint; op: cstring)		107
+nim	GA_Lgop	globalarrays/gawrap.html#GA_Lgop,ptr.int64,cint,cstring	proc GA_Lgop(x: ptr int64; n: cint; op: cstring)		110
+nim	GA_Fgop	globalarrays/gawrap.html#GA_Fgop,ptr.float32,cint,cstring	proc GA_Fgop(x: ptr float32; n: cint; op: cstring)		113
+nim	GA_Dgop	globalarrays/gawrap.html#GA_Dgop,ptr.float64,cint,cstring	proc GA_Dgop(x: ptr float64; n: cint; op: cstring)		116
+nim	toGAType	globalarrays/gawrap.html#toGAType,typedesc[int32]	proc toGAType(t: typedesc[int32]): cint		121
+nim	toGAType	globalarrays/gawrap.html#toGAType,typedesc[int64]	proc toGAType(t: typedesc[int64]): cint		123
+nim	toGAType	globalarrays/gawrap.html#toGAType,typedesc[float32]	proc toGAType(t: typedesc[float32]): cint		125
+nim	toGAType	globalarrays/gawrap.html#toGAType,typedesc[float64]	proc toGAType(t: typedesc[float64]): cint		127
+nim	newHandle	globalarrays/gawrap.html#newHandle	proc newHandle(): cint		129
+nim	setName	globalarrays/gawrap.html#setName,cint,cstring	proc setName(handle: cint; name: cstring)		133
+nim	setData	globalarrays/gawrap.html#setData,cint,array[D,cint],typedesc	proc setData[D: static[int]](handle: cint; dims: array[D, cint]; T: typedesc)		137
+nim	setChunk	globalarrays/gawrap.html#setChunk,cint,array[D,cint]	proc setChunk[D: static[int]](handle: cint; chunks: array[D, cint])		141
+nim	setGhosts	globalarrays/gawrap.html#setGhosts,cint,array[D,cint]	proc setGhosts[D: static[int]](handle: cint; widths: array[D, cint])		145
+nim	alloc	globalarrays/gawrap.html#alloc,cint	proc alloc(handle: cint)		149
+nim	localIndices	globalarrays/gawrap.html#localIndices,cint,array[D,cint],array[D,cint]	proc localIndices[D: static[int]](handle: cint; lo, hi: var array[D, cint])		155
+nimgrp	togatype	globalarrays/gawrap.html#toGAType-procs-all	proc		121

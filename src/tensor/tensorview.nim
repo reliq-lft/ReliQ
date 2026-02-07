@@ -31,6 +31,12 @@ import lattice
 import localtensor
 import globaltensor
 import sitetensor
+import lattice/stencil
+export stencil
+
+# SIMD layout infrastructure
+import simd/simdlayout
+export simdlayout
 
 # Backend selection via compile-time flags
 # Use -d:UseSycl for SYCL backend
@@ -40,8 +46,9 @@ const UseSycl* {.booldefine.} = false
 const UseOpenMP* {.booldefine.} = false
 
 when UseOpenMP:
-  import openmp/[ompbase, ompdisp]
-  export ompdisp
+  import openmp/[ompbase, ompdisp, ompsimd]
+  import simd/simdtypes
+  export ompdisp, ompsimd, simdtypes
   # OpenMP uses host memory directly - no separate device buffers
   type
     BackendBuffer* = pointer
@@ -90,7 +97,10 @@ type DeviceStorage* = object
   elementSize*: int         ## sizeof(T)
   hostPtr*: pointer         
   hostOffsets*: seq[int]
-  destroyed*: bool          ## Flag to prevent double destruction    
+  destroyed*: bool          ## Flag to prevent double destruction
+  simdLayout*: SimdLatticeLayout  ## SIMD layout for vectorized AoSoA access
+  aosoaData*: pointer       ## Pointer to AoSoA transformed data (OpenMP)
+  aosoaSeqRef*: RootRef     ## Reference to keep AoSoA seq alive (OpenMP)
 
 type TensorFieldView*[L, T] = object
   ## Tensor field view on device memory
@@ -104,6 +114,7 @@ type TensorFieldView*[L, T] = object
   shape*: seq[int]          # Tensor shape at each site
   data*: DeviceStorage
   hasPadding*: bool
+  simdGrid*: seq[int]       ## Runtime SIMD lane grid (e.g., [1,2,2,2] for 8 lanes)
 
 #[ constructor/destructor helpers ]#
 
@@ -177,16 +188,112 @@ proc transformAoSoAtoAoS*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
       let aosIdx = site * elemsPerSite + e
       result[aosIdx] = srcData[aosoaIdx]
 
+#[ SIMD-aware AoSoA layout transformation functions ]#
+
+proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int): seq[T] =
+  ## Transform data from AoS to AoSoA layout using SIMD layout with configurable lane grid.
+  ## 
+  ## Unlike the simple VectorWidth-based AoSoA, this uses the SimdLatticeLayout to
+  ## properly map lattice coordinates to SIMD lanes based on the user-specified simdGrid.
+  ##
+  ## AoS layout: site0[e0,e1,...], site1[e0,e1,...], ...
+  ## AoSoA layout: outer0[e0: lane0..laneN, e1: lane0..laneN, ...], outer1[...]
+  ##
+  ## Parameters:
+  ##   src: Pointer to AoS source data
+  ##   layout: SimdLatticeLayout with innerGeom (SIMD lanes) and outerGeom (vector groups)
+  ##   elemsPerSite: Number of tensor elements per site
+  let totalElements = layout.nSites * elemsPerSite
+  result = newSeq[T](totalElements)
+  
+  let srcData = cast[ptr UncheckedArray[T]](src)
+  
+  for outerIdx in 0..<layout.nSitesOuter:
+    for lane in 0..<layout.nSitesInner:
+      let localSite = outerInnerToLocal(outerIdx, lane, layout)
+      for e in 0..<elemsPerSite:
+        let aosIdx = localSite * elemsPerSite + e
+        let aosoaIdx = aosoaIndex(outerIdx, lane, e, elemsPerSite, layout.nSitesInner)
+        result[aosoaIdx] = srcData[aosIdx]
+
+proc transformAoSoAtoAoSSimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int): seq[T] =
+  ## Transform data from AoSoA back to AoS layout using SIMD layout.
+  ##
+  ## Inverse of transformAoStoAoSoASimd.
+  let totalElements = layout.nSites * elemsPerSite
+  result = newSeq[T](totalElements)
+  
+  let srcData = cast[ptr UncheckedArray[T]](src)
+  
+  for outerIdx in 0..<layout.nSitesOuter:
+    for lane in 0..<layout.nSitesInner:
+      let localSite = outerInnerToLocal(outerIdx, lane, layout)
+      for e in 0..<elemsPerSite:
+        let aosoaIdx = aosoaIndex(outerIdx, lane, e, elemsPerSite, layout.nSitesInner)
+        let aosIdx = localSite * elemsPerSite + e
+        result[aosIdx] = srcData[aosoaIdx]
+
+proc defaultSimdGrid*[D: static[int]](localGrid: array[D, int]): seq[int] =
+  ## Generate default SIMD grid that distributes VectorWidth lanes across dimensions.
+  ## Prefers faster-varying (lower index) dimensions.
+  result = newSeq[int](D)
+  for d in 0..<D: result[d] = 1
+  
+  var remainingLanes = VectorWidth
+  
+  for d in 0..<D:
+    if remainingLanes <= 1: break
+    var lanesFordim = 1
+    var candidate = 2
+    while candidate <= remainingLanes and candidate <= localGrid[d]:
+      if localGrid[d] mod candidate == 0 and remainingLanes mod candidate == 0:
+        lanesFordim = candidate
+      candidate *= 2
+    result[d] = lanesFordim
+    remainingLanes = remainingLanes div lanesFordim
+
+proc defaultSimdGrid*(localGrid: seq[int]): seq[int] =
+  ## Generate default SIMD grid that distributes VectorWidth lanes across dimensions.
+  ## Overload for seq input.
+  let D = localGrid.len
+  result = newSeq[int](D)
+  for d in 0..<D: result[d] = 1
+  
+  var remainingLanes = VectorWidth
+  
+  for d in 0..<D:
+    if remainingLanes <= 1: break
+    var lanesFordim = 1
+    var candidate = 2
+    while candidate <= remainingLanes and candidate <= localGrid[d]:
+      if localGrid[d] mod candidate == 0 and remainingLanes mod candidate == 0:
+        lanesFordim = candidate
+      candidate *= 2
+    result[d] = lanesFordim
+    remainingLanes = remainingLanes div lanesFordim
+
 #[ constructors/destructors ]#
 
 when UseOpenMP:
-  # OpenMP backend: works directly on host memory without device transfers
+  # OpenMP backend: works directly on host memory with SIMD-aware AoSoA layout
+  
   template newTensorFieldView*[D: static[int], R: static[int], L, T](
     tensor: LocalTensorField[D, R, L, T];
-    io: IOKind
+    io: IOKind;
+    simdGrid: openArray[int]
   ): TensorFieldView[L, T] =
-    ## Create tensor field view from local tensor field (OpenMP backend)
-    ## Works directly on host memory without device transfers
+    ## Create tensor field view from local tensor field (OpenMP backend) with custom SIMD grid.
+    ##
+    ## The simdGrid parameter specifies how SIMD lanes are distributed across dimensions.
+    ## For example, simdGrid=[1,2,2,2] distributes 8 SIMD lanes as: 1 in dim 0, 2 in dims 1-3.
+    ##
+    ## Parameters:
+    ##   tensor: Local tensor field to create view from
+    ##   io: IOKind (iokRead, iokWrite, iokReadWrite)
+    ##   simdGrid: SIMD lane grid per dimension (e.g., [1,2,2,2] for 8 lanes on 4D lattice)
+    ##
+    ## Example:
+    ##   var view = localField.newTensorFieldView(iokRead, [1, 2, 2, 2])
     block:
       let totalSites = computeTotalLatticeSites(tensor.localGrid)
       let isComplex = isComplex32(T) or isComplex64(T)
@@ -194,17 +301,33 @@ when UseOpenMP:
       let tensorElementsPerSite = computeElementsPerSite(tensor.shape, false)
       let elemSize = sizeof(T)
       
+      # Create SIMD layout from local grid and user-specified simdGrid
+      let layout = newSimdLatticeLayout(@(tensor.localGrid), @simdGrid)
+      
       var view = TensorFieldView[L, T](
         ioKind: io,
         lattice: tensor.lattice,
         dims: D,
         rank: R,
         shape: @(tensor.shape),
-        hasPadding: tensor.hasPadding
+        hasPadding: tensor.hasPadding,
+        simdGrid: @simdGrid
       )
       
+      # Transform data to AoSoA layout using SIMD layout
+      # Use a ref seq to keep the data alive
+      type SeqHolder = ref object of RootObj
+        data: seq[T]
+      
+      var holder = SeqHolder()
+      case io
+      of iokRead, iokReadWrite:
+        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite)
+      of iokWrite:
+        holder.data = newSeq[T](totalSites * tensorElementsPerSite)
+      
       view.data = DeviceStorage(
-        buffers: @[cast[pointer](tensor.data)],  # Store host pointer directly
+        buffers: @[cast[pointer](addr holder.data[0])],
         queues: @[nil.BackendQueue],
         sitesPerDevice: @[totalSites],
         totalSites: totalSites,
@@ -212,7 +335,68 @@ when UseOpenMP:
         tensorElementsPerSite: tensorElementsPerSite,
         elementSize: elemSize,
         hostPtr: cast[pointer](tensor.data),
-        hostOffsets: @[0]
+        hostOffsets: @[0],
+        simdLayout: layout,
+        aosoaData: cast[pointer](addr holder.data[0]),
+        aosoaSeqRef: holder  # Keep the ref alive
+      )
+      
+      move(view)
+  
+  template newTensorFieldView*[D: static[int], R: static[int], L, T](
+    tensor: LocalTensorField[D, R, L, T];
+    io: IOKind
+  ): TensorFieldView[L, T] =
+    ## Create tensor field view from local tensor field (OpenMP backend)
+    ## Uses default SIMD grid based on VectorWidth for AoSoA vectorized layout.
+    block:
+      let totalSites = computeTotalLatticeSites(tensor.localGrid)
+      let isComplex = isComplex32(T) or isComplex64(T)
+      let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
+      let tensorElementsPerSite = computeElementsPerSite(tensor.shape, false)
+      let elemSize = sizeof(T)
+      
+      # Compute default SIMD grid from VectorWidth and lattice dimensions
+      let simdGrid = defaultSimdGrid(@(tensor.localGrid))
+      
+      # Create SIMD layout from local grid and computed simdGrid
+      let layout = newSimdLatticeLayout(@(tensor.localGrid), simdGrid)
+      
+      var view = TensorFieldView[L, T](
+        ioKind: io,
+        lattice: tensor.lattice,
+        dims: D,
+        rank: R,
+        shape: @(tensor.shape),
+        hasPadding: tensor.hasPadding,
+        simdGrid: simdGrid
+      )
+      
+      # Transform data to AoSoA layout using SIMD layout
+      # Use a ref seq to keep the data alive
+      type SeqHolder = ref object of RootObj
+        data: seq[T]
+      
+      var holder = SeqHolder()
+      case io
+      of iokRead, iokReadWrite:
+        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite)
+      of iokWrite:
+        holder.data = newSeq[T](totalSites * tensorElementsPerSite)
+      
+      view.data = DeviceStorage(
+        buffers: @[cast[pointer](addr holder.data[0])],
+        queues: @[nil.BackendQueue],
+        sitesPerDevice: @[totalSites],
+        totalSites: totalSites,
+        elementsPerSite: elementsPerSite,
+        tensorElementsPerSite: tensorElementsPerSite,
+        elementSize: elemSize,
+        hostPtr: cast[pointer](tensor.data),
+        hostOffsets: @[0],
+        simdLayout: layout,
+        aosoaData: cast[pointer](addr holder.data[0]),
+        aosoaSeqRef: holder  # Keep the ref alive
       )
       
       move(view)
@@ -298,6 +482,23 @@ template newTensorFieldView*[D: static[int], R: static[int], L, T](
   ## Create tensor field view from global tensor field
   tensor.newLocalTensorField().newTensorFieldView(io)
 
+when UseOpenMP:
+  template newTensorFieldView*[D: static[int], R: static[int], L, T](
+    tensor: TensorField[D, R, L, T];
+    io: IOKind;
+    simdGrid: openArray[int]
+  ): TensorFieldView[L, T] =
+    ## Create tensor field view from global tensor field with custom SIMD grid
+    ##
+    ## Parameters:
+    ##   tensor: Global tensor field
+    ##   io: IOKind (iokRead, iokWrite, iokReadWrite)
+    ##   simdGrid: SIMD lane grid per dimension (e.g., [1,2,2,2] for 8 lanes)
+    ##
+    ## Example:
+    ##   var view = field.newTensorFieldView(iokRead, [1, 2, 2, 2])
+    tensor.newLocalTensorField().newTensorFieldView(io, simdGrid)
+
 # Prevent copying of DeviceStorage to avoid double-free
 proc `=copy`*(dest: var DeviceStorage, src: DeviceStorage) 
   {.error: "DeviceStorage cannot be copied".}
@@ -324,23 +525,53 @@ proc sitesPerDevice*[L, T](view: TensorFieldView[L, T]): seq[int] =
   ## Returns the number of sites assigned to each device
   view.data.sitesPerDevice
 
+#[ SIMD Layout Accessors ]#
+
+proc simdLayout*[L, T](view: TensorFieldView[L, T]): SimdLatticeLayout =
+  ## Returns the SIMD layout for vectorized access
+  view.data.simdLayout
+
+proc nSitesInner*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
+  ## Returns the number of SIMD lanes (sites per vector group)
+  view.data.simdLayout.nSitesInner
+
+proc nSitesOuter*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
+  ## Returns the number of vector groups (outer loop iterations)
+  view.data.simdLayout.nSitesOuter
+
+proc hasSimdLayout*[L, T](view: TensorFieldView[L, T]): bool {.inline.} =
+  ## Returns true if this view was created with a SIMD layout
+  view.simdGrid.len > 0
+
+proc aosoaDataPtr*[L, T](view: TensorFieldView[L, T]): ptr UncheckedArray[T] {.inline.} =
+  ## Returns pointer to AoSoA data buffer (for SIMD views)
+  cast[ptr UncheckedArray[T]](view.data.aosoaData)
+
 #[ CPU fallback support for printing ]#
 
 when UseOpenMP:
   proc readSiteData*[L, T](view: TensorFieldView[L, T], site: int): RuntimeSiteData[T] =
     ## Read tensor data for a single site (OpenMP backend).
-    ## Data is already on host, so direct access is used.
+    ## Handles both AoS (hostPtr) and AoSoA (aosoaData) layouts.
     result.shape = view.shape
     result.rank = view.rank
     
     let elemsPerSite = view.data.tensorElementsPerSite
     result.data = newSeq[T](elemsPerSite)
     
-    # Direct access to host memory
-    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let baseIdx = site * elemsPerSite
-    for e in 0..<elemsPerSite:
-      result.data[e] = hostData[baseIdx + e]
+    if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
+      # SIMD layout: read from AoSoA data using SIMD indexing
+      let aosoaPtr = cast[ptr UncheckedArray[T]](view.data.aosoaData)
+      let layout = view.data.simdLayout
+      for e in 0..<elemsPerSite:
+        let idx = aosoaIndexFromLocal(site, e, elemsPerSite, layout)
+        result.data[e] = aosoaPtr[idx]
+    else:
+      # AoS layout: direct linear access to host memory
+      let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+      let baseIdx = site * elemsPerSite
+      for e in 0..<elemsPerSite:
+        result.data[e] = hostData[baseIdx + e]
 
   proc formatSiteData*[L, T](view: TensorFieldView[L, T], site: int): string =
     ## Read and format tensor data for a single site.
@@ -349,11 +580,17 @@ when UseOpenMP:
 
   proc writeSiteElement*[L, T](view: TensorFieldView[L, T], site: int, elementIdx: int, value: T) =
     ## Write a single element at a specific site (OpenMP backend).
-    ## Direct host memory access.
+    ## Handles both AoS and AoSoA layouts.
     let elemsPerSite = view.data.tensorElementsPerSite
-    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let idx = site * elemsPerSite + elementIdx
-    hostData[idx] = value
+    if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
+      let aosoaPtr = cast[ptr UncheckedArray[T]](view.data.aosoaData)
+      let layout = view.data.simdLayout
+      let idx = aosoaIndexFromLocal(site, elementIdx, elemsPerSite, layout)
+      aosoaPtr[idx] = value
+    else:
+      let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+      let idx = site * elemsPerSite + elementIdx
+      hostData[idx] = value
 
 else:
   proc readSiteData*[L, T](view: TensorFieldView[L, T], site: int): RuntimeSiteData[T] =
@@ -445,6 +682,44 @@ else:
 # For OpenCL/SYCL: phantom operators for kernel codegen
 
 when UseOpenMP:
+  # Helper to compute AoSoA element offset from local site index
+  proc aosoaOffset[L, T](view: TensorFieldView[L, T], site: int, elemIdx: int): int {.inline.} =
+    ## Convert (site, elemIdx) to offset in AoSoA buffer
+    ## For a view with SIMD layout, uses outerIdx * nSitesInner * elemsPerSite + elemIdx * nSitesInner + innerIdx
+    let layout = view.data.simdLayout
+    let (outer, inner) = localToOuterInner(site, layout)
+    let nSitesInner = layout.nSitesInner
+    let elemsPerSite = view.data.tensorElementsPerSite
+    result = outer * nSitesInner * elemsPerSite + elemIdx * nSitesInner + inner
+  
+  # Helper to get data pointer (AoSoA or AoS based on layout)
+  proc getDataPtr[L, T](view: TensorFieldView[L, T]): ptr UncheckedArray[T] {.inline.} =
+    if view.simdGrid.len > 0:
+      cast[ptr UncheckedArray[T]](view.data.aosoaData)
+    else:
+      cast[ptr UncheckedArray[T]](view.data.hostPtr)
+  
+  # Helper to compute element offset (handles both AoS and AoSoA)
+  proc elemOffset[L, T](view: TensorFieldView[L, T], site: int, elemIdx: int): int {.inline.} =
+    if view.simdGrid.len > 0:
+      view.aosoaOffset(site, elemIdx)
+    else:
+      site * view.data.tensorElementsPerSite + elemIdx
+  
+  # Helper to read element from proxy (handles both layouts)
+  proc readProxyElem[L, T](proxy: TensorSiteProxy[L, T], elemIdx: int): T {.inline.} =
+    let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    if proxy.hasSimdLayout:
+      let view = cast[ptr TensorFieldView[L, T]](proxy.view)
+      data[view[].aosoaOffset(proxy.site, elemIdx)]
+    else:
+      data[proxy.site * proxy.elemsPerSite + elemIdx]
+  
+  # Helper to write element to view (handles both layouts)
+  proc writeViewElem[L, T](view: TensorFieldView[L, T], site: int, elemIdx: int, value: T) {.inline.} =
+    let data = view.getDataPtr()
+    data[view.elemOffset(site, elemIdx)] = value
+
   # OpenMP backend: returns TensorSiteProxy for uniform API
   # TensorSiteProxy operators in sitetensor.nim have real implementations for OpenMP
   
@@ -455,128 +730,136 @@ when UseOpenMP:
     result.site = site
     result.runtimeData = readSiteData(view, site)
     # OpenMP-specific: store info needed for direct element access
-    result.hostPtr = view.data.hostPtr
+    # For SIMD layout, we store the AoSoA pointer so TensorSiteProxy knows to use SIMD indexing
+    if view.simdGrid.len > 0:
+      result.hostPtr = view.data.aosoaData
+      result.hasSimdLayout = true
+      result.simdLayoutPtr = cast[pointer](unsafeAddr view.data.simdLayout)
+      result.nSitesInner = view.data.simdLayout.nSitesInner
+    else:
+      result.hostPtr = view.data.hostPtr
+      result.hasSimdLayout = false
+      result.simdLayoutPtr = nil
+      result.nSitesInner = 0
     result.shape = view.shape
     result.elemsPerSite = view.data.tensorElementsPerSite
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: TensorSiteProxy[L, T]) {.inline.} =
     ## Copy site tensor from one view to another
-    ## Direct host memory copy
-    let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+    ## Handles both AoS and AoSoA layouts
     let elemsPerSite = view.data.tensorElementsPerSite
-    let srcBase = value.site * elemsPerSite
-    let dstBase = site * elemsPerSite
-    for e in 0..<elemsPerSite:
-      dstData[dstBase + e] = srcData[srcBase + e]
+    
+    if view.simdGrid.len > 0:
+      # SIMD layout: use AoSoA indexing
+      let dstData = cast[ptr UncheckedArray[T]](view.data.aosoaData)
+      let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
+      if value.hasSimdLayout:
+        # Source also uses SIMD layout - compute both offsets
+        let srcView = cast[ptr TensorFieldView[L, T]](value.view)
+        for e in 0..<elemsPerSite:
+          let dstOffset = view.aosoaOffset(site, e)
+          let srcOffset = srcView[].aosoaOffset(value.site, e)
+          dstData[dstOffset] = srcData[srcOffset]
+      else:
+        # Source uses AoS, dest uses AoSoA
+        let srcBase = value.site * elemsPerSite
+        for e in 0..<elemsPerSite:
+          let dstOffset = view.aosoaOffset(site, e)
+          dstData[dstOffset] = srcData[srcBase + e]
+    else:
+      # AoS layout: direct linear indexing
+      let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
+      let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+      let srcBase = value.site * elemsPerSite
+      let dstBase = site * elemsPerSite
+      for e in 0..<elemsPerSite:
+        dstData[dstBase + e] = srcData[srcBase + e]
 
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: T) {.inline.} =
     ## Set scalar value at site (for scalar fields)
-    let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    hostData[site] = value
+    if view.simdGrid.len > 0:
+      let hostData = cast[ptr UncheckedArray[T]](view.data.aosoaData)
+      hostData[view.aosoaOffset(site, 0)] = value
+    else:
+      let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+      hostData[site] = value
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) {.inline.} =
     ## Matrix/vector addition: C[n] = A[n] + B[n] or C[n] = A[n] - B[n]
     ## Handles both direct proxy access and computed intermediate results
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
     let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
     
     # Handle computed buffers vs direct memory access
     if value.hasComputedA and value.hasComputedB:
       # Both operands are from computed results (e.g., A*B + C*D)
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] - value.computedB[e]
+          view.writeViewElem(site, e, value.computedA[e] - value.computedB[e])
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] + value.computedB[e]
+          view.writeViewElem(site, e, value.computedA[e] + value.computedB[e])
     elif value.hasComputedA and not value.hasComputedB:
       # A is computed, B is from proxy (e.g., (A*B + C*D) - E[n])
-      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
-      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] - srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.computedA[e] - value.proxyB.readProxyElem(e))
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] + srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.computedA[e] + value.proxyB.readProxyElem(e))
     elif not value.hasComputedA and value.hasComputedB:
       # A is from proxy, B is computed
-      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] - value.computedB[e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.computedB[e])
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] + value.computedB[e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.computedB[e])
     else:
       # Both from proxies (simple case: A[n] + B[n])
-      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
-      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
-      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.proxyB.readProxyElem(e))
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.proxyB.readProxyElem(e))
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) {.inline.} =
     ## Vector addition: same as MatAddResult
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
     let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
     
     if value.hasComputedA and value.hasComputedB:
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] - value.computedB[e]
+          view.writeViewElem(site, e, value.computedA[e] - value.computedB[e])
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] + value.computedB[e]
+          view.writeViewElem(site, e, value.computedA[e] + value.computedB[e])
     elif value.hasComputedA and not value.hasComputedB:
-      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
-      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] - srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.computedA[e] - value.proxyB.readProxyElem(e))
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = value.computedA[e] + srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.computedA[e] + value.proxyB.readProxyElem(e))
     elif not value.hasComputedA and value.hasComputedB:
-      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] - value.computedB[e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.computedB[e])
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] + value.computedB[e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.computedB[e])
     else:
-      let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-      let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
-      let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
-      let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
       if value.isSubtraction:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.proxyB.readProxyElem(e))
       else:
         for e in 0..<elemsPerSite:
-          dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
+          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.proxyB.readProxyElem(e))
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) {.inline.} =
     ## Matrix multiplication: C[n] = A[n] * B[n]
     ## C[i,j] = sum_k(A[i,k] * B[k,j])
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-    let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
     let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
-    let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
-    let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
     
     # Get matrix dimensions from shape
     let rows = view.shape[0]
@@ -587,53 +870,52 @@ when UseOpenMP:
       for j in 0..<cols:
         var sum: T = T(0)
         for k in 0..<innerDim:
-          let aIdx = srcABase + i * innerDim + k
-          let bIdx = srcBBase + k * cols + j
-          sum += srcAData[aIdx] * srcBData[bIdx]
-        let dstIdx = dstBase + i * cols + j
-        dstData[dstIdx] = sum
+          let aElemIdx = i * innerDim + k
+          let bElemIdx = k * cols + j
+          sum += value.proxyA.readProxyElem(aElemIdx) * value.proxyB.readProxyElem(bElemIdx)
+        let dstElemIdx = i * cols + j
+        view.writeViewElem(site, dstElemIdx, sum)
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) {.inline.} =
     ## Matrix-vector multiplication: v_out[n] = M[n] * v[n]
     ## v_out[i] = sum_j(M[i,j] * v[j])
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let srcMData = cast[ptr UncheckedArray[T]](value.proxyMat.hostPtr)
-    let srcVData = cast[ptr UncheckedArray[T]](value.proxyVec.hostPtr)
-    let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
-    let srcMBase = value.proxyMat.site * value.proxyMat.elemsPerSite
-    let srcVBase = value.proxyVec.site * value.proxyVec.elemsPerSite
-    
     let rows = value.proxyMat.shape[0]
     let cols = if value.proxyMat.shape.len > 1: value.proxyMat.shape[1] else: 1
     
     for i in 0..<rows:
       var sum: T = T(0)
       for j in 0..<cols:
-        let mIdx = srcMBase + i * cols + j
-        let vIdx = srcVBase + j
-        sum += srcMData[mIdx] * srcVData[vIdx]
-      dstData[dstBase + i] = sum
+        let mElemIdx = i * cols + j
+        sum += value.proxyMat.readProxyElem(mElemIdx) * value.proxyVec.readProxyElem(j)
+      view.writeViewElem(site, i, sum)
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) {.inline.} =
     ## Scalar multiplication: C[n] = scalar * A[n]
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
     let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
-    let srcBase = value.proxy.site * value.proxy.elemsPerSite
     for e in 0..<elemsPerSite:
-      dstData[dstBase + e] = value.scalar * srcData[srcBase + e]
+      view.writeViewElem(site, e, value.scalar * value.proxy.readProxyElem(e))
   
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) {.inline.} =
     ## Scalar addition: C[n] = A[n] + scalar
-    let dstData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-    let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
     let elemsPerSite = view.data.tensorElementsPerSite
-    let dstBase = site * elemsPerSite
-    let srcBase = value.proxy.site * value.proxy.elemsPerSite
     for e in 0..<elemsPerSite:
-      dstData[dstBase + e] = srcData[srcBase + e] + value.scalar
+      view.writeViewElem(site, e, value.proxy.readProxyElem(e) + value.scalar)
+
+  # ============================================================================
+  # Stencil Shift Operators - Clean neighbor access syntax
+  # ============================================================================
+  
+  proc `[]`*[L, T, D: static int](view: TensorFieldView[L, T], shift: StencilShift[D]): TensorSiteProxy[L, T] {.inline.} =
+    ## Access neighbor site using stencil shift
+    ##
+    ## Usage:
+    ##   let nbr = view[stencil.shift(n, +1, 0)]   # Forward x neighbor
+    ##   let nbr = view[stencil.fwd(n, 0)]         # Same as above
+    ##   let nbr = view[stencil.bwd(n, 3)]         # Backward t neighbor
+    ##
+    ## This provides a clean syntax for stencil-based neighbor access
+    ## that works identically across all backends.
+    view[shift.neighborIdx]
 
 else:
   # OpenCL/SYCL backend: phantom operators for kernel codegen
@@ -671,6 +953,19 @@ else:
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) = 
     raise newException(Defect, "TensorFieldView[]= ScalarAddResult phantom operator")
 
+  # ============================================================================
+  # Stencil Shift Operators - Clean neighbor access syntax (GPU backends)
+  # ============================================================================
+  
+  proc `[]`*[L, T, D: static int](view: TensorFieldView[L, T], shift: StencilShift[D]): TensorSiteProxy[L, T] {.inline.} =
+    ## Access neighbor site using stencil shift (phantom for GPU codegen)
+    ##
+    ## Usage:
+    ##   let nbr = view[stencil.shift(n, +1, 0)]   # Forward x neighbor
+    ##   let nbr = view[stencil.fwd(n, 0)]         # Same as above
+    ##   let nbr = view[stencil.bwd(n, 3)]         # Backward t neighbor
+    view[shift.neighborIdx]
+
 #[ Legacy marker functions - still supported ]#
 
 proc matmul*[L, T](a, b: TensorFieldView[L, T], site: int): MatMulResult[L, T] {.inline.} =
@@ -698,11 +993,33 @@ proc `=copy`*[L, T](dest: var TensorFieldView[L, T], src: TensorFieldView[L, T])
 when UseOpenMP:
   proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
     ## Destructor for TensorFieldView (OpenMP backend)
-    ## For OpenMP, data is already on host - no device transfers needed.
-    ## Simply mark as destroyed to prevent double-destruction.
+    ## For SIMD views, transforms AoSoA data back to AoS in host memory.
+    ## For non-SIMD views, data is already on host - no transforms needed.
     if view.data.destroyed:
       return  # Already destroyed, skip
-    # No device buffers to release for OpenMP - we use host memory directly
+    
+    # Check if this is a SIMD view with AoSoA data
+    if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
+      case view.ioKind:
+        of iokWrite, iokReadWrite:
+          # Transform AoSoA back to AoS in host memory
+          let layout = view.data.simdLayout
+          let elemsPerSite = view.data.tensorElementsPerSite
+          let aosData = transformAoSoAtoAoSSimd[T](
+            view.data.aosoaData, layout, elemsPerSite
+          )
+          
+          # Copy to host buffer
+          let destPtr = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+          for i in 0..<aosData.len:
+            destPtr[i] = aosData[i]
+        of iokRead:
+          discard
+      
+      # Free the AoSoA buffer
+      # Note: The GC_ref in constructor keeps the seq alive until here
+    
+    # Mark as destroyed
     view.data.destroyed = true
 
 else:
@@ -758,6 +1075,98 @@ proc numGlobalSites*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
   result = 1
   for d in 0..<view.dims:
     result *= view.lattice.globalGrid[d]
+
+#[ ============================================================================
+   SIMD Vectorized Iteration Templates
+   ============================================================================ ]#
+
+when UseOpenMP:
+  import std/macros
+  
+  macro eachSimd*(forLoop: ForLoopStmt): untyped =
+    ## SIMD-aware vectorized loop iterator for OpenMP backend
+    ##
+    ## This macro provides efficient iteration over TensorFieldView with SIMD
+    ## vectorization. It iterates over outer (vector group) indices, with all
+    ## SIMD lanes processed together.
+    ##
+    ## Usage:
+    ##   for outer in eachSimd view:
+    ##     # outer is the vector group index (0 to nSitesOuter-1)
+    ##     # Use SIMD load/store for efficient access:
+    ##     let vec = loadSimdVectorDyn(view.aosoaDataPtr, outer, elemIdx, 
+    ##                                  elemsPerSite, view.nSitesInner)
+    ##     storeSimdVectorDyn(result, view.aosoaDataPtr, outer, elemIdx,
+    ##                        elemsPerSite, view.nSitesInner)
+    ##
+    ## For element-wise operations across all tensor elements:
+    ##   for outer in eachSimd view:
+    ##     for e in 0..<view.elementsPerSite:
+    ##       var vec = loadSimdVectorDyn(view.aosoaDataPtr, outer, e, ...)
+    ##       vec = 2.0 * vec
+    ##       storeSimdVectorDyn(vec, view.aosoaDataPtr, outer, e, ...)
+    
+    let loopVar = forLoop[0]
+    let viewExpr = forLoop[1][1]  # Skip 'eachSimd' wrapper
+    let body = forLoop[2]
+    
+    result = quote do:
+      block:
+        let viewRef = `viewExpr`
+        let nOuter = viewRef.nSitesOuter
+        proc loopBody(idx: int64, ctx: pointer) {.cdecl.} =
+          let `loopVar` = int(idx)
+          `body`
+        ompParallelFor(0'i64, int64(nOuter), loopBody, nil)
+  
+  template forEachSite*(view: TensorFieldView, body: untyped) =
+    ## Template for iterating over all sites with SIMD vectorization
+    ##
+    ## Provides access to `outerIdx` and `lane` within the body.
+    ## Outer loop is OpenMP-parallelized, inner loop processes SIMD lanes.
+    ##
+    ## Example:
+    ##   forEachSite(view):
+    ##     let localSite = outerInnerToLocal(outerIdx, lane, view.simdLayout)
+    ##     # Process localSite...
+    block:
+      let viewRef = view
+      let layout = viewRef.data.simdLayout
+      proc outerLoopBody(idx: int64, ctx: pointer) {.cdecl.} =
+        let outerIdx {.inject.} = int(idx)
+        for lane {.inject.} in 0..<layout.nSitesInner:
+          body
+      ompParallelFor(0'i64, int64(layout.nSitesOuter), outerLoopBody, nil)
+  
+  template loadSimdTensor*[T](
+    view: TensorFieldView,
+    outerIdx: int
+  ): seq[SimdVecDyn[T]] =
+    ## Load all tensor elements for a vector group as SIMD vectors
+    ##
+    ## Returns a sequence of SIMD vectors, one per tensor element.
+    ## result[elemIdx] contains values for all SIMD lanes of that element.
+    block:
+      let elemsPerSite = view.data.tensorElementsPerSite
+      let nSitesInner = view.nSitesInner
+      let dataPtr = view.aosoaDataPtr
+      var tensors = newSeq[SimdVecDyn[T]](elemsPerSite)
+      for e in 0..<elemsPerSite:
+        tensors[e] = loadSimdVectorDyn[T](dataPtr, outerIdx, e, elemsPerSite, nSitesInner)
+      tensors
+  
+  template storeSimdTensor*[T](
+    tensors: seq[SimdVecDyn[T]],
+    view: TensorFieldView,
+    outerIdx: int
+  ) =
+    ## Store all tensor elements from SIMD vectors
+    block:
+      let elemsPerSite = view.data.tensorElementsPerSite
+      let nSitesInner = view.nSitesInner
+      let dataPtr = view.aosoaDataPtr
+      for e in 0..<elemsPerSite:
+        storeSimdVectorDyn(tensors[e], dataPtr, outerIdx, e, elemsPerSite, nSitesInner)
 
 when isMainModule:
   parallel:
@@ -1954,5 +2363,501 @@ when isMainModule:
             let base = site * 2
             check localF32.data[base + 0] == 3.0'f32
             check localF32.data[base + 1] == 5.0'f32
+
+      #[ ============================================================================
+         Stencil API Tests - Unified stencil operations for all backends
+         ============================================================================ ]#
+      suite "Stencil API with TensorFieldView":
+        
+        test "Stencil types are exported from tensorview":
+          ## Verify stencil types are accessible via tensorview import
+          let pattern = nearestNeighborStencil[4]()
+          check pattern.nPoints == 8
+          check pattern.points.len == 8
+        
+        test "LatticeStencil construction from lattice":
+          ## Create stencil from the test lattice
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          check stencil.nSites > 0
+          check stencil.nPoints == 8
+          check stencil.nLocalSites > 0
+        
+        test "StencilShift type via shift/fwd/bwd API":
+          ## Test the StencilShift type returned by shift(), fwd(), bwd()
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          let site = 0
+          let shiftFwd = stencil.shift(site, +1, 0)  # Forward in x
+          let shiftBwd = stencil.shift(site, -1, 0)  # Backward in x
+          
+          check shiftFwd.neighborIdx >= 0
+          check shiftBwd.neighborIdx >= 0
+          check shiftFwd.neighborIdx != shiftBwd.neighborIdx
+          
+          # fwd() and bwd() shorthands match shift()
+          check stencil.fwd(site, 0).neighborIdx == shiftFwd.neighborIdx
+          check stencil.bwd(site, 0).neighborIdx == shiftBwd.neighborIdx
+        
+        test "Stencil neighbor indices are within bounds":
+          ## All neighbor indices should be within [0, nPaddedSites)
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          for site in 0..<stencil.nLocalSites:
+            for p in 0..<stencil.nPoints:
+              let nbrIdx = stencil.neighbor(site, p)
+              check nbrIdx >= 0
+              check nbrIdx < stencil.nPaddedSites
+        
+        test "Stencil iteration helpers":
+          ## Test sites() and points() iterators
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          var siteCount = 0
+          for site in stencil.sites:
+            siteCount += 1
+          check siteCount == stencil.nLocalSites
+          
+          var pointCount = 0
+          for p in stencil.points:
+            pointCount += 1
+          check pointCount == stencil.nPoints
+        
+        test "Stencil shift index matches neighbor lookup":
+          ## Verify shift().idx gives same result as neighbor()
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          for site in 0..<min(50, stencil.nSites):
+            for dir in 0..<4:
+              let fwdShift = stencil.fwd(site, dir)
+              let fwdPoint = 2 * dir
+              check fwdShift.idx == stencil.neighbor(site, fwdPoint)
+              
+              let bwdShift = stencil.bwd(site, dir)
+              let bwdPoint = 2 * dir + 1
+              check bwdShift.idx == stencil.neighbor(site, bwdPoint)
+        
+        test "Forward and backward stencil patterns":
+          ## Test different stencil pattern constructors
+          let fwdPattern = forwardStencil[4]()
+          check fwdPattern.nPoints == 4
+          
+          let bwdPattern = backwardStencil[4]()
+          check bwdPattern.nPoints == 4
+          
+          let fwdStencil = newLatticeStencil(fwdPattern, testLattice)
+          let bwdStencil = newLatticeStencil(bwdPattern, testLattice)
+          
+          # All neighbor indices should be valid
+          for site in 0..<min(100, fwdStencil.nSites):
+            for p in 0..<4:
+              check fwdStencil.neighbor(site, p) >= 0
+              check fwdStencil.neighbor(site, p) < fwdStencil.nPaddedSites
+              check bwdStencil.neighbor(site, p) >= 0
+              check bwdStencil.neighbor(site, p) < bwdStencil.nPaddedSites
+        
+        test "Stencil forward != backward in each direction":
+          ## For interior sites, forward and backward neighbors should differ
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          # Pick a site that's well in the interior
+          if stencil.nSites > 0:
+            let site = stencil.nSites div 2
+            for dir in 0..<4:
+              let fwd = stencil.fwd(site, dir)
+              let bwd = stencil.bwd(site, dir)
+              check fwd.idx != bwd.idx
+        
+        test "Stencil different directions give different neighbors":
+          ## Forward neighbors in different directions should be different sites
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          if stencil.nSites > 0:
+            let site = stencil.nSites div 2
+            let fwd0 = stencil.fwd(site, 0).idx
+            let fwd1 = stencil.fwd(site, 1).idx
+            let fwd2 = stencil.fwd(site, 2).idx
+            let fwd3 = stencil.fwd(site, 3).idx
+            check fwd0 != fwd1
+            check fwd0 != fwd2
+            check fwd0 != fwd3
+            check fwd1 != fwd2
+            check fwd1 != fwd3
+            check fwd2 != fwd3
+        
+        test "Stencil neighbor is self-inverse (periodic BC)":
+          ## Going forward then backward should return to the same site
+          ## This requires no ghost width (periodic wrapping within local domain)
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          for site in 0..<min(50, stencil.nSites):
+            for dir in 0..<4:
+              # Get forward neighbor index
+              let fwdIdx = stencil.fwd(site, dir).idx
+              # Get backward neighbor of that forward neighbor
+              let backAgain = stencil.bwd(fwdIdx, dir).idx
+              check backAgain == site
+        
+        test "Stencil with 2D lattice":
+          ## Test stencil on a 2D lattice (fewer dimensions)
+          let dims2D: array[2, int] = [8, 8]
+          let lat2D = newSimpleCubicLattice(dims2D)
+          
+          let stencil2D = newLatticeStencil(nearestNeighborStencil[2](), lat2D)
+          check stencil2D.nPoints == 4  # ±x, ±y
+          check stencil2D.nSites > 0
+          
+          for site in 0..<stencil2D.nSites:
+            for p in 0..<4:
+              let nbr = stencil2D.neighbor(site, p)
+              check nbr >= 0 and nbr < stencil2D.nPaddedSites
+        
+        test "Stencil with 3D lattice":
+          ## Test stencil on a 3D lattice
+          let dims3D: array[3, int] = [4, 4, 4]
+          let lat3D = newSimpleCubicLattice(dims3D)
+          
+          let stencil3D = newLatticeStencil(nearestNeighborStencil[3](), lat3D)
+          check stencil3D.nPoints == 6  # ±x, ±y, ±z
+          check stencil3D.nSites > 0
+          
+          for site in 0..<stencil3D.nSites:
+            for p in 0..<6:
+              let nbr = stencil3D.neighbor(site, p)
+              check nbr >= 0 and nbr < stencil3D.nPaddedSites
+        
+        test "Stencil neighbor copy via each loop":
+          ## Copy from neighbor site using stencil.neighbor() inside each loop
+          ## Works on all backends: the stencil.neighbor() call evaluates to an int
+          ## which is then used as the view index
+          var tensorSrc = testLattice.newTensorField([1]): float64
+          var tensorDst = testLattice.newTensorField([1]): float64
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          # Initialize source to 7.0, destination to 0.0
+          for i in 0..<numSites:
+            localSrc.data[i] = 7.0
+            localDst.data[i] = 0.0
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            # Copy forward-x neighbor to destination
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 0)
+              vDst[n] = vSrc[nbrIdx]
+          
+          # All destinations should be 7.0 (copied from neighbor in constant field)
+          for i in 0..<numSites:
+            check localDst.data[i] == 7.0
+        
+        test "Stencil neighbor copy with matrix fields via each loop":
+          ## Copy neighbor's 2x2 matrix via stencil in each loop
+          var tensorSrc = testLattice.newTensorField([2, 2]): float64
+          var tensorDst = testLattice.newTensorField([2, 2]): float64
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          # Initialize source matrices to identity
+          for site in 0..<numSites:
+            let base = site * 4
+            localSrc.data[base + 0] = 1.0
+            localSrc.data[base + 1] = 0.0
+            localSrc.data[base + 2] = 0.0
+            localSrc.data[base + 3] = 1.0
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            # Copy backward-t neighbor to destination
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 7)  # Backward t is point 7
+              vDst[n] = vSrc[nbrIdx]
+          
+          # Verify all destination matrices are identity
+          for site in 0..<numSites:
+            let base = site * 4
+            check localDst.data[base + 0] == 1.0
+            check localDst.data[base + 1] == 0.0
+            check localDst.data[base + 2] == 0.0
+            check localDst.data[base + 3] == 1.0
+        
+        test "Stencil neighbor copy with vector fields via each loop":
+          ## Copy neighbor's rank-1 tensor via stencil in each loop
+          var tensorSrc = testLattice.newTensorField([3]): float64
+          var tensorDst = testLattice.newTensorField([3]): float64
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          # Initialize source vectors to (3, 6, 9)
+          for site in 0..<numSites:
+            let base = site * 3
+            localSrc.data[base + 0] = 3.0
+            localSrc.data[base + 1] = 6.0
+            localSrc.data[base + 2] = 9.0
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            # Copy forward-y neighbor
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 2)  # Forward y is point 2
+              vDst[n] = vSrc[nbrIdx]
+          
+          # Verify vectors copied correctly
+          for site in 0..<numSites:
+            let base = site * 3
+            check localDst.data[base + 0] == 3.0
+            check localDst.data[base + 1] == 6.0
+            check localDst.data[base + 2] == 9.0
+        
+        test "Stencil neighbor copy with float32 via each loop":
+          ## Test stencil copy with float32 type
+          var tensorSrc = testLattice.newTensorField([2]): float32
+          var tensorDst = testLattice.newTensorField([2]): float32
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            localSrc.data[base + 0] = 1.5'f32
+            localSrc.data[base + 1] = 2.5'f32
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 5)  # Backward z is point 5
+              vDst[n] = vSrc[nbrIdx]
+          
+          for site in 0..<numSites:
+            let base = site * 2
+            check localDst.data[base + 0] == 1.5'f32
+            check localDst.data[base + 1] == 2.5'f32
+        
+        test "Stencil combined with arithmetic in each loop":
+          ## Multiply neighbor value by scalar in each loop
+          var tensorSrc = testLattice.newTensorField([1]): float64
+          var tensorDst = testLattice.newTensorField([1]): float64
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          for i in 0..<numSites:
+            localSrc.data[i] = 5.0
+            localDst.data[i] = 0.0
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            # dst[n] = 3.0 * src[neighbor(n)]
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 0)
+              vDst[n] = 3.0 * vSrc[nbrIdx]
+          
+          # 3.0 * 5.0 = 15.0
+          for i in 0..<numSites:
+            check localDst.data[i] == 15.0
+        
+        test "Stencil add neighbor and self in each loop":
+          ## C[n] = A[n] + A[neighbor(n)]
+          ## For constant field this should be 2*constant
+          var tensorSrc = testLattice.newTensorField([1]): float64
+          var tensorDst = testLattice.newTensorField([1]): float64
+          
+          var localSrc = tensorSrc.newLocalTensorField()
+          var localDst = tensorDst.newLocalTensorField()
+          
+          let numSites = localSrc.localGrid[0] * localSrc.localGrid[1] * 
+                         localSrc.localGrid[2] * localSrc.localGrid[3]
+          
+          for i in 0..<numSites:
+            localSrc.data[i] = 4.0
+            localDst.data[i] = 0.0
+          
+          let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
+          
+          block:
+            var vSrc = localSrc.newTensorFieldView(iokRead)
+            var vDst = localDst.newTensorFieldView(iokWrite)
+            
+            for n in each 0..<vDst.numSites():
+              let nbrIdx = stencil.neighbor(n, 0)
+              vDst[n] = vSrc[n] + vSrc[nbrIdx]
+          
+          # 4.0 + 4.0 = 8.0
+          for i in 0..<numSites:
+            check localDst.data[i] == 8.0
+
+      #[ ============================================================================
+         SIMD Vectorized TensorFieldView Tests (OpenMP backend)
+         ============================================================================ ]#
+      when UseOpenMP:
+        suite "SIMD Vectorized TensorFieldView":
+          
+          test "Create SIMD view with custom lane grid [1,2,2,2]":
+            ## Test creating a SIMD-vectorized view with user-specified lane grid
+            var tensorA = testLattice.newTensorField([1]): float64
+            var localA = tensorA.newLocalTensorField()
+            
+            let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                           localA.localGrid[2] * localA.localGrid[3]
+            
+            # Initialize data
+            for i in 0..<numSites:
+              localA.data[i] = float64(i)
+            
+            # Create SIMD view with [1, 2, 2, 2] = 8 lanes
+            block:
+              let simdGrid = @[1, 2, 2, 2]
+              var simdView = localA.newTensorFieldView(iokRead, simdGrid)
+              
+              check simdView.hasSimdLayout
+              check simdView.nSitesInner == 8
+              check simdView.nSitesOuter == numSites div 8
+              check simdView.simdLayout.innerGeom == @[1, 2, 2, 2]
+          
+          test "SIMD view roundtrip preserves data":
+            ## Test that data survives roundtrip through SIMD view (AoS -> AoSoA -> AoS)
+            var tensorA = testLattice.newTensorField([2]): float64
+            var localA = tensorA.newLocalTensorField()
+            
+            let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                           localA.localGrid[2] * localA.localGrid[3]
+            let numElements = numSites * 2
+            
+            # Initialize with pattern
+            for i in 0..<numElements:
+              localA.data[i] = float64(i * 7 + 3)
+            
+            # Save original values
+            var originalData = newSeq[float64](numElements)
+            for i in 0..<numElements:
+              originalData[i] = localA.data[i]
+            
+            # Create SIMD view (transforms to AoSoA), then destroy (transforms back)
+            block:
+              let simdGrid = @[1, 2, 2, 2]
+              var simdView = localA.newTensorFieldView(iokReadWrite, simdGrid)
+              check simdView.hasSimdLayout
+              # View will transform back to AoS on destruction
+            
+            # Verify data matches after roundtrip
+            for i in 0..<numElements:
+              check localA.data[i] == originalData[i]
+          
+          test "SIMD view AoSoA data transformation":
+            ## Verify AoSoA layout actually rearranges data
+            var tensorA = testLattice.newTensorField([1]): float64
+            var localA = tensorA.newLocalTensorField()
+            
+            let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                           localA.localGrid[2] * localA.localGrid[3]
+            
+            # Initialize with site index
+            for i in 0..<numSites:
+              localA.data[i] = float64(i)
+            
+            block:
+              let simdGrid = @[1, 2, 2, 2]  # 8 lanes
+              var simdView = localA.newTensorFieldView(iokRead, simdGrid)
+              
+              # Get AoSoA pointer
+              let aosoaPtr = cast[ptr UncheckedArray[float64]](simdView.aosoaDataPtr)
+              check aosoaPtr != nil
+              
+              # In AoSoA layout, the first 8 values should be the 8 sites
+              # that form the first vector group. Verify they match the layout.
+              let layout = simdView.simdLayout
+              for lane in 0..<8:
+                let localSite = outerInnerToLocal(0, lane, layout)
+                # The value at aosoaPtr[lane] should equal the original value at localSite
+                check aosoaPtr[lane] == float64(localSite)
+          
+          test "SIMD vector operations via forEachSite":
+            ## Test SIMD iteration using forEachSite template
+            var tensorA = testLattice.newTensorField([1]): float64
+            var localA = tensorA.newLocalTensorField()
+            
+            let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                           localA.localGrid[2] * localA.localGrid[3]
+            
+            # Initialize all to 1.0
+            for i in 0..<numSites:
+              localA.data[i] = 1.0
+            
+            # Use SIMD view to double all values
+            block:
+              let simdGrid = @[2, 2, 2, 2]  # 16 lanes
+              var simdView = localA.newTensorFieldView(iokReadWrite, simdGrid)
+              
+              let layout = simdView.simdLayout
+              let nSitesInner = layout.nSitesInner
+              let dataPtr = cast[ptr UncheckedArray[float64]](simdView.aosoaDataPtr)
+              
+              # Double each value via SIMD load/store
+              for outer in 0..<layout.nSitesOuter:
+                var vec = loadSimdVectorDyn[float64](dataPtr, outer, 0, 1, nSitesInner)
+                vec = 2.0 * vec
+                storeSimdVectorDyn(vec, dataPtr, outer, 0, 1, nSitesInner)
+            
+            # Verify all values are now 2.0
+            for i in 0..<numSites:
+              check localA.data[i] == 2.0
+          
+          test "SIMD nSitesInner matches product of simdGrid":
+            ## Verify nSitesInner calculation
+            var tensorA = testLattice.newTensorField([3, 3]): float64
+            var localA = tensorA.newLocalTensorField()
+            
+            let numSites = localA.localGrid[0] * localA.localGrid[1] * 
+                           localA.localGrid[2] * localA.localGrid[3]
+            
+            # Test various simdGrid configurations
+            block:
+              let simdGrid = @[2, 2, 1, 1]  # 4 lanes
+              var simdView = localA.newTensorFieldView(iokRead, simdGrid)
+              check simdView.nSitesInner == 4
+              check simdView.nSitesOuter == numSites div 4
+            
+            block:
+              let simdGrid = @[1, 1, 2, 4]  # 8 lanes
+              var simdView = localA.newTensorFieldView(iokRead, simdGrid)
+              check simdView.nSitesInner == 8
+              check simdView.nSitesOuter == numSites div 8
 
     # End of block - all tensor fields destroyed here before GA finalization

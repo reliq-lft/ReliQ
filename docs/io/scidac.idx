@@ -1,0 +1,61 @@
+nimTitle	scidac	io/scidac.html	module io/scidac		0
+nim	crc32	io/scidac.html#crc32,openArray[byte]	proc crc32(data: openArray[byte]): uint32		67
+nim	SciDACPrivateFileXml	io/scidac.html#SciDACPrivateFileXml	const SciDACPrivateFileXml		81
+nim	SciDACFileXml	io/scidac.html#SciDACFileXml	const SciDACFileXml		82
+nim	SciDACPrivateRecordXml	io/scidac.html#SciDACPrivateRecordXml	const SciDACPrivateRecordXml		83
+nim	SciDACRecordXml	io/scidac.html#SciDACRecordXml	const SciDACRecordXml		84
+nim	SciDACBinaryData	io/scidac.html#SciDACBinaryData	const SciDACBinaryData		85
+nim	SciDACChecksumRecord	io/scidac.html#SciDACChecksumRecord	const SciDACChecksumRecord		86
+nim	ILDGFormat	io/scidac.html#ILDGFormat	const ILDGFormat		89
+nim	ILDGBinaryData	io/scidac.html#ILDGBinaryData	const ILDGBinaryData		90
+nim	ILDGDataLFN	io/scidac.html#ILDGDataLFN	const ILDGDataLFN		91
+nim	spSingle	io/scidac.html#spSingle	SciDACPrecision.spSingle		98
+nim	spDouble	io/scidac.html#spDouble	SciDACPrecision.spDouble		98
+nim	SciDACPrecision	io/scidac.html#SciDACPrecision	enum SciDACPrecision		98
+nim	stReal	io/scidac.html#stReal	SciDACTypeSize.stReal		102
+nim	stComplex	io/scidac.html#stComplex	SciDACTypeSize.stComplex		102
+nim	stColorVector	io/scidac.html#stColorVector	SciDACTypeSize.stColorVector		102
+nim	stColorMatrix	io/scidac.html#stColorMatrix	SciDACTypeSize.stColorMatrix		102
+nim	stDiracSpinor	io/scidac.html#stDiracSpinor	SciDACTypeSize.stDiracSpinor		102
+nim	stPropagator	io/scidac.html#stPropagator	SciDACTypeSize.stPropagator		102
+nim	SciDACTypeSize	io/scidac.html#SciDACTypeSize	enum SciDACTypeSize		102
+nim	SciDACChecksum	io/scidac.html#SciDACChecksum	object SciDACChecksum		111
+nim	SciDACFileInfo	io/scidac.html#SciDACFileInfo	object SciDACFileInfo		117
+nim	SciDACRecordInfo	io/scidac.html#SciDACRecordInfo	object SciDACRecordInfo		124
+nim	SciDACUserInfo	io/scidac.html#SciDACUserInfo	object SciDACUserInfo		136
+nim	ILDGFormatInfo	io/scidac.html#ILDGFormatInfo	object ILDGFormatInfo		140
+nim	`$`	io/scidac.html#$,SciDACChecksum	proc `$`(cs: SciDACChecksum): string		147
+nim	initSciDACChecksum	io/scidac.html#initSciDACChecksum	proc initSciDACChecksum(): SciDACChecksum		151
+nim	updateChecksum	io/scidac.html#updateChecksum,SciDACChecksum,openArray[byte],uint32	proc updateChecksum(cs: var SciDACChecksum; data: openArray[byte];\n               siteIndex: uint32 = 0)		164
+nim	combineChecksums	io/scidac.html#combineChecksums,SciDACChecksum,SciDACChecksum	proc combineChecksums(cs1, cs2: SciDACChecksum): SciDACChecksum		174
+nim	parseChecksumXml	io/scidac.html#parseChecksumXml,string	proc parseChecksumXml(xml: string): SciDACChecksum		182
+nim	generateChecksumXml	io/scidac.html#generateChecksumXml,SciDACChecksum	proc generateChecksumXml(cs: SciDACChecksum): string		189
+nim	generateFileXml	io/scidac.html#generateFileXml,SciDACFileInfo	proc generateFileXml(info: SciDACFileInfo): string		197
+nim	generateRecordXml	io/scidac.html#generateRecordXml,SciDACRecordInfo	proc generateRecordXml(info: SciDACRecordInfo): string		213
+nim	generateUserXml	io/scidac.html#generateUserXml,SciDACUserInfo	proc generateUserXml(info: SciDACUserInfo): string		229
+nim	generateILDGFormatXml	io/scidac.html#generateILDGFormatXml,ILDGFormatInfo	proc generateILDGFormatXml(info: ILDGFormatInfo): string		235
+nim	parseFileXml	io/scidac.html#parseFileXml,string	proc parseFileXml(xml: string): SciDACFileInfo		249
+nim	parseRecordXml	io/scidac.html#parseRecordXml,string	proc parseRecordXml(xml: string): SciDACRecordInfo		260
+nim	parseILDGFormatXml	io/scidac.html#parseILDGFormatXml,string	proc parseILDGFormatXml(xml: string): ILDGFormatInfo		273
+nim	SciDACReader	io/scidac.html#SciDACReader	type SciDACReader		289
+nim	newSciDACReader	io/scidac.html#newSciDACReader,string	proc newSciDACReader(filename: string): SciDACReader		296
+nim	close	io/scidac.html#close,SciDACReader	proc close(r: SciDACReader)		304
+nim	readFileInfo	io/scidac.html#readFileInfo,SciDACReader	proc readFileInfo(r: SciDACReader): SciDACFileInfo		307
+nim	messages	io/scidac.html#messages.i,SciDACReader	iterator messages(r: SciDACReader): tuple[recordInfo: SciDACRecordInfo, userXml: string,\n                                 checksum: SciDACChecksum]		322
+nim	readBinaryData	io/scidac.html#readBinaryData,SciDACReader	proc readBinaryData(r: SciDACReader): seq[byte]		353
+nim	readBinaryDataTyped	io/scidac.html#readBinaryDataTyped,SciDACReader	proc readBinaryDataTyped[T](r: SciDACReader): seq[T]		369
+nim	SciDACWriter	io/scidac.html#SciDACWriter	type SciDACWriter		382
+nim	newSciDACWriter	io/scidac.html#newSciDACWriter,string,SciDACFileInfo	proc newSciDACWriter(filename: string; fileInfo: SciDACFileInfo): SciDACWriter		387
+nim	close	io/scidac.html#close,SciDACWriter	proc close(w: SciDACWriter): LimeStatus		395
+nim	writeFileInfo	io/scidac.html#writeFileInfo,SciDACWriter,string	proc writeFileInfo(w: SciDACWriter; userXml: string = ""): LimeStatus		398
+nim	writeField	io/scidac.html#writeField,SciDACWriter,openArray[T],SciDACRecordInfo,string	proc writeField[T](w: SciDACWriter; data: openArray[T]; recordInfo: SciDACRecordInfo;\n              userXml: string = ""): LimeStatus		416
+nim	writeFieldBytes	io/scidac.html#writeFieldBytes,SciDACWriter,openArray[byte],SciDACRecordInfo,string	proc writeFieldBytes(w: SciDACWriter; data: openArray[byte];\n                recordInfo: SciDACRecordInfo; userXml: string = ""): LimeStatus		450
+nim	ILDGReader	io/scidac.html#ILDGReader	type ILDGReader		462
+nim	newILDGReader	io/scidac.html#newILDGReader,string	proc newILDGReader(filename: string): ILDGReader		468
+nim	close	io/scidac.html#close,ILDGReader	proc close(r: ILDGReader)		475
+nim	readFormat	io/scidac.html#readFormat,ILDGReader	proc readFormat(r: ILDGReader): ILDGFormatInfo		478
+nim	readGaugeField	io/scidac.html#readGaugeField,ILDGReader	proc readGaugeField(r: ILDGReader): seq[byte]		491
+nim	defaultRecordInfo	io/scidac.html#defaultRecordInfo,SciDACPrecision,int,int,int,int	proc defaultRecordInfo(precision: SciDACPrecision; colors: int = 3; spins: int = 0;\n                  typesize: int = 18; datacount: int = 4): SciDACRecordInfo		503
+nim	newFileInfo	io/scidac.html#newFileInfo,openArray[int],int	proc newFileInfo(dims: openArray[int]; volfmt: int = 0): SciDACFileInfo		522
+nim	calcDataSize	io/scidac.html#calcDataSize,SciDACFileInfo,SciDACRecordInfo	proc calcDataSize(fileInfo: SciDACFileInfo; recordInfo: SciDACRecordInfo): int64		531
+nimgrp	close	io/scidac.html#close-procs-all	proc		304

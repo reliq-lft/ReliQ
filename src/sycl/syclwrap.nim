@@ -270,6 +270,50 @@ proc sycl_kernel_set_elements_i64*(queue: SyclQueue, bufC: SyclBuffer,
                                     numSites: csize_t, elemsPerSite: cint,
                                     vectorWidth: cint, numVectorGroups: csize_t)
 
+# ============================================================================
+# Stencil Gather Kernels
+# ============================================================================
+# float32
+proc sycl_kernel_stencil_copy_f32*(queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                                    pointIdx: cint, nPoints: cint,
+                                    numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_scalar_mul_f32*(queue: SyclQueue, bufSrc: SyclBuffer, scalar: cfloat, bufDst, bufOffsets: SyclBuffer,
+                                          pointIdx: cint, nPoints: cint,
+                                          numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_add_f32*(queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                                   pointIdx: cint, nPoints: cint,
+                                   numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+# float64
+proc sycl_kernel_stencil_copy_f64*(queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                                    pointIdx: cint, nPoints: cint,
+                                    numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_scalar_mul_f64*(queue: SyclQueue, bufSrc: SyclBuffer, scalar: cdouble, bufDst, bufOffsets: SyclBuffer,
+                                          pointIdx: cint, nPoints: cint,
+                                          numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_add_f64*(queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                                   pointIdx: cint, nPoints: cint,
+                                   numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+# int32
+proc sycl_kernel_stencil_copy_i32*(queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                                    pointIdx: cint, nPoints: cint,
+                                    numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_scalar_mul_i32*(queue: SyclQueue, bufSrc: SyclBuffer, scalar: cint, bufDst, bufOffsets: SyclBuffer,
+                                          pointIdx: cint, nPoints: cint,
+                                          numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_add_i32*(queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                                   pointIdx: cint, nPoints: cint,
+                                   numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+# int64
+proc sycl_kernel_stencil_copy_i64*(queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                                    pointIdx: cint, nPoints: cint,
+                                    numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_scalar_mul_i64*(queue: SyclQueue, bufSrc: SyclBuffer, scalar: clonglong, bufDst, bufOffsets: SyclBuffer,
+                                          pointIdx: cint, nPoints: cint,
+                                          numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+proc sycl_kernel_stencil_add_i64*(queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                                   pointIdx: cint, nPoints: cint,
+                                   numSites: csize_t, elemsPerSite: cint, vectorWidth: cint)
+
 {.pop.}
 
 # ============================================================================
@@ -599,3 +643,102 @@ proc kernelSetElements*(queue: SyclQueue, bufC: SyclBuffer,
                                addr indices[0], addr vals[0], elementIndices.len.cint,
                                numSites.csize_t, elemsPerSite.cint,
                                vectorWidth.cint, numVectorGroups.csize_t)
+
+# ============================================================================
+# Stencil Gather Kernels (type-generic)
+# ============================================================================
+
+proc kernelStencilCopy*(queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                        pointIdx: int, nPoints: int,
+                        numSites: int, elemsPerSite: int, vectorWidth: int) {.inline.} =
+  ## Gather copy: dst[n] = src[neighbor(n, pointIdx)]
+  sycl_kernel_stencil_copy_f64(queue, bufSrc, bufDst, bufOffsets,
+                                pointIdx.cint, nPoints.cint,
+                                numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+
+proc kernelStencilCopy*[T](queue: SyclQueue, bufSrc, bufDst, bufOffsets: SyclBuffer,
+                           pointIdx: int, nPoints: int,
+                           numSites: int, elemsPerSite: int, vectorWidth: int,
+                           dummy: typedesc[T]) {.inline.} =
+  when T is float32:
+    sycl_kernel_stencil_copy_f32(queue, bufSrc, bufDst, bufOffsets,
+                                  pointIdx.cint, nPoints.cint,
+                                  numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is float64:
+    sycl_kernel_stencil_copy_f64(queue, bufSrc, bufDst, bufOffsets,
+                                  pointIdx.cint, nPoints.cint,
+                                  numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int32:
+    sycl_kernel_stencil_copy_i32(queue, bufSrc, bufDst, bufOffsets,
+                                  pointIdx.cint, nPoints.cint,
+                                  numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int64:
+    sycl_kernel_stencil_copy_i64(queue, bufSrc, bufDst, bufOffsets,
+                                  pointIdx.cint, nPoints.cint,
+                                  numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  else:
+    {.error: "Unsupported type for kernelStencilCopy".}
+
+proc kernelStencilScalarMul*(queue: SyclQueue, bufSrc: SyclBuffer, scalar: float64,
+                             bufDst, bufOffsets: SyclBuffer,
+                             pointIdx: int, nPoints: int,
+                             numSites: int, elemsPerSite: int, vectorWidth: int) {.inline.} =
+  ## Gather scalar mul: dst[n] = scalar * src[neighbor(n, pointIdx)]
+  sycl_kernel_stencil_scalar_mul_f64(queue, bufSrc, scalar.cdouble, bufDst, bufOffsets,
+                                      pointIdx.cint, nPoints.cint,
+                                      numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+
+proc kernelStencilScalarMul*[T](queue: SyclQueue, bufSrc: SyclBuffer, scalar: T,
+                                bufDst, bufOffsets: SyclBuffer,
+                                pointIdx: int, nPoints: int,
+                                numSites: int, elemsPerSite: int, vectorWidth: int,
+                                dummy: typedesc[T]) {.inline.} =
+  when T is float32:
+    sycl_kernel_stencil_scalar_mul_f32(queue, bufSrc, scalar.cfloat, bufDst, bufOffsets,
+                                        pointIdx.cint, nPoints.cint,
+                                        numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is float64:
+    sycl_kernel_stencil_scalar_mul_f64(queue, bufSrc, scalar.cdouble, bufDst, bufOffsets,
+                                        pointIdx.cint, nPoints.cint,
+                                        numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int32:
+    sycl_kernel_stencil_scalar_mul_i32(queue, bufSrc, scalar.cint, bufDst, bufOffsets,
+                                        pointIdx.cint, nPoints.cint,
+                                        numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int64:
+    sycl_kernel_stencil_scalar_mul_i64(queue, bufSrc, scalar.clonglong, bufDst, bufOffsets,
+                                        pointIdx.cint, nPoints.cint,
+                                        numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  else:
+    {.error: "Unsupported type for kernelStencilScalarMul".}
+
+proc kernelStencilAdd*(queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                       pointIdx: int, nPoints: int,
+                       numSites: int, elemsPerSite: int, vectorWidth: int) {.inline.} =
+  ## Gather add: dst[n] = srcA[n] + srcB[neighbor(n, pointIdx)]
+  sycl_kernel_stencil_add_f64(queue, bufSrcA, bufSrcB, bufDst, bufOffsets,
+                               pointIdx.cint, nPoints.cint,
+                               numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+
+proc kernelStencilAdd*[T](queue: SyclQueue, bufSrcA, bufSrcB, bufDst, bufOffsets: SyclBuffer,
+                          pointIdx: int, nPoints: int,
+                          numSites: int, elemsPerSite: int, vectorWidth: int,
+                          dummy: typedesc[T]) {.inline.} =
+  when T is float32:
+    sycl_kernel_stencil_add_f32(queue, bufSrcA, bufSrcB, bufDst, bufOffsets,
+                                 pointIdx.cint, nPoints.cint,
+                                 numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is float64:
+    sycl_kernel_stencil_add_f64(queue, bufSrcA, bufSrcB, bufDst, bufOffsets,
+                                 pointIdx.cint, nPoints.cint,
+                                 numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int32:
+    sycl_kernel_stencil_add_i32(queue, bufSrcA, bufSrcB, bufDst, bufOffsets,
+                                 pointIdx.cint, nPoints.cint,
+                                 numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  elif T is int64:
+    sycl_kernel_stencil_add_i64(queue, bufSrcA, bufSrcB, bufDst, bufOffsets,
+                                 pointIdx.cint, nPoints.cint,
+                                 numSites.csize_t, elemsPerSite.cint, vectorWidth.cint)
+  else:
+    {.error: "Unsupported type for kernelStencilAdd".}

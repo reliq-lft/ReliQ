@@ -1,0 +1,3 @@
+nimTitle	simplecubiclattice	lattice/simplecubiclattice.html	module lattice/simplecubiclattice		0
+nim	SimpleCubicLattice	lattice/simplecubiclattice.html#SimpleCubicLattice	object SimpleCubicLattice		30
+nim	newSimpleCubicLattice	lattice/simplecubiclattice.html#newSimpleCubicLattice,array[D,int],array[D,int],array[D,int]	proc newSimpleCubicLattice[D: static[int]](globalGrid: array[D, int]; mpiGrid: array[\n    D, int] = defaultMPIGrid[D](); ghostGrid: array[D, int] = defaultGhostGrid[D]()): SimpleCubicLattice[\n    D]		44

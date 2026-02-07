@@ -1,0 +1,50 @@
+nimTitle	sycldisp	sycl/sycldisp.html	module sycl/sycldisp		0
+nim	VectorWidth	sycl/sycldisp.html#VectorWidth	const VectorWidth		52
+nim	DebugKernels	sycl/sycldisp.html#DebugKernels	const DebugKernels		53
+nim	etFloat32	sycl/sycldisp.html#etFloat32	ElementType.etFloat32		60
+nim	etFloat64	sycl/sycldisp.html#etFloat64	ElementType.etFloat64		60
+nim	etInt32	sycl/sycldisp.html#etInt32	ElementType.etInt32		60
+nim	etInt64	sycl/sycldisp.html#etInt64	ElementType.etInt64		60
+nim	ElementType	sycl/sycldisp.html#ElementType	enum ElementType		60
+nim	ekSiteProxy	sycl/sycldisp.html#ekSiteProxy	ExprKind.ekSiteProxy		83
+nim	ekMatMul	sycl/sycldisp.html#ekMatMul	ExprKind.ekMatMul		83
+nim	ekMatVec	sycl/sycldisp.html#ekMatVec	ExprKind.ekMatVec		83
+nim	ekMatAdd	sycl/sycldisp.html#ekMatAdd	ExprKind.ekMatAdd		83
+nim	ekMatSub	sycl/sycldisp.html#ekMatSub	ExprKind.ekMatSub		83
+nim	ekScalarMul	sycl/sycldisp.html#ekScalarMul	ExprKind.ekScalarMul		83
+nim	ekScalarAdd	sycl/sycldisp.html#ekScalarAdd	ExprKind.ekScalarAdd		83
+nim	ekLiteral	sycl/sycldisp.html#ekLiteral	ExprKind.ekLiteral		83
+nim	ekUnknown	sycl/sycldisp.html#ekUnknown	ExprKind.ekUnknown		83
+nim	ExprKind	sycl/sycldisp.html#ExprKind	enum ExprKind		83
+nim	ExprInfo	sycl/sycldisp.html#ExprInfo	object ExprInfo		94
+nim	KernelInfo	sycl/sycldisp.html#KernelInfo	object KernelInfo		104
+nim	analyzeExpr	sycl/sycldisp.html#analyzeExpr,NimNode,seq[string],seq[string]	proc analyzeExpr(n: NimNode; viewNames: seq[string]; nbrVarNames: seq[string] = @[]): ExprInfo		254
+nim	dkCopy	sycl/sycldisp.html#dkCopy	DispatchKind.dkCopy		609
+nim	dkAdd	sycl/sycldisp.html#dkAdd	DispatchKind.dkAdd		609
+nim	dkSub	sycl/sycldisp.html#dkSub	DispatchKind.dkSub		609
+nim	dkMul	sycl/sycldisp.html#dkMul	DispatchKind.dkMul		609
+nim	dkScalarMul	sycl/sycldisp.html#dkScalarMul	DispatchKind.dkScalarMul		609
+nim	dkScalarAdd	sycl/sycldisp.html#dkScalarAdd	DispatchKind.dkScalarAdd		609
+nim	dkMatMul	sycl/sycldisp.html#dkMatMul	DispatchKind.dkMatMul		609
+nim	dkMatVec	sycl/sycldisp.html#dkMatVec	DispatchKind.dkMatVec		609
+nim	dkMatAdd	sycl/sycldisp.html#dkMatAdd	DispatchKind.dkMatAdd		609
+nim	dkVecAdd	sycl/sycldisp.html#dkVecAdd	DispatchKind.dkVecAdd		609
+nim	dkStencilCopy	sycl/sycldisp.html#dkStencilCopy	DispatchKind.dkStencilCopy		609
+nim	dkStencilScalarMul	sycl/sycldisp.html#dkStencilScalarMul	DispatchKind.dkStencilScalarMul		609
+nim	dkStencilAdd	sycl/sycldisp.html#dkStencilAdd	DispatchKind.dkStencilAdd		609
+nim	dkUnknown	sycl/sycldisp.html#dkUnknown	DispatchKind.dkUnknown		609
+nim	DispatchKind	sycl/sycldisp.html#DispatchKind	enum DispatchKind		609
+nim	eskCopy	sycl/sycldisp.html#eskCopy	ExecStepKind.eskCopy		630
+nim	eskAdd	sycl/sycldisp.html#eskAdd	ExecStepKind.eskAdd		630
+nim	eskSub	sycl/sycldisp.html#eskSub	ExecStepKind.eskSub		630
+nim	eskMatMul	sycl/sycldisp.html#eskMatMul	ExecStepKind.eskMatMul		630
+nim	eskMatVec	sycl/sycldisp.html#eskMatVec	ExecStepKind.eskMatVec		630
+nim	eskScalarMul	sycl/sycldisp.html#eskScalarMul	ExecStepKind.eskScalarMul		630
+nim	eskScalarAdd	sycl/sycldisp.html#eskScalarAdd	ExecStepKind.eskScalarAdd		630
+nim	ExecStepKind	sycl/sycldisp.html#ExecStepKind	enum ExecStepKind		630
+nim	ExecOperand	sycl/sycldisp.html#ExecOperand	object ExecOperand		639
+nim	ExecStep	sycl/sycldisp.html#ExecStep	object ExecStep		645
+nim	ExecPlan	sycl/sycldisp.html#ExecPlan	object ExecPlan		652
+nim	DispatchInfo	sycl/sycldisp.html#DispatchInfo	object DispatchInfo		785
+nim	eachImpl	sycl/sycldisp.html#eachImpl.m,untyped,typed,typed,typed	macro eachImpl(loopVar: untyped; lo: typed; hi: typed; body: typed): untyped		912
+nim	each	sycl/sycldisp.html#each.m,ForLoopStmt	macro each(x: ForLoopStmt): untyped		1706

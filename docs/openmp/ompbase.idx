@@ -1,0 +1,7 @@
+nimTitle	ompbase	openmp/ompbase.html	module openmp/ompbase		0
+nim	omp_get_max_threads	openmp/ompbase.html#omp_get_max_threads	proc omp_get_max_threads(): cint		38
+nim	omp_get_thread_num	openmp/ompbase.html#omp_get_thread_num	proc omp_get_thread_num(): cint		39
+nim	initOpenMP	openmp/ompbase.html#initOpenMP	proc initOpenMP()		44
+nim	getNumThreads	openmp/ompbase.html#getNumThreads	proc getNumThreads(): int		52
+nim	getThreadId	openmp/ompbase.html#getThreadId	proc getThreadId(): int		56
+nim	ompParallel	openmp/ompbase.html#ompParallel.t,untyped	template ompParallel(body: untyped)		60

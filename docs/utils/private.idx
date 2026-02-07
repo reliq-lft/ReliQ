@@ -1,0 +1,3 @@
+nimTitle	private	utils/private.html	module utils/private		0
+nim	mapTo	utils/private.html#mapTo,array[D,T],typedesc[U]	proc mapTo[D: static[int]; T, U](arr: array[D, T]; targetType: typedesc[U]): array[D,\n    U]		30
+nim	product	utils/private.html#product,array[D,int]	proc product[D: static[int]](arr: array[D, int]): int		37

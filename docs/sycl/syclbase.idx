@@ -1,0 +1,25 @@
+nimTitle	syclbase	sycl/syclbase.html	module sycl/syclbase		0
+nim	Success	sycl/syclbase.html#Success	TClResult.Success		69
+nim	TClResult	sycl/syclbase.html#TClResult	enum TClResult		69
+nim	check	sycl/syclbase.html#check.t,TClResult	template check(a: TClResult)		72
+nim	syclQueues	sycl/syclbase.html#syclQueues	var syclQueues		76
+nim	syclDeviceType	sycl/syclbase.html#syclDeviceType_2	var syclDeviceType		77
+nim	initSycl	sycl/syclbase.html#initSycl,SyclDeviceType	proc initSycl(dtype: SyclDeviceType = sdtDefault)		79
+nim	finalizeSycl	sycl/syclbase.html#finalizeSycl	proc finalizeSycl()		96
+nim	buffer	sycl/syclbase.html#buffer,SyclQueue,int	proc buffer[T](queue: SyclQueue; count: int): SyclBuffer		106
+nim	bufferLike	sycl/syclbase.html#bufferLike,SyclQueue,openArray[T]	proc bufferLike[T](queue: SyclQueue; data: openArray[T]): SyclBuffer		110
+nim	write	sycl/syclbase.html#write,SyclQueue,openArray[T],SyclBuffer	proc write[T](queue: SyclQueue; data: openArray[T]; buf: SyclBuffer)		114
+nim	read	sycl/syclbase.html#read,SyclQueue,openArray[T],SyclBuffer	proc read[T](queue: SyclQueue; data: var openArray[T]; buf: SyclBuffer)		119
+nim	read	sycl/syclbase.html#read,SyclQueue,pointer,SyclBuffer,int	proc read(queue: SyclQueue; dest: pointer; buf: SyclBuffer; size: int)		124
+nim	write	sycl/syclbase.html#write,SyclQueue,pointer,SyclBuffer,int	proc write(queue: SyclQueue; src: pointer; buf: SyclBuffer; size: int)		128
+nim	finish	sycl/syclbase.html#finish,SyclQueue	proc finish(queue: SyclQueue): TClResult		132
+nim	release	sycl/syclbase.html#release,SyclBuffer,SyclQueue	proc release(buf: SyclBuffer; queue: SyclQueue)		138
+nim	release	sycl/syclbase.html#release,SyclBuffer	proc release(buf: SyclBuffer)		142
+nim	PMem	sycl/syclbase.html#PMem	type PMem		150
+nim	PCommandQueue	sycl/syclbase.html#PCommandQueue	type PCommandQueue		151
+nim	clQueues	sycl/syclbase.html#clQueues.t	template clQueues(): seq[SyclQueue]		154
+nim	clContext	sycl/syclbase.html#clContext.t	template clContext(): SyclQueue		155
+nim	clDevices	sycl/syclbase.html#clDevices.t	template clDevices(): seq[SyclQueue]		156
+nimgrp	write	sycl/syclbase.html#write-procs-all	proc		114
+nimgrp	release	sycl/syclbase.html#release-procs-all	proc		138
+nimgrp	read	sycl/syclbase.html#read-procs-all	proc		119

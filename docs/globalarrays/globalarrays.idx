@@ -1,0 +1,2 @@
+nimTitle	globalarrays	globalarrays/globalarrays.html	module globalarrays/globalarrays		0
+nim	gaParallel	globalarrays/globalarrays.html#gaParallel.t,untyped	template gaParallel(body: untyped): untyped		34

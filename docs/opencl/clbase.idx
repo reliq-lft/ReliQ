@@ -1,0 +1,174 @@
+nimTitle	clbase	opencl/clbase.html	module opencl/clbase		0
+nim	name	opencl/clbase.html#name,Pplatform_id	proc name(id: Pplatform_id): string		95
+nim	name	opencl/clbase.html#name,Pdevice_id	proc name(id: Pdevice_id): string		101
+nim	maxWorkGroups	opencl/clbase.html#maxWorkGroups,Pdevice_id	proc maxWorkGroups(id: Pdevice_id): int		107
+nim	localMemory	opencl/clbase.html#localMemory,Pdevice_id	proc localMemory(id: Pdevice_id): uint64		110
+nim	globalMemory	opencl/clbase.html#globalMemory,Pdevice_id	proc globalMemory(id: Pdevice_id): uint64		113
+nim	maxWorkItems	opencl/clbase.html#maxWorkItems,Pdevice_id	proc maxWorkItems(id: Pdevice_id): seq[int]		116
+nim	version	opencl/clbase.html#version,Pplatform_id	proc version(id: Pplatform_id): string		122
+nim	getPlatformByName	opencl/clbase.html#getPlatformByName,string	proc getPlatformByName(platformName: string): Pplatform_id		128
+nim	firstPlatform	opencl/clbase.html#firstPlatform	proc firstPlatform(): Pplatform_id		140
+nim	getDevices	opencl/clbase.html#getDevices,Pplatform_id	proc getDevices(platform: Pplatform_id): seq[Pdevice_id]		149
+nim	createContext	opencl/clbase.html#createContext,seq[Pdevice_id]	proc createContext(devices: seq[Pdevice_id]): Pcontext		159
+nim	commandQueueFor	opencl/clbase.html#commandQueueFor,Pcontext,Pdevice_id	proc commandQueueFor(context: Pcontext; device: Pdevice_id): Pcommand_queue		165
+nim	openclDefaults	opencl/clbase.html#openclDefaults	proc openclDefaults(): tuple[devices: seq[Pdevice_id], context: Pcontext]		170
+nim	singleDeviceDefaults	opencl/clbase.html#singleDeviceDefaults	proc singleDeviceDefaults(): tuple[device: Pdevice_id, context: Pcontext,\n                              queue: Pcommand_queue]		177
+nim	multipleDeviceDefaults	opencl/clbase.html#multipleDeviceDefaults	proc multipleDeviceDefaults(): tuple[devices: seq[Pdevice_id], context: Pcontext,\n                                queues: seq[Pcommand_queue]]		185
+nim	createProgram	opencl/clbase.html#createProgram,Pcontext,string	proc createProgram(context: Pcontext; body: string): Pprogram		194
+nim	createProgramBinary	opencl/clbase.html#createProgramBinary,Pcontext,Pdevice_id,string	proc createProgramBinary(context: Pcontext; device: Pdevice_id; body: string): Pprogram		200
+nim	buildOn	opencl/clbase.html#buildOn,Pprogram,seq[Pdevice_id]	proc buildOn(program: Pprogram; devices: seq[Pdevice_id])		209
+nim	buildOn	opencl/clbase.html#buildOn,Pprogram,Pdevice_id	proc buildOn(program: Pprogram; device: Pdevice_id)		213
+nim	createAndBuild	opencl/clbase.html#createAndBuild,Pcontext,string,seq[Pdevice_id]	proc createAndBuild(context: Pcontext; body: string; devices: seq[Pdevice_id]): Pprogram		215
+nim	createAndBuild	opencl/clbase.html#createAndBuild,Pcontext,string,Pdevice_id	proc createAndBuild(context: Pcontext; body: string; device: Pdevice_id): Pprogram		219
+nim	createAndBuildBinary	opencl/clbase.html#createAndBuildBinary,Pcontext,string,Pdevice_id	proc createAndBuildBinary(context: Pcontext; body: string; device: Pdevice_id): Pprogram		223
+nim	buffer	opencl/clbase.html#buffer,Pcontext,int,Tmem_flags	proc buffer[A](context: Pcontext; size: int; flags: Tmem_flags = MEM_READ_WRITE): Pmem		227
+nim	bufferLike	opencl/clbase.html#bufferLike,Pcontext,openArray[A],Tmem_flags	proc bufferLike[A](context: Pcontext; xs: openArray[A];\n              flags: Tmem_flags = MEM_READ_WRITE): Pmem		232
+nim	GpuBuffer	opencl/clbase.html#GpuBuffer	object GpuBuffer		236
+nim	gpuBuffer	opencl/clbase.html#gpuBuffer,Pcontext,int,Tmem_flags	proc gpuBuffer[T](context: Pcontext; size: int; flags: Tmem_flags = MEM_READ_WRITE): GpuBuffer[\n    T]		240
+nim	gpuBufferLike	opencl/clbase.html#gpuBufferLike,Pcontext,openArray[T],Tmem_flags	proc gpuBufferLike[T](context: Pcontext; xs: openArray[T];\n                 flags: Tmem_flags = MEM_READ_WRITE): GpuBuffer[T]		247
+nim	write	opencl/clbase.html#write,Pcommand_queue,seq[T],GpuBuffer[T]	proc write[T](queue: Pcommand_queue; src: var seq[T]; dest: GpuBuffer[T])		251
+nim	read	opencl/clbase.html#read,Pcommand_queue,seq[T],GpuBuffer[T]	proc read[T](queue: Pcommand_queue; dest: var seq[T]; src: GpuBuffer[T])		255
+nim	release	opencl/clbase.html#release.t,GpuBuffer[T]	template release[T](buffer: GpuBuffer[T])		259
+nim	`[]`	opencl/clbase.html#[],GpuBuffer[T],int	proc `[]`[T](buffer: GpuBuffer[T]; index: int): T		264
+nim	`[]=`	opencl/clbase.html#[]=,GpuBuffer[T],int,T	proc `[]=`[T](buffer: GpuBuffer[T]; index: int; value: T)		266
+nim	`[]`	opencl/clbase.html#[],Pmem,int	proc `[]`(buffer: Pmem; index: int): float64		271
+nim	`[]=`	opencl/clbase.html#[]=,Pmem,int,float64	proc `[]=`(buffer: Pmem; index: int; value: float64)		273
+nim	buildErrors	opencl/clbase.html#buildErrors,Pprogram,seq[Pdevice_id]	proc buildErrors(program: Pprogram; devices: seq[Pdevice_id]): string		276
+nim	createKernel	opencl/clbase.html#createKernel,Pprogram,string	proc createKernel(program: Pprogram; name: string): Pkernel		282
+nim	LocalBuffer	opencl/clbase.html#LocalBuffer	type LocalBuffer		288
+nim	setArg	opencl/clbase.html#setArg.t,Pkernel,Pmem,int	template setArg(kernel: Pkernel; item: Pmem; index: int)		291
+nim	setArg	opencl/clbase.html#setArg.t,Pkernel,GpuBuffer[T],int	template setArg[T](kernel: Pkernel; item: GpuBuffer[T]; index: int)		295
+nim	setArg	opencl/clbase.html#setArg.t,Pkernel,A,int	template setArg[A](kernel: Pkernel; item: var A; index: int)		299
+nim	setArg	opencl/clbase.html#setArg.t,Pkernel,LocalBuffer[A],int	template setArg[A](kernel: Pkernel; item: LocalBuffer[A]; index: int)		302
+nim	setArg	opencl/clbase.html#setArg.t,Pkernel,anyInt,int	template setArg(kernel: Pkernel; item: anyInt; index: int)		305
+nim	args	opencl/clbase.html#args.m,Pkernel,varargs[untyped]	macro args(kernel: Pkernel; args: varargs[untyped]): untyped		309
+nim	run	opencl/clbase.html#run,Pcommand_queue,Pkernel,int	proc run(queue: Pcommand_queue; kernel: Pkernel; totalWork: int)		319
+nim	run	opencl/clbase.html#run,Pcommand_queue,Pkernel,int,int	proc run(queue: Pcommand_queue; kernel: Pkernel; totalWork, localWork: int)		323
+nim	run2d	opencl/clbase.html#run2d,Pcommand_queue,Pkernel,	proc run2d(queue: Pcommand_queue; kernel: Pkernel; totalWork: (int, int))		329
+nim	run2d	opencl/clbase.html#run2d,Pcommand_queue,Pkernel,,	proc run2d(queue: Pcommand_queue; kernel: Pkernel; totalWork, localWork: (int, int))		334
+nim	run3d	opencl/clbase.html#run3d,Pcommand_queue,Pkernel,	proc run3d(queue: Pcommand_queue; kernel: Pkernel; totalWork: (int, int, int))		343
+nim	run3d	opencl/clbase.html#run3d,Pcommand_queue,Pkernel,,	proc run3d(queue: Pcommand_queue; kernel: Pkernel;\n      totalWork, localWork: (int, int, int))		348
+nim	write	opencl/clbase.html#write,Pcommand_queue,pointer,Pmem,int	proc write(queue: Pcommand_queue; src: pointer; dest: Pmem; size: int)		357
+nim	write	opencl/clbase.html#write,Pcommand_queue,seq[A],Pmem	proc write[A](queue: Pcommand_queue; src: var seq[A]; dest: Pmem)		360
+nim	read	opencl/clbase.html#read,Pcommand_queue,pointer,Pmem,int	proc read(queue: Pcommand_queue; dest: pointer; src: Pmem; size: int)		363
+nim	read	opencl/clbase.html#read,Pcommand_queue,seq[A],Pmem	proc read[A](queue: Pcommand_queue; dest: var seq[A]; src: Pmem)		366
+nim	release	opencl/clbase.html#release.t,Pcommand_queue	template release(queue: Pcommand_queue)		369
+nim	release	opencl/clbase.html#release.t,Pkernel	template release(kernel: Pkernel)		370
+nim	release	opencl/clbase.html#release.t,Pprogram	template release(program: Pprogram)		371
+nim	release	opencl/clbase.html#release.t,Pmem	template release(buffer: Pmem)		372
+nim	release	opencl/clbase.html#release.t,Pcontext	template release(context: Pcontext)		373
+nim	initCL	opencl/clbase.html#initCL.t	template initCL(): untyped		377
+nim	finalizeCL	opencl/clbase.html#finalizeCL.t	template finalizeCL(): untyped		384
+nim	kernel	opencl/clbase.html#kernel.t	template kernel()		454
+nim	device	opencl/clbase.html#device.t	template device()		455
+nim	global	opencl/clbase.html#global.t	template global()		456
+nim	local	opencl/clbase.html#local.t	template local()		457
+nim	constant	opencl/clbase.html#constant.t	template constant()		458
+nim	oclName	opencl/clbase.html#oclName.t,string	template oclName(s: string): untyped		459
+nim	Dim	opencl/clbase.html#Dim	type Dim		462
+nim	get_global_id	opencl/clbase.html#get_global_id.t,Dim	template get_global_id(dim: Dim): Dim		473
+nim	get_local_id	opencl/clbase.html#get_local_id.t,Dim	template get_local_id(dim: Dim): Dim		474
+nim	get_group_id	opencl/clbase.html#get_group_id.t,Dim	template get_group_id(dim: Dim): Dim		475
+nim	get_global_size	opencl/clbase.html#get_global_size.t,Dim	template get_global_size(dim: Dim): Dim		476
+nim	get_local_size	opencl/clbase.html#get_local_size.t,Dim	template get_local_size(dim: Dim): Dim		477
+nim	get_num_groups	opencl/clbase.html#get_num_groups.t,Dim	template get_num_groups(dim: Dim): Dim		478
+nim	get_work_dim	opencl/clbase.html#get_work_dim.t	template get_work_dim(): Dim		479
+nim	get_global_offset	opencl/clbase.html#get_global_offset.t,Dim	template get_global_offset(dim: Dim): Dim		480
+nim	barrier_impl	opencl/clbase.html#barrier_impl,cint	proc barrier_impl(flags: cint)		483
+nim	barrier	opencl/clbase.html#barrier.t,cint	template barrier(flags: cint)		484
+nim	mem_fence_impl	opencl/clbase.html#mem_fence_impl,cint	proc mem_fence_impl(flags: cint)		486
+nim	mem_fence	opencl/clbase.html#mem_fence.t,cint	template mem_fence(flags: cint)		487
+nim	read_mem_fence_impl	opencl/clbase.html#read_mem_fence_impl,cint	proc read_mem_fence_impl(flags: cint)		489
+nim	read_mem_fence	opencl/clbase.html#read_mem_fence.t,cint	template read_mem_fence(flags: cint)		490
+nim	write_mem_fence_impl	opencl/clbase.html#write_mem_fence_impl,cint	proc write_mem_fence_impl(flags: cint)		492
+nim	write_mem_fence	opencl/clbase.html#write_mem_fence.t,cint	template write_mem_fence(flags: cint)		493
+nim	CLK_LOCAL_MEM_FENCE	opencl/clbase.html#CLK_LOCAL_MEM_FENCE	const CLK_LOCAL_MEM_FENCE		495
+nim	CLK_GLOBAL_MEM_FENCE	opencl/clbase.html#CLK_GLOBAL_MEM_FENCE	const CLK_GLOBAL_MEM_FENCE		496
+nim	atomic_add_impl	opencl/clbase.html#atomic_add_impl,ptr.int32,int32	proc atomic_add_impl(p: ptr int32; val: int32): int32		499
+nim	atomic_sub_impl	opencl/clbase.html#atomic_sub_impl,ptr.int32,int32	proc atomic_sub_impl(p: ptr int32; val: int32): int32		500
+nim	atomic_xchg_impl	opencl/clbase.html#atomic_xchg_impl,ptr.int32,int32	proc atomic_xchg_impl(p: ptr int32; val: int32): int32		501
+nim	atomic_inc_impl	opencl/clbase.html#atomic_inc_impl,ptr.int32	proc atomic_inc_impl(p: ptr int32): int32		502
+nim	atomic_dec_impl	opencl/clbase.html#atomic_dec_impl,ptr.int32	proc atomic_dec_impl(p: ptr int32): int32		503
+nim	atomic_cmpxchg_impl	opencl/clbase.html#atomic_cmpxchg_impl,ptr.int32,int32,int32	proc atomic_cmpxchg_impl(p: ptr int32; cmp, val: int32): int32		504
+nim	atomic_min_impl	opencl/clbase.html#atomic_min_impl,ptr.int32,int32	proc atomic_min_impl(p: ptr int32; val: int32): int32		505
+nim	atomic_max_impl	opencl/clbase.html#atomic_max_impl,ptr.int32,int32	proc atomic_max_impl(p: ptr int32; val: int32): int32		506
+nim	atomic_and_impl	opencl/clbase.html#atomic_and_impl,ptr.int32,int32	proc atomic_and_impl(p: ptr int32; val: int32): int32		507
+nim	atomic_or_impl	opencl/clbase.html#atomic_or_impl,ptr.int32,int32	proc atomic_or_impl(p: ptr int32; val: int32): int32		508
+nim	atomic_xor_impl	opencl/clbase.html#atomic_xor_impl,ptr.int32,int32	proc atomic_xor_impl(p: ptr int32; val: int32): int32		509
+nim	atomic_add	opencl/clbase.html#atomic_add.t,ptr.int32,int32	template atomic_add(p: ptr int32; val: int32): int32		511
+nim	atomic_sub	opencl/clbase.html#atomic_sub.t,ptr.int32,int32	template atomic_sub(p: ptr int32; val: int32): int32		512
+nim	atomic_xchg	opencl/clbase.html#atomic_xchg.t,ptr.int32,int32	template atomic_xchg(p: ptr int32; val: int32): int32		513
+nim	atomic_inc	opencl/clbase.html#atomic_inc.t,ptr.int32	template atomic_inc(p: ptr int32): int32		514
+nim	atomic_dec	opencl/clbase.html#atomic_dec.t,ptr.int32	template atomic_dec(p: ptr int32): int32		515
+nim	atomic_cmpxchg	opencl/clbase.html#atomic_cmpxchg.t,ptr.int32,int32,int32	template atomic_cmpxchg(p: ptr int32; cmp, val: int32): int32		516
+nim	atomic_min	opencl/clbase.html#atomic_min.t,ptr.int32,int32	template atomic_min(p: ptr int32; val: int32): int32		517
+nim	atomic_max	opencl/clbase.html#atomic_max.t,ptr.int32,int32	template atomic_max(p: ptr int32; val: int32): int32		518
+nim	atomic_and	opencl/clbase.html#atomic_and.t,ptr.int32,int32	template atomic_and(p: ptr int32; val: int32): int32		519
+nim	atomic_or	opencl/clbase.html#atomic_or.t,ptr.int32,int32	template atomic_or(p: ptr int32; val: int32): int32		520
+nim	atomic_xor	opencl/clbase.html#atomic_xor.t,ptr.int32,int32	template atomic_xor(p: ptr int32; val: int32): int32		521
+nim	sin	opencl/clbase.html#sin,float32	proc sin(x: float32): float32		524
+nim	cos	opencl/clbase.html#cos,float32	proc cos(x: float32): float32		525
+nim	tan	opencl/clbase.html#tan,float32	proc tan(x: float32): float32		526
+nim	asin	opencl/clbase.html#asin,float32	proc asin(x: float32): float32		527
+nim	acos	opencl/clbase.html#acos,float32	proc acos(x: float32): float32		528
+nim	atan	opencl/clbase.html#atan,float32	proc atan(x: float32): float32		529
+nim	atan2	opencl/clbase.html#atan2,float32,float32	proc atan2(y, x: float32): float32		530
+nim	sinh	opencl/clbase.html#sinh,float32	proc sinh(x: float32): float32		531
+nim	cosh	opencl/clbase.html#cosh,float32	proc cosh(x: float32): float32		532
+nim	tanh	opencl/clbase.html#tanh,float32	proc tanh(x: float32): float32		533
+nim	exp	opencl/clbase.html#exp,float32	proc exp(x: float32): float32		534
+nim	exp2	opencl/clbase.html#exp2,float32	proc exp2(x: float32): float32		535
+nim	log	opencl/clbase.html#log,float32	proc log(x: float32): float32		536
+nim	log2	opencl/clbase.html#log2,float32	proc log2(x: float32): float32		537
+nim	log10	opencl/clbase.html#log10,float32	proc log10(x: float32): float32		538
+nim	pow	opencl/clbase.html#pow,float32,float32	proc pow(x, y: float32): float32		539
+nim	sqrt	opencl/clbase.html#sqrt,float32	proc sqrt(x: float32): float32		540
+nim	rsqrt_impl	opencl/clbase.html#rsqrt_impl,float32	proc rsqrt_impl(x: float32): float32		541
+nim	rsqrt	opencl/clbase.html#rsqrt.t,float32	template rsqrt(x: float32): float32		542
+nim	fabs	opencl/clbase.html#fabs,float32	proc fabs(x: float32): float32		543
+nim	floor	opencl/clbase.html#floor,float32	proc floor(x: float32): float32		544
+nim	ceil	opencl/clbase.html#ceil,float32	proc ceil(x: float32): float32		545
+nim	round	opencl/clbase.html#round,float32	proc round(x: float32): float32		546
+nim	trunc	opencl/clbase.html#trunc,float32	proc trunc(x: float32): float32		547
+nim	fmod	opencl/clbase.html#fmod,float32,float32	proc fmod(x, y: float32): float32		548
+nim	fmin	opencl/clbase.html#fmin,float32,float32	proc fmin(x, y: float32): float32		549
+nim	fmax	opencl/clbase.html#fmax,float32,float32	proc fmax(x, y: float32): float32		550
+nim	fma	opencl/clbase.html#fma,float32,float32,float32	proc fma(a, b, c: float32): float32		551
+nim	clamp_impl	opencl/clbase.html#clamp_impl,float32,float32,float32	proc clamp_impl(x, minVal, maxVal: float32): float32		553
+nim	clamp	opencl/clbase.html#clamp.t,float32,float32,float32	template clamp(x, minVal, maxVal: float32): float32		554
+nim	native_sin_impl	opencl/clbase.html#native_sin_impl,float32	proc native_sin_impl(x: float32): float32		557
+nim	native_cos_impl	opencl/clbase.html#native_cos_impl,float32	proc native_cos_impl(x: float32): float32		558
+nim	native_tan_impl	opencl/clbase.html#native_tan_impl,float32	proc native_tan_impl(x: float32): float32		559
+nim	native_exp_impl	opencl/clbase.html#native_exp_impl,float32	proc native_exp_impl(x: float32): float32		560
+nim	native_exp2_impl	opencl/clbase.html#native_exp2_impl,float32	proc native_exp2_impl(x: float32): float32		561
+nim	native_log_impl	opencl/clbase.html#native_log_impl,float32	proc native_log_impl(x: float32): float32		562
+nim	native_log2_impl	opencl/clbase.html#native_log2_impl,float32	proc native_log2_impl(x: float32): float32		563
+nim	native_log10_impl	opencl/clbase.html#native_log10_impl,float32	proc native_log10_impl(x: float32): float32		564
+nim	native_sqrt_impl	opencl/clbase.html#native_sqrt_impl,float32	proc native_sqrt_impl(x: float32): float32		565
+nim	native_rsqrt_impl	opencl/clbase.html#native_rsqrt_impl,float32	proc native_rsqrt_impl(x: float32): float32		566
+nim	native_recip_impl	opencl/clbase.html#native_recip_impl,float32	proc native_recip_impl(x: float32): float32		567
+nim	native_powr_impl	opencl/clbase.html#native_powr_impl,float32,float32	proc native_powr_impl(x, y: float32): float32		568
+nim	native_sin	opencl/clbase.html#native_sin.t,float32	template native_sin(x: float32): float32		570
+nim	native_cos	opencl/clbase.html#native_cos.t,float32	template native_cos(x: float32): float32		571
+nim	native_tan	opencl/clbase.html#native_tan.t,float32	template native_tan(x: float32): float32		572
+nim	native_exp	opencl/clbase.html#native_exp.t,float32	template native_exp(x: float32): float32		573
+nim	native_exp2	opencl/clbase.html#native_exp2.t,float32	template native_exp2(x: float32): float32		574
+nim	native_log	opencl/clbase.html#native_log.t,float32	template native_log(x: float32): float32		575
+nim	native_log2	opencl/clbase.html#native_log2.t,float32	template native_log2(x: float32): float32		576
+nim	native_log10	opencl/clbase.html#native_log10.t,float32	template native_log10(x: float32): float32		577
+nim	native_sqrt	opencl/clbase.html#native_sqrt.t,float32	template native_sqrt(x: float32): float32		578
+nim	native_rsqrt	opencl/clbase.html#native_rsqrt.t,float32	template native_rsqrt(x: float32): float32		579
+nim	native_recip	opencl/clbase.html#native_recip.t,float32	template native_recip(x: float32): float32		580
+nim	native_powr	opencl/clbase.html#native_powr.t,float32,float32	template native_powr(x, y: float32): float32		581
+nimgrp	buildon	opencl/clbase.html#buildOn-procs-all	proc		209
+nimgrp	[]	opencl/clbase.html#[]-procs-all	proc		264
+nimgrp	write	opencl/clbase.html#write-procs-all	proc		251
+nimgrp	run3d	opencl/clbase.html#run3d-procs-all	proc		343
+nimgrp	run	opencl/clbase.html#run-procs-all	proc		319
+nimgrp	[]=	opencl/clbase.html#[]=-procs-all	proc		266
+nimgrp	createandbuild	opencl/clbase.html#createAndBuild-procs-all	proc		215
+nimgrp	name	opencl/clbase.html#name-procs-all	proc		95
+nimgrp	read	opencl/clbase.html#read-procs-all	proc		255
+nimgrp	run2d	opencl/clbase.html#run2d-procs-all	proc		329
+nimgrp	setarg	opencl/clbase.html#setArg-templates-all	template		291
+nimgrp	release	opencl/clbase.html#release-templates-all	template		259

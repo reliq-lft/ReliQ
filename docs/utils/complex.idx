@@ -1,0 +1,6 @@
+nimTitle	complex	utils/complex.html	module utils/complex		0
+nim	isReal32	utils/complex.html#isReal32.t,typedesc	template isReal32(T: typedesc): bool		34
+nim	isReal64	utils/complex.html#isReal64.t,typedesc	template isReal64(T: typedesc): bool		37
+nim	isComplex32	utils/complex.html#isComplex32.t,typedesc	template isComplex32(T: typedesc): bool		40
+nim	isComplex64	utils/complex.html#isComplex64.t,typedesc	template isComplex64(T: typedesc): bool		43
+nim	isComplex	utils/complex.html#isComplex.t,typedesc	template isComplex(T: typedesc): bool		46

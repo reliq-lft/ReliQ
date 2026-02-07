@@ -77,9 +77,6 @@ endif
 
 .PHONY: help clean sycl-lib
 
-# Filter out reserved targets from MAKECMDGOALS for the catch-all
-BUILD_TARGETS := $(filter-out help clean reliq sycl-lib,$(MAKECMDGOALS))
-
 # SYCL wrapper library (build with Intel DPC++ or hipSYCL)
 sycl-lib:
 	@mkdir -p lib
@@ -154,6 +151,95 @@ help:
 
 clean:
 	$(NIM) clean build/Makefile.nims $(ARGS)
+
+# ============================================================================
+# Test infrastructure
+# ============================================================================
+# Usage:
+#   make test              Run all tests with all available backends
+#   make test-opencl       Run tests with OpenCL backend
+#   make test-openmp       Run tests with OpenMP backend
+#   make test-sycl         Run tests with SYCL backend
+#   make test-core         Run backend-agnostic core tests only
+#
+# Test targets are grouped by backend requirements:
+#   Core tests: simdtypes, simdlayout, stencil, sitetensor, localtensor, tensor, io
+#   Backend tests: tensorview (OpenCL/SYCL/OpenMP), ompsimd (OpenMP only)
+# ============================================================================
+
+.PHONY: test test-opencl test-openmp test-sycl test-core
+
+comma := ,
+
+# Shell function to build and run a single test
+# Usage: $(call run_tests,BACKEND_LABEL,FLAGS,test1 test2 ...)
+define run_test_suite
+	@printf "\n\033[1m═══════════════════════════════════════════════════\033[0m\n"; \
+	printf "\033[1m  ReliQ Test Suite — $(1)\033[0m\n"; \
+	printf "\033[1m═══════════════════════════════════════════════════\033[0m\n\n"; \
+	total_ok=0; total_fail=0; total_build_fail=0; \
+	for t in $(3); do \
+		printf "\033[0;36m  Building $$t\033[0m"; \
+		if $(NIM) build build/Makefile.nims $(2) $(ARGS) $$t > /tmp/reliq_build_$$t.log 2>&1; then \
+			printf " ... \033[0;32mbuilt\033[0m\n"; \
+			printf "\033[0;36m  Running  $$t (n=1)\033[0m"; \
+			output=$$(./reliq -e $$t -n 1 2>&1); \
+			ok=$$(echo "$$output" | grep -c '\[OK\]' || true); \
+			fail=$$(echo "$$output" | grep -c '\[FAILED\]' || true); \
+			if [ "$$fail" -gt 0 ]; then \
+				printf " ... \033[0;31mFAILED ($$ok passed, $$fail failed)\033[0m\n"; \
+				echo "$$output" | grep '\[FAILED\]' | sed 's/^/    /' | head -10; \
+			elif [ "$$ok" -gt 0 ]; then \
+				printf " ... \033[0;32mPASSED ($$ok tests)\033[0m\n"; \
+			else \
+				printf " ... \033[1;33mNO TESTS (ran without error)\033[0m\n"; \
+			fi; \
+			total_ok=$$((total_ok + ok)); total_fail=$$((total_fail + fail)); \
+			printf "\033[0;36m  Running  $$t (n=4)\033[0m"; \
+			output=$$(./reliq -e $$t -n 4 2>&1); \
+			ok=$$(echo "$$output" | grep -c '\[OK\]' || true); \
+			fail=$$(echo "$$output" | grep -c '\[FAILED\]' || true); \
+			if [ "$$fail" -gt 0 ]; then \
+				printf " ... \033[0;31mFAILED ($$ok passed, $$fail failed)\033[0m\n"; \
+				echo "$$output" | grep '\[FAILED\]' | sed 's/^/    /' | head -10; \
+			elif [ "$$ok" -gt 0 ]; then \
+				printf " ... \033[0;32mPASSED ($$ok tests)\033[0m\n"; \
+			else \
+				printf " ... \033[1;33mNO TESTS (ran without error)\033[0m\n"; \
+			fi; \
+			total_ok=$$((total_ok + ok)); total_fail=$$((total_fail + fail)); \
+		else \
+			printf " ... \033[0;31mBUILD FAILED\033[0m\n"; \
+			tail -3 /tmp/reliq_build_$$t.log | sed 's/^/    /'; \
+			total_build_fail=$$((total_build_fail + 1)); \
+		fi; \
+	done; \
+	printf "\n\033[1m  Summary: $$total_ok passed, $$total_fail failed, $$total_build_fail build errors\033[0m\n\n"
+endef
+
+test-core:
+	$(call run_test_suite,Core Tests,,simdtypes simdlayout stencil sitetensor localtensor tensor transporter io)
+
+test-opencl:
+	$(call run_test_suite,OpenCL Backend,,tensorview)
+
+test-openmp:
+	$(call run_test_suite,OpenMP Backend,-d:UseOpenMP:true --passC:-fopenmp --passL:-fopenmp,tensorview ompsimd)
+
+test-sycl: sycl-lib
+	$(call run_test_suite,SYCL Backend,-d:UseSycl:true --passL:-L$(PWD)/lib --passL:-lreliq_sycl --passL:-Wl$(comma)-rpath$(comma)$(PWD)/lib,tensorview)
+
+test: test-core test-opencl test-openmp test-sycl
+	@printf "\n\033[1m═══════════════════════════════════════════════════\033[0m\n"
+	@printf "\033[1m  All test suites complete.\033[0m\n"
+	@printf "\033[1m═══════════════════════════════════════════════════\033[0m\n\n"
+
+# ============================================================================
+# Generic build target (catch-all for individual module compilation)
+# ============================================================================
+
+# Filter out reserved targets from MAKECMDGOALS for the catch-all
+BUILD_TARGETS := $(filter-out help clean reliq sycl-lib test test-core test-opencl test-openmp test-sycl,$(MAKECMDGOALS))
 
 # Build target: only runs if we have actual build targets
 ifneq ($(BUILD_TARGETS),)

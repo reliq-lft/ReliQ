@@ -1,0 +1,6 @@
+nimTitle	gabase	globalarrays/gabase.html	module globalarrays/gabase		0
+nim	GlobalArrays	globalarrays/gabase.html#GlobalArrays.t,untyped	template GlobalArrays(body: untyped): untyped		34
+nim	initGA	globalarrays/gabase.html#initGA	proc initGA()		43
+nim	initGA	globalarrays/gabase.html#initGA,ptr.cint,ptr.cstringArray	proc initGA(argc: ptr cint; argv: ptr cstringArray)		45
+nim	finalizeGA	globalarrays/gabase.html#finalizeGA	proc finalizeGA()		48
+nimgrp	initga	globalarrays/gabase.html#initGA-procs-all	proc		43

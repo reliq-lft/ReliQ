@@ -1,0 +1,16 @@
+nimTitle	gatypes	globalarrays/gatypes.html	module globalarrays/gatypes		0
+nim	GlobalArray	globalarrays/gatypes.html#GlobalArray	object GlobalArray		43
+nim	newGlobalArray	globalarrays/gatypes.html#newGlobalArray,array[D,SomeInteger],array[D,SomeInteger],array[D,SomeInteger],typedesc	proc newGlobalArray[D: static[int]](globalGrid: array[D, SomeInteger];\n                               mpiGrid: array[D, SomeInteger];\n                               ghostGrid: array[D, SomeInteger]; T: typedesc): GlobalArray[\n    D, T]		66
+nim	conformable	globalarrays/gatypes.html#conformable,GlobalArray[D,T],GlobalArray[D,T]	proc conformable[D: static[int]; T](a, b: GlobalArray[D, T]): bool		131
+nim	`=destroy`	globalarrays/gatypes.html#=destroy,GlobalArray[D,T]	proc `=destroy`[D: static[int]; T](ga: GlobalArray[D, T])		149
+nim	`=copy`	globalarrays/gatypes.html#=copy,GlobalArray[D,T],GlobalArray[D,T]	proc `=copy`[D: static[int]; T](dest: var GlobalArray[D, T]; src: GlobalArray[D, T])		158
+nim	getHandle	globalarrays/gatypes.html#getHandle,GlobalArray[D,T]	proc getHandle[D: static[int]; T](ga: GlobalArray[D, T]): cint		185
+nim	getGlobalGrid	globalarrays/gatypes.html#getGlobalGrid,GlobalArray[D,T]	proc getGlobalGrid[D: static[int]; T](ga: GlobalArray[D, T]): array[D, int]		197
+nim	getLocalGrid	globalarrays/gatypes.html#getLocalGrid,GlobalArray[D,T]	proc getLocalGrid[D: static[int]; T](ga: GlobalArray[D, T]): array[D, int]		209
+nim	getMPIGrid	globalarrays/gatypes.html#getMPIGrid,GlobalArray[D,T]	proc getMPIGrid[D: static[int]; T](ga: GlobalArray[D, T]): array[D, int]		221
+nim	getGhostGrid	globalarrays/gatypes.html#getGhostGrid,GlobalArray[D,T]	proc getGhostGrid[D: static[int]; T](ga: GlobalArray[D, T]): array[D, int]		233
+nim	numSites	globalarrays/gatypes.html#numSites,GlobalArray[D,T]	proc numSites[D: static[int]; T](ga: GlobalArray[D, T]): int		245
+nim	getBounds	globalarrays/gatypes.html#getBounds,GlobalArray[D,T]	proc getBounds[D: static[int]; T](ga: GlobalArray[D, T]): (array[D, int],\n    array[D, int])		256
+nim	updateGhostDirection	globalarrays/gatypes.html#updateGhostDirection,GlobalArray[D,T],SomeInteger,SomeInteger,bool	proc updateGhostDirection[D: static[int]; T](ga: GlobalArray[D, T]; dir: SomeInteger;\n                                        side: SomeInteger;\n                                        update_corners: bool = true)		270
+nim	updateGhosts	globalarrays/gatypes.html#updateGhosts,GlobalArray[D,T],bool	proc updateGhosts[D: static[int]; T](ga: GlobalArray[D, T];\n                                update_corners: bool = true)		295
+nim	isInitialized	globalarrays/gatypes.html#isInitialized,GlobalArray[D,T]	proc isInitialized[D: static[int]; T](ga: GlobalArray[D, T]): bool		313

@@ -1,0 +1,7 @@
+nimTitle	ompwrap	openmp/ompwrap.html	module openmp/ompwrap		0
+nim	OmpLoopCallback	openmp/ompwrap.html#OmpLoopCallback	type OmpLoopCallback		17
+nim	OmpChunkCallback	openmp/ompwrap.html#OmpChunkCallback	type OmpChunkCallback		18
+nim	ompParallelFor	openmp/ompwrap.html#ompParallelFor,int64,int64,OmpLoopCallback,pointer	proc ompParallelFor(start, end: int64; callback: OmpLoopCallback; context: pointer)		24
+nim	ompParallelForChunked	openmp/ompwrap.html#ompParallelForChunked,int64,int64,OmpChunkCallback,pointer	proc ompParallelForChunked(start, end: int64; callback: OmpChunkCallback;\n                      context: pointer)		28
+nim	ompGetNumThreads	openmp/ompwrap.html#ompGetNumThreads	proc ompGetNumThreads(): cint		38
+nim	ompSetNumThreads	openmp/ompwrap.html#ompSetNumThreads,cint	proc ompSetNumThreads(numThreads: cint)		41

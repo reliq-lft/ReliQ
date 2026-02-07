@@ -36,7 +36,7 @@
 ## - Byte swapping for portability
 ##
 ## Site ordering in QIO files follows lexicographic order:
-##   site = x + Lx*(y + Ly*(z + Lz*t))
+##   ``site = x + Lx * (y + Ly * (z + Lz * t))``
 ##
 ## Reference: https://github.com/usqcd-software/qio
 
@@ -80,8 +80,8 @@ proc `$`*(cs: QIOChecksum): string =
 # ===========================================================================
 
 proc lexIndex*(coords: openArray[int], dims: openArray[int]): int =
-  ## Convert lattice coordinates to lexicographic index
-  ## QIO order: x + Lx*(y + Ly*(z + Lz*t))
+  ## Convert lattice coordinates to lexicographic index.
+  ## QIO order: ``x + Lx * (y + Ly * (z + Lz * t))``
   result = 0
   var stride = 1
   for i in 0..<coords.len:

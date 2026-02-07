@@ -1,0 +1,53 @@
+nimTitle	lime	io/lime.html	module io/lime		0
+nim	LimeMagicNumber	io/lime.html#LimeMagicNumber	const LimeMagicNumber		45
+nim	LimeVersion	io/lime.html#LimeVersion	const LimeVersion		46
+nim	LimeHeaderSize	io/lime.html#LimeHeaderSize	const LimeHeaderSize		47
+nim	LimeTypeMaxLen	io/lime.html#LimeTypeMaxLen	const LimeTypeMaxLen		48
+nim	lsSuccess	io/lime.html#lsSuccess	LimeStatus.lsSuccess		52
+nim	lsErrParam	io/lime.html#lsErrParam	LimeStatus.lsErrParam		52
+nim	lsErrHeaderNext	io/lime.html#lsErrHeaderNext	LimeStatus.lsErrHeaderNext		52
+nim	lsErrWrite	io/lime.html#lsErrWrite	LimeStatus.lsErrWrite		52
+nim	lsEndOfRecord	io/lime.html#lsEndOfRecord	LimeStatus.lsEndOfRecord		52
+nim	lsEndOfFile	io/lime.html#lsEndOfFile	LimeStatus.lsEndOfFile		52
+nim	lsErrRead	io/lime.html#lsErrRead	LimeStatus.lsErrRead		52
+nim	lsErrSeek	io/lime.html#lsErrSeek	LimeStatus.lsErrSeek		52
+nim	lsErrMbMe	io/lime.html#lsErrMbMe	LimeStatus.lsErrMbMe		52
+nim	lsErrClose	io/lime.html#lsErrClose	LimeStatus.lsErrClose		52
+nim	lsErrMagic	io/lime.html#lsErrMagic	LimeStatus.lsErrMagic		52
+nim	lsErrVersion	io/lime.html#lsErrVersion	LimeStatus.lsErrVersion		52
+nim	LimeStatus	io/lime.html#LimeStatus	enum LimeStatus		52
+nim	LimeRecordHeader	io/lime.html#LimeRecordHeader	object LimeRecordHeader		66
+nim	LimeReader	io/lime.html#LimeReader	type LimeReader		72
+nim	LimeWriter	io/lime.html#LimeWriter	type LimeWriter		79
+nim	newLimeReader	io/lime.html#newLimeReader,Stream	proc newLimeReader(stream: Stream): LimeReader		130
+nim	newLimeReader	io/lime.html#newLimeReader,string	proc newLimeReader(filename: string): LimeReader		139
+nim	close	io/lime.html#close,LimeReader	proc close(reader: LimeReader)		146
+nim	nextRecord	io/lime.html#nextRecord,LimeReader	proc nextRecord(reader: LimeReader): LimeStatus		156
+nim	header	io/lime.html#header,LimeReader	proc header(reader: LimeReader): LimeRecordHeader		232
+nim	mbFlag	io/lime.html#mbFlag,LimeReader	proc mbFlag(reader: LimeReader): bool		236
+nim	meFlag	io/lime.html#meFlag,LimeReader	proc meFlag(reader: LimeReader): bool		240
+nim	limeType	io/lime.html#limeType,LimeReader	proc limeType(reader: LimeReader): string		244
+nim	dataBytes	io/lime.html#dataBytes,LimeReader	proc dataBytes(reader: LimeReader): int64		248
+nim	bytesRemaining	io/lime.html#bytesRemaining,LimeReader	proc bytesRemaining(reader: LimeReader): int64		252
+nim	readData	io/lime.html#readData,LimeReader,pointer,int	proc readData(reader: LimeReader; dest: pointer; nbytes: int): (int, LimeStatus)		256
+nim	readAllData	io/lime.html#readAllData,LimeReader	proc readAllData(reader: LimeReader): seq[byte]		277
+nim	readString	io/lime.html#readString,LimeReader	proc readString(reader: LimeReader): string		286
+nim	seek	io/lime.html#seek,LimeReader,int64,int	proc seek(reader: LimeReader; offset: int64; whence: int = 0): LimeStatus		297
+nim	getPosition	io/lime.html#getPosition,LimeReader	proc getPosition(reader: LimeReader): int64		328
+nim	setPosition	io/lime.html#setPosition,LimeReader,int64	proc setPosition(reader: LimeReader; offset: int64): LimeStatus		332
+nim	newLimeWriter	io/lime.html#newLimeWriter,Stream	proc newLimeWriter(stream: Stream): LimeWriter		346
+nim	newLimeWriter	io/lime.html#newLimeWriter,string	proc newLimeWriter(filename: string): LimeWriter		355
+nim	writeHeader	io/lime.html#writeHeader,LimeWriter,LimeRecordHeader	proc writeHeader(writer: LimeWriter; header: LimeRecordHeader): LimeStatus		362
+nim	createHeader	io/lime.html#createHeader,bool,bool,string,int64	proc createHeader(mbFlag, meFlag: bool; limeType: string; dataLen: int64): LimeRecordHeader		406
+nim	writeData	io/lime.html#writeData,LimeWriter,pointer,int	proc writeData(writer: LimeWriter; source: pointer; nbytes: int): (int, LimeStatus)		415
+nim	writeString	io/lime.html#writeString,LimeWriter,string	proc writeString(writer: LimeWriter; s: string): LimeStatus		431
+nim	writeBytes	io/lime.html#writeBytes,LimeWriter,openArray[byte]	proc writeBytes(writer: LimeWriter; data: openArray[byte]): LimeStatus		438
+nim	close	io/lime.html#close,LimeWriter	proc close(writer: LimeWriter): LimeStatus		445
+nim	records	io/lime.html#records.i,LimeReader	iterator records(reader: LimeReader): LimeRecordHeader		463
+nim	writeRecord	io/lime.html#writeRecord,LimeWriter,string,string	proc writeRecord(writer: LimeWriter; limeType: string; data: string; mbFlag = true;\n            meFlag = true): LimeStatus		468
+nim	writeRecord	io/lime.html#writeRecord,LimeWriter,string,openArray[byte]	proc writeRecord(writer: LimeWriter; limeType: string; data: openArray[byte];\n            mbFlag = true; meFlag = true): LimeStatus		476
+nim	dumpContents	io/lime.html#dumpContents,string	proc dumpContents(filename: string)		484
+nimgrp	newlimewriter	io/lime.html#newLimeWriter-procs-all	proc		346
+nimgrp	close	io/lime.html#close-procs-all	proc		146
+nimgrp	writerecord	io/lime.html#writeRecord-procs-all	proc		468
+nimgrp	newlimereader	io/lime.html#newLimeReader-procs-all	proc		130

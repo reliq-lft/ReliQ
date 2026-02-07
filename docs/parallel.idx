@@ -1,0 +1,4 @@
+nimTitle	parallel	parallel.html	module parallel		0
+nim	UseSycl	parallel.html#UseSycl	const UseSycl		37
+nim	UseOpenMP	parallel.html#UseOpenMP	const UseOpenMP		38
+nim	parallel	parallel.html#parallel.t,untyped	template parallel(body: untyped): untyped		50

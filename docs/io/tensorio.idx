@@ -1,0 +1,27 @@
+nimTitle	tensorio	io/tensorio.html	module io/tensorio		0
+nim	globalLexIndex	io/tensorio.html#globalLexIndex,array[D,int],array[D,int]	proc globalLexIndex[D: static[int]](coords: array[D, int]; dims: array[D, int]): int		74
+nim	globalLexCoords	io/tensorio.html#globalLexCoords,int,array[D,int]	proc globalLexCoords[D: static[int]](index: int; dims: array[D, int]): array[D, int]		83
+nim	TensorFieldReader	io/tensorio.html#TensorFieldReader	type TensorFieldReader		95
+nim	newTensorFieldReader	io/tensorio.html#newTensorFieldReader,string	proc newTensorFieldReader(filename: string): TensorFieldReader		106
+nim	close	io/tensorio.html#close,TensorFieldReader	proc close(reader: TensorFieldReader)		115
+nim	dims	io/tensorio.html#dims,TensorFieldReader	proc dims(reader: TensorFieldReader): seq[int]		119
+nim	printFileInfo	io/tensorio.html#printFileInfo,TensorFieldReader	proc printFileInfo(reader: TensorFieldReader)		123
+nim	printRecordInfo	io/tensorio.html#printRecordInfo,TensorFieldReader	proc printRecordInfo(reader: TensorFieldReader)		138
+nim	loadBinaryData	io/tensorio.html#loadBinaryData,TensorFieldReader,bool	proc loadBinaryData(reader: TensorFieldReader; validate: bool = true)		161
+nim	precision	io/tensorio.html#precision,TensorFieldReader	proc precision(reader: TensorFieldReader): SciDACPrecision		199
+nim	colors	io/tensorio.html#colors,TensorFieldReader	proc colors(reader: TensorFieldReader): int		203
+nim	spins	io/tensorio.html#spins,TensorFieldReader	proc spins(reader: TensorFieldReader): int		207
+nim	typesize	io/tensorio.html#typesize,TensorFieldReader	proc typesize(reader: TensorFieldReader): int		211
+nim	datacount	io/tensorio.html#datacount,TensorFieldReader	proc datacount(reader: TensorFieldReader): int		215
+nim	readTensorField	io/tensorio.html#readTensorField,TensorField[D,R,L: Lattice[readTensorField.D],T],string,bool	proc readTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: var TensorField[D, R, L, T]; filename: string;\n    swapBytes: bool = true)		223
+nim	TensorFieldWriter	io/tensorio.html#TensorFieldWriter	type TensorFieldWriter		366
+nim	newTensorFieldWriter	io/tensorio.html#newTensorFieldWriter,string,array[D,int]	proc newTensorFieldWriter[D: static[int]](filename: string; dims: array[D, int]): TensorFieldWriter		372
+nim	close	io/tensorio.html#close,TensorFieldWriter	proc close(writer: TensorFieldWriter): LimeStatus		394
+nim	writeTensorField	io/tensorio.html#writeTensorField,TensorField[D,R,L: Lattice[writeTensorField.D],T],string,string,int,int	proc writeTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](\n    tensor: TensorField[D, R, L, T]; filename: string; userXml: string = "";\n    colors: int = 3; spins: int = 0): LimeStatus		398
+nim	readGaugeField	io/tensorio.html#readGaugeField,array[,TensorField[D,,L: Lattice[readGaugeField.D],Complex64]],string,bool	proc readGaugeField[D: static[int]; L: Lattice[D]](\n    gaugeField: var array[4, TensorField[D, 2, L, Complex64]]; filename: string;\n    swapBytes: bool = true)		566
+nim	writeGaugeField	io/tensorio.html#writeGaugeField,array[,TensorField[D,,L: Lattice[writeGaugeField.D],Complex64]],string,string	proc writeGaugeField[D: static[int]; L: Lattice[D]](\n    gaugeField: array[4, TensorField[D, 2, L, Complex64]]; filename: string;\n    userXml: string = ""): LimeStatus		682
+nim	readGaugeFieldToTensor	io/tensorio.html#readGaugeFieldToTensor,TensorField[D,,L: Lattice[readGaugeFieldToTensor.D],Complex64],string	proc readGaugeFieldToTensor[D: static[int]; L: Lattice[D]](\n    tensor: var TensorField[D, 3, L, Complex64]; filename: string)		784
+nim	writeGaugeFieldFromTensor	io/tensorio.html#writeGaugeFieldFromTensor,TensorField[D,,L: Lattice[writeGaugeFieldFromTensor.D],Complex64],string,string	proc writeGaugeFieldFromTensor[D: static[int]; L: Lattice[D]](\n    tensor: TensorField[D, 3, L, Complex64]; filename: string;\n    userXml: string = ""): LimeStatus		795
+nim	readPropagatorToTensor	io/tensorio.html#readPropagatorToTensor,TensorField[D,,L: Lattice[readPropagatorToTensor.D],Complex64],string	proc readPropagatorToTensor[D: static[int]; L: Lattice[D]](\n    tensor: var TensorField[D, 4, L, Complex64]; filename: string)		804
+nim	writePropagatorFromTensor	io/tensorio.html#writePropagatorFromTensor,TensorField[D,,L: Lattice[writePropagatorFromTensor.D],Complex64],string,string	proc writePropagatorFromTensor[D: static[int]; L: Lattice[D]](\n    tensor: TensorField[D, 4, L, Complex64]; filename: string;\n    userXml: string = ""): LimeStatus		814
+nimgrp	close	io/tensorio.html#close-procs-all	proc		115

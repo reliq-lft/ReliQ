@@ -1,0 +1,99 @@
+nimTitle	stencil	lattice/stencil.html	module lattice/stencil		0
+nim	Direction	lattice/stencil.html#Direction	type Direction		57
+nim	SignedDirection	lattice/stencil.html#SignedDirection	object SignedDirection		60
+nim	`$`	lattice/stencil.html#$,Direction	proc `$`(d: Direction): string		65
+nim	`$`	lattice/stencil.html#$,SignedDirection	proc `$`(sd: SignedDirection): string		66
+nim	`==`	lattice/stencil.html#==,Direction,Direction	proc `==`(a, b: Direction): bool		69
+nim	hash	lattice/stencil.html#hash,Direction	proc hash(d: Direction): int		70
+nim	forward	lattice/stencil.html#forward,Direction	proc forward(d: Direction): SignedDirection		72
+nim	backward	lattice/stencil.html#backward,Direction	proc backward(d: Direction): SignedDirection		75
+nim	X	lattice/stencil.html#X.t	template X(): Direction		78
+nim	Y	lattice/stencil.html#Y.t	template Y(): Direction		79
+nim	Z	lattice/stencil.html#Z.t	template Z(): Direction		80
+nim	T	lattice/stencil.html#T.t	template T(): Direction		81
+nim	directions	lattice/stencil.html#directions.i,int	iterator directions(nDim: int): Direction		83
+nim	allDirections	lattice/stencil.html#allDirections.i,int	iterator allDirections(nDim: int): SignedDirection		87
+nim	StencilPoint	lattice/stencil.html#StencilPoint	object StencilPoint		98
+nim	newStencilPoint	lattice/stencil.html#newStencilPoint,array[D,int],int	proc newStencilPoint[D: static int](offset: array[D, int]; id: int = 0): StencilPoint[\n    D]		103
+nim	newStencilPoint	lattice/stencil.html#newStencilPoint,SignedDirection	proc newStencilPoint[D: static int](sd: SignedDirection): StencilPoint[D]		106
+nim	`$`	lattice/stencil.html#$,StencilPoint[D]	proc `$`[D: static int](p: StencilPoint[D]): string		112
+nim	StencilPattern	lattice/stencil.html#StencilPattern	object StencilPattern		124
+nim	newStencilPattern	lattice/stencil.html#newStencilPattern,string	proc newStencilPattern[D: static int](name: string = ""): StencilPattern[D]		129
+nim	addPoint	lattice/stencil.html#addPoint,StencilPattern[D],array[D,int]	proc addPoint[D: static int](s: var StencilPattern[D]; offset: array[D, int])		132
+nim	addPoint	lattice/stencil.html#addPoint,StencilPattern[D],SignedDirection	proc addPoint[D: static int](s: var StencilPattern[D]; sd: SignedDirection)		135
+nim	addPoint	lattice/stencil.html#addPoint,StencilPattern[D],int,int	proc addPoint[D: static int](s: var StencilPattern[D]; sign: int; dir: int)		141
+nim	nPoints	lattice/stencil.html#nPoints,StencilPattern[D]	proc nPoints[D: static int](s: StencilPattern[D]): int		147
+nim	`$`	lattice/stencil.html#$,StencilPattern[D]	proc `$`[D: static int](s: StencilPattern[D]): string		149
+nim	Stencil	lattice/stencil.html#Stencil	type Stencil		155
+nim	newStencil	lattice/stencil.html#newStencil,string	proc newStencil[D: static int](name: string = ""): Stencil[D]		156
+nim	nearestNeighborStencil	lattice/stencil.html#nearestNeighborStencil	proc nearestNeighborStencil[D: static int](): StencilPattern[D]		162
+nim	laplacianStencil	lattice/stencil.html#laplacianStencil	proc laplacianStencil[D: static int](): StencilPattern[D]		169
+nim	forwardStencil	lattice/stencil.html#forwardStencil	proc forwardStencil[D: static int](): StencilPattern[D]		173
+nim	backwardStencil	lattice/stencil.html#backwardStencil	proc backwardStencil[D: static int](): StencilPattern[D]		179
+nim	PathStep	lattice/stencil.html#PathStep	object PathStep		190
+nim	step	lattice/stencil.html#step,int,bool	proc step(dir: int; forward: bool = true): PathStep		194
+nim	fwd	lattice/stencil.html#fwd,int	proc fwd(dir: int): PathStep		197
+nim	bwd	lattice/stencil.html#bwd,int	proc bwd(dir: int): PathStep		198
+nim	pathToStencil	lattice/stencil.html#pathToStencil,openArray[PathStep]	proc pathToStencil[D: static int](path: openArray[PathStep]): StencilPattern[D]		200
+nim	rectanglePath	lattice/stencil.html#rectanglePath,int,int,int,int	proc rectanglePath(mu, nu: int; a, b: int): seq[PathStep]		209
+nim	plaquettePath	lattice/stencil.html#plaquettePath,int,int	proc plaquettePath(mu, nu: int): seq[PathStep]		216
+nim	UseOpenCL	lattice/stencil.html#UseOpenCL	const UseOpenCL		224
+nim	UseSYCL	lattice/stencil.html#UseSYCL	const UseSYCL		225
+nim	UseOpenMP	lattice/stencil.html#UseOpenMP	const UseOpenMP		226
+nim	VectorWidth	lattice/stencil.html#VectorWidth	const VectorWidth		227
+nim	sbScalar	lattice/stencil.html#sbScalar	StencilBackend.sbScalar		230
+nim	sbSimd	lattice/stencil.html#sbSimd	StencilBackend.sbSimd		230
+nim	sbOpenCL	lattice/stencil.html#sbOpenCL	StencilBackend.sbOpenCL		230
+nim	sbSycl	lattice/stencil.html#sbSycl	StencilBackend.sbSycl		230
+nim	StencilBackend	lattice/stencil.html#StencilBackend	enum StencilBackend		230
+nim	LatticeStencil	lattice/stencil.html#LatticeStencil	object LatticeStencil		281
+nim	nSites	lattice/stencil.html#nSites,LatticeStencil[D]	proc nSites[D: static int](s: LatticeStencil[D]): int		307
+nim	newLatticeStencil	lattice/stencil.html#newLatticeStencil,StencilPattern[D],array[D,int],array[D,int],array[D,int]	proc newLatticeStencil[D: static int](pattern: StencilPattern[D];\n                                 localGeom: array[D, int];\n                                 ghostWidth: array[D, int];\n                                 simdGrid: array[D, int]): LatticeStencil[D]		442
+nim	newLatticeStencil	lattice/stencil.html#newLatticeStencil,StencilPattern[D],array[D,int],array[D,int]	proc newLatticeStencil[D: static int](pattern: StencilPattern[D];\n                                 localGeom: array[D, int];\n                                 ghostWidth: array[D, int]): LatticeStencil[D]		484
+nim	newLatticeStencil	lattice/stencil.html#newLatticeStencil,StencilPattern[D],array[D,int]	proc newLatticeStencil[D: static int](pattern: StencilPattern[D];\n                                 localGeom: array[D, int]): LatticeStencil[D]		497
+nim	nearestNeighborStencil	lattice/stencil.html#nearestNeighborStencil,L	proc nearestNeighborStencil[D: static int; L: Lattice[D]](lat: L): StencilPattern[D]		517
+nim	laplacianStencil	lattice/stencil.html#laplacianStencil,L	proc laplacianStencil[D: static int; L: Lattice[D]](lat: L): StencilPattern[D]		525
+nim	forwardStencil	lattice/stencil.html#forwardStencil,L	proc forwardStencil[D: static int; L: Lattice[D]](lat: L): StencilPattern[D]		529
+nim	backwardStencil	lattice/stencil.html#backwardStencil,L	proc backwardStencil[D: static int; L: Lattice[D]](lat: L): StencilPattern[D]		533
+nim	newLatticeStencil	lattice/stencil.html#newLatticeStencil,StencilPattern[D],L	proc newLatticeStencil[D: static int; L: Lattice[D]](pattern: StencilPattern[D];\n    lat: L): LatticeStencil[D]		539
+nim	newLatticeStencil	lattice/stencil.html#newLatticeStencil,L	proc newLatticeStencil[D: static int; L: Lattice[D]](lat: L): LatticeStencil[D]		571
+nim	neighbor	lattice/stencil.html#neighbor,LatticeStencil[D],int,int	proc neighbor[D: static int](s: LatticeStencil[D]; site, point: int): int		589
+nim	isGhostNeighbor	lattice/stencil.html#isGhostNeighbor,LatticeStencil[D],int,int	proc isGhostNeighbor[D: static int](s: LatticeStencil[D]; site, point: int): bool		596
+nim	neighborSimd	lattice/stencil.html#neighborSimd,LatticeStencil[D],int,int,int	proc neighborSimd[D: static int](s: LatticeStencil[D]; outer, lane, point: int): tuple[\n    outer, lane: int]		600
+nim	StencilShift	lattice/stencil.html#StencilShift	object StencilShift		618
+nim	shift	lattice/stencil.html#shift,LatticeStencil[D],int,int,int	proc shift[D: static int](s: LatticeStencil[D]; site: int; sign: int; dir: int): StencilShift[\n    D]		625
+nim	shift	lattice/stencil.html#shift,LatticeStencil[D],int,SignedDirection	proc shift[D: static int](s: LatticeStencil[D]; site: int; sd: SignedDirection): StencilShift[\n    D]		645
+nim	fwd	lattice/stencil.html#fwd,LatticeStencil[D],int,int	proc fwd[D: static int](s: LatticeStencil[D]; site: int; dir: int): StencilShift[D]		653
+nim	bwd	lattice/stencil.html#bwd,LatticeStencil[D],int,int	proc bwd[D: static int](s: LatticeStencil[D]; site: int; dir: int): StencilShift[D]		657
+nim	idx	lattice/stencil.html#idx,StencilShift	proc idx(sh: StencilShift): int		662
+nim	sites	lattice/stencil.html#sites.i,LatticeStencil[D]	iterator sites[D: static int](s: LatticeStencil[D]): int		668
+nim	points	lattice/stencil.html#points.i,LatticeStencil[D]	iterator points[D: static int](s: LatticeStencil[D]): int		672
+nim	neighbors	lattice/stencil.html#neighbors.i,LatticeStencil[D],int	iterator neighbors[D: static int](s: LatticeStencil[D]; site: int): int		676
+nim	forEachNeighbor	lattice/stencil.html#forEachNeighbor.t,LatticeStencil[D],int,untyped,untyped,untyped	template forEachNeighbor[D: static int](s: LatticeStencil[D]; site: int;\n                               pointVar, nbrVar: untyped; body: untyped)		680
+nim	nLanes	lattice/stencil.html#nLanes,LatticeStencil[D]	proc nLanes[D: static int](s: LatticeStencil[D]): int		690
+nim	nOuter	lattice/stencil.html#nOuter,LatticeStencil[D]	proc nOuter[D: static int](s: LatticeStencil[D]): int		691
+nim	localToPadded	lattice/stencil.html#localToPadded,LatticeStencil[D],int	proc localToPadded[D: static int](s: LatticeStencil[D]; localSite: int): int		697
+nim	paddedToLocal	lattice/stencil.html#paddedToLocal,LatticeStencil[D],int	proc paddedToLocal[D: static int](s: LatticeStencil[D]; paddedSite: int): int		707
+nim	localToPadded	lattice/stencil.html#localToPadded,int,array[D,int],array[D,int]	proc localToPadded[D: static int](localSite: int; localGeom: array[D, int];\n                             ghostWidth: array[D, int]): int		721
+nim	paddedToLocal	lattice/stencil.html#paddedToLocal,int,array[D,int],array[D,int]	proc paddedToLocal[D: static int](paddedSite: int; localGeom: array[D, int];\n                             ghostWidth: array[D, int]): int		737
+nim	getOffsetBuffer	lattice/stencil.html#getOffsetBuffer,LatticeStencil[D]	proc getOffsetBuffer[D: static int](s: LatticeStencil[D]): ptr int32		759
+nim	offsetBufferSize	lattice/stencil.html#offsetBufferSize,LatticeStencil[D]	proc offsetBufferSize[D: static int](s: LatticeStencil[D]): int		765
+nim	StencilEntry	lattice/stencil.html#StencilEntry	object StencilEntry		776
+nim	StencilView	lattice/stencil.html#StencilView	object StencilView		782
+nim	newStencilView	lattice/stencil.html#newStencilView,StencilPattern[D],array[D,int]	proc newStencilView[D: static int](stencil: StencilPattern[D];\n                              localGeom: array[D, int]): StencilView[D]		789
+nim	getEntry	lattice/stencil.html#getEntry,StencilView[D],int,int	proc getEntry[D: static int](sv: StencilView[D]; site, point: int): StencilEntry		820
+nim	neighborOffset	lattice/stencil.html#neighborOffset,StencilView[D],int,int	proc neighborOffset[D: static int](sv: StencilView[D]; site, point: int): int		823
+nimgrp	newlatticestencil	lattice/stencil.html#newLatticeStencil-procs-all	proc		442
+nimgrp	$	lattice/stencil.html#$-procs-all	proc		65
+nimgrp	shift	lattice/stencil.html#shift-procs-all	proc		625
+nimgrp	localtopadded	lattice/stencil.html#localToPadded-procs-all	proc		697
+nimgrp	paddedtolocal	lattice/stencil.html#paddedToLocal-procs-all	proc		707
+nimgrp	nearestneighborstencil	lattice/stencil.html#nearestNeighborStencil-procs-all	proc		162
+nimgrp	forwardstencil	lattice/stencil.html#forwardStencil-procs-all	proc		173
+nimgrp	backwardstencil	lattice/stencil.html#backwardStencil-procs-all	proc		179
+nimgrp	fwd	lattice/stencil.html#fwd-procs-all	proc		197
+nimgrp	bwd	lattice/stencil.html#bwd-procs-all	proc		198
+nimgrp	laplacianstencil	lattice/stencil.html#laplacianStencil-procs-all	proc		169
+nimgrp	addpoint	lattice/stencil.html#addPoint-procs-all	proc		132
+nimgrp	newstencilpoint	lattice/stencil.html#newStencilPoint-procs-all	proc		103
+heading	Unified Stencil Operations for Lattice Field Theory	lattice/stencil.html#unified-stencil-operations-for-lattice-field-theory	 Unified Stencil Operations for Lattice Field Theory		0

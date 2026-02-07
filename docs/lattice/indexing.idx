@@ -1,0 +1,7 @@
+nimTitle	indexing	lattice/indexing.html	module lattice/indexing		0
+nim	flatToCoords	lattice/indexing.html#flatToCoords,int,array[D,int]	proc flatToCoords[D: static[int]](idx: int; dims: array[D, int]): array[D, int]		30
+nim	coordsToFlat	lattice/indexing.html#coordsToFlat,array[D,int],array[D,int]	proc coordsToFlat[D: static[int]](coords: array[D, int]; dims: array[D, int]): int		47
+nim	localToGlobalCoords	lattice/indexing.html#localToGlobalCoords,array[D,int],array[D,int]	proc localToGlobalCoords[D: static[int]](localCoords: array[D, int];\n                                    lo: array[D, int]): array[D, int]		65
+nim	globalToLocalCoords	lattice/indexing.html#globalToLocalCoords,array[D,int],array[D,int]	proc globalToLocalCoords[D: static[int]](globalCoords: array[D, int];\n                                    lo: array[D, int]): array[D, int]		80
+nim	localFlatToGlobalFlat	lattice/indexing.html#localFlatToGlobalFlat,int,array[D,int],array[D,int],array[D,int]	proc localFlatToGlobalFlat[D: static[int]](localIdx: int; localDims: array[D, int];\n                                      globalDims: array[D, int];\n                                      lo: array[D, int]): int		95
+nim	globalFlatToLocalFlat	lattice/indexing.html#globalFlatToLocalFlat,int,array[D,int],array[D,int],array[D,int]	proc globalFlatToLocalFlat[D: static[int]](globalIdx: int; localDims: array[D, int];\n                                      globalDims: array[D, int];\n                                      lo: array[D, int]): int		125

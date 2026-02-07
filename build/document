@@ -38,11 +38,56 @@ MAIN="${SRC}/index.md"
 mkdir -p ${DOCS}
 rm -rf ${DOCS}/*
 
-echo "Docs from source path: ${MAIN}"
-echo "Generating docs in: ${DOCS}"
+NIMFLAGS="--backend:cpp --index:on --outdir:${DOCS} --path:${SRC}"
 
-CMD="$NIM md2html --backend:cpp --project --index:on --outdir:$DOCS --path:${SRC} ${MAIN}"
-echo "Running command: ${CMD}"
-eval $CMD
+echo "=== ReliQ Documentation Generator ==="
+echo "Source:  ${SRC}"
+echo "Output:  ${DOCS}"
+echo ""
 
-#cp ${SWD}/build/index.html ${SWD}/docs/index.html
+# --- Step 1: Generate the main index page from Markdown ---
+echo "[1/4] Generating index page..."
+$NIM md2html ${NIMFLAGS} ${MAIN} 2>&1 | grep -v "^Hint:"
+
+# --- Step 2: Generate API docs from reliq.nim (follows default/OpenCL imports) ---
+echo "[2/4] Generating API docs (default backend path)..."
+$NIM doc ${NIMFLAGS} --project --docRoot:${SRC} ${SRC}/reliq.nim 2>&1 | grep -E "Error:|SuccessX" | head -5
+
+# --- Step 3: Generate docs for backend-specific modules not reached via default imports ---
+echo "[3/4] Generating backend-specific module docs..."
+EXTRA_MODULES=(
+  # OpenMP backend
+  "openmp/ompdisp"
+  "openmp/ompsimd"
+  # SYCL backend
+  "sycl/sycldisp"
+  "sycl/syclbase"
+  "sycl/syclwrap"
+  # SIMD types
+  "simd/simdtypes"
+  # Transporter (uses when isMainModule guard)
+  "tensor/transporter"
+  # Lattice indexing
+  "lattice/indexing"
+)
+
+for mod in "${EXTRA_MODULES[@]}"; do
+  src_file="${SRC}/${mod}.nim"
+  if [[ -f "$src_file" ]]; then
+    # Extract subdirectory (e.g., "openmp" from "openmp/ompdisp")
+    subdir=$(dirname "$mod")
+    if [[ "$subdir" != "." ]]; then
+      mkdir -p "${DOCS}/${subdir}"
+    fi
+    echo "  doc: ${mod}"
+    $NIM doc ${NIMFLAGS} --docRoot:${SRC} "$src_file" 2>&1 | grep -E "Error:|SuccessX" | head -2
+  else
+    echo "  skip (not found): ${mod}"
+  fi
+done
+
+# --- Step 4: Summary ---
+echo ""
+NHTML=$(find ${DOCS} -name "*.html" | wc -l)
+echo "=== Documentation generated: ${NHTML} pages in ${DOCS} ==="
+echo "Open docs/index.html in a browser to view."

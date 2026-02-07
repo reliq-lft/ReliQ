@@ -1,0 +1,14 @@
+nimTitle	gampi	globalarrays/gampi.html	module globalarrays/gampi		0
+nim	initMPI	globalarrays/gampi.html#initMPI,ptr.cint,ptr.cstringArray	proc initMPI(argc: ptr cint; argv: ptr cstringArray): cint		40
+nim	finalizeMPI	globalarrays/gampi.html#finalizeMPI	proc finalizeMPI(): cint		43
+nim	MPI_Allreduce	globalarrays/gampi.html#MPI_Allreduce,pointer,pointer,cint,cint,cint,cint	proc MPI_Allreduce(sendbuf: pointer; recvbuf: pointer; count: cint; datatype: cint;\n              op: cint; comm: cint): cint		48
+nim	MPI_COMM_WORLD	globalarrays/gampi.html#MPI_COMM_WORLD	var MPI_COMM_WORLD		58
+nim	MPI_SUM	globalarrays/gampi.html#MPI_SUM	var MPI_SUM		59
+nim	MPI_DOUBLE	globalarrays/gampi.html#MPI_DOUBLE	var MPI_DOUBLE		60
+nim	MPI_FLOAT	globalarrays/gampi.html#MPI_FLOAT	var MPI_FLOAT		61
+nim	MPI_INT	globalarrays/gampi.html#MPI_INT	var MPI_INT		62
+nim	MPI_LONG_LONG	globalarrays/gampi.html#MPI_LONG_LONG	var MPI_LONG_LONG		63
+nim	allReduceFloat64	globalarrays/gampi.html#allReduceFloat64,ptr.float64,ptr.float64,cint	proc allReduceFloat64(sendbuf: ptr float64; recvbuf: ptr float64; count: cint): cint		66
+nim	allReduceFloat32	globalarrays/gampi.html#allReduceFloat32,ptr.float32,ptr.float32,cint	proc allReduceFloat32(sendbuf: ptr float32; recvbuf: ptr float32; count: cint): cint		71
+nim	allReduceInt32	globalarrays/gampi.html#allReduceInt32,ptr.int32,ptr.int32,cint	proc allReduceInt32(sendbuf: ptr int32; recvbuf: ptr int32; count: cint): cint		76
+nim	allReduceInt64	globalarrays/gampi.html#allReduceInt64,ptr.int64,ptr.int64,cint	proc allReduceInt64(sendbuf: ptr int64; recvbuf: ptr int64; count: cint): cint		81

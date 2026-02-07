@@ -1,0 +1,11 @@
+nimTitle	cldisp	opencl/cldisp.html	module opencl/cldisp		0
+nim	VectorWidth	opencl/cldisp.html#VectorWidth	const VectorWidth		45
+nim	DebugKernels	opencl/cldisp.html#DebugKernels	const DebugKernels		46
+nim	UseWorkGroups	opencl/cldisp.html#UseWorkGroups	const UseWorkGroups		47
+nim	etFloat32	opencl/cldisp.html#etFloat32	ElementType.etFloat32		54
+nim	etFloat64	opencl/cldisp.html#etFloat64	ElementType.etFloat64		54
+nim	etInt32	opencl/cldisp.html#etInt32	ElementType.etInt32		54
+nim	etInt64	opencl/cldisp.html#etInt64	ElementType.etInt64		54
+nim	ElementType	opencl/cldisp.html#ElementType	enum ElementType		54
+nim	eachImpl	opencl/cldisp.html#eachImpl.m,untyped,typed,typed,typed	macro eachImpl(loopVar: untyped; lo: typed; hi: typed; body: typed): untyped		743
+nim	each	opencl/cldisp.html#each.m,ForLoopStmt	macro each(x: ForLoopStmt): untyped		916

@@ -140,7 +140,132 @@ proc newTensorField*[D: static[int], R: static[int], L: Lattice[D]](
     result.data = newGlobalArray(globalGrid, mpiGrid, ghostGrid): float32
   elif isComplex64(T):
     result.data = newGlobalArray(globalGrid, mpiGrid, ghostGrid): float64
- 
+
+#[ ============================================================================
+   Halo Exchange (Ghost Region Update) for Distributed Tensor Fields
+   ============================================================================ ]#
+
+proc updateGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T],
+  dim: int,
+  direction: int = 0,
+  updateCorners: bool = false
+) =
+  ## Update ghost regions for a tensor field in specified dimension
+  ##
+  ## This synchronizes ghost (halo) regions between MPI ranks.
+  ## Must be called before reading from ghost regions after local updates.
+  ##
+  ## Parameters:
+  ##   tensor: The tensor field to update
+  ##   dim: Dimension to update (0..D-1)
+  ##   direction: +1 for forward, -1 for backward, 0 for both (default)
+  ##   updateCorners: Whether to update corner ghost cells
+  ##
+  ## Example:
+  ## ```nim
+  ## var field = lat.newTensorField([3, 3]): Complex64
+  ## # ... modify local data ...
+  ## field.updateGhosts(0)  # Update ghosts in x direction
+  ## field.updateGhosts(1)  # Update ghosts in y direction
+  ## # Now ghost regions contain correct neighbor data
+  ## ```
+  let handle = tensor.data.getHandle()
+  let updateCornersFlag: cint = if updateCorners: 1 else: 0
+  
+  if direction == 0:
+    # Update both directions
+    handle.GA_Update_ghost_dir(cint(dim), cint(1), updateCornersFlag)
+    handle.GA_Update_ghost_dir(cint(dim), cint(-1), updateCornersFlag)
+  else:
+    handle.GA_Update_ghost_dir(cint(dim), cint(direction), updateCornersFlag)
+
+proc updateAllGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T],
+  updateCorners: bool = false
+) =
+  ## Update ghost regions in all dimensions
+  ##
+  ## Convenience function to update all ghost regions at once.
+  ## Equivalent to calling updateGhosts for each dimension.
+  ##
+  ## Example:
+  ## ```nim
+  ## var field = lat.newTensorField([3, 3]): Complex64
+  ## # ... modify local data ...
+  ## field.updateAllGhosts()  # Update all ghost regions
+  ## ```
+  for dim in 0..<D:
+    tensor.updateGhosts(dim, 0, updateCorners)
+
+proc hasGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T]
+): bool =
+  ## Check if tensor field has ghost regions configured
+  for d in 0..<D:
+    if tensor.lattice.ghostGrid[d] > 0:
+      return true
+  return false
+
+proc ghostWidth*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T]
+): array[D, int] =
+  ## Get the ghost width in each dimension
+  tensor.lattice.ghostGrid
+
+proc localGrid*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T]
+): array[D, int] =
+  ## Get local grid dimensions (excluding ghosts)
+  for d in 0..<D:
+    let mpi = if tensor.lattice.mpiGrid[d] <= 0: 1 else: tensor.lattice.mpiGrid[d]
+    result[d] = tensor.lattice.globalGrid[d] div mpi
+
+proc paddedGrid*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T]
+): array[D, int] =
+  ## Get padded grid dimensions (including ghosts on both sides)
+  let local = tensor.localGrid()
+  let ghosts = tensor.ghostWidth()
+  for d in 0..<D:
+    result[d] = local[d] + 2 * ghosts[d]
+
+#[ ============================================================================
+   Stencil Integration - Create stencils that work with TensorFields
+   ============================================================================ ]#
+
+# Forward import for stencil types
+import lattice/stencil
+
+proc newLatticeStencil*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: TensorField[D, R, L, T],
+  pattern: StencilPattern[D]
+): LatticeStencil[D] =
+  ## Create a unified lattice stencil from a tensor field
+  ##
+  ## Automatically extracts local geometry and ghost width from the tensor.
+  ## The stencil understands both local and ghost regions.
+  ##
+  ## Example:
+  ## ```nim
+  ## let lat = newSimpleCubicLattice([16, 16, 16, 32], [1, 1, 1, 4], [1, 1, 1, 1])
+  ## var field = lat.newTensorField([3, 3]): Complex64
+  ## 
+  ## let stencil = field.newLatticeStencil(nearestNeighborStencil[4]())
+  ## 
+  ## # Use stencil with views in each loop
+  ## var local = field.newLocalTensorField()
+  ## field.updateAllGhosts()
+  ## 
+  ## block:
+  ##   var view = local.newTensorFieldView(iokRead)
+  ##   for site in 0..<stencil.nSites:
+  ##     for dir in 0..<4:
+  ##       let fwd = view[stencil.fwd(site, dir)]
+  ##       let bwd = view[stencil.bwd(site, dir)]
+  ## ```
+  newLatticeStencil(pattern, tensor.localGrid(), tensor.ghostWidth())
+
 when isMainModule:
   block:
     var argc = cargc()

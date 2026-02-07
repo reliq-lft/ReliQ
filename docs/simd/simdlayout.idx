@@ -1,0 +1,19 @@
+nimTitle	simdlayout	simd/simdlayout.html	module simd/simdlayout		0
+nim	SimdLatticeLayout	simd/simdlayout.html#SimdLatticeLayout	object SimdLatticeLayout		60
+nim	computeStrides	simd/simdlayout.html#computeStrides,seq[int]	proc computeStrides(geom: seq[int]): seq[int]		77
+nim	computeProduct	simd/simdlayout.html#computeProduct,seq[int]	proc computeProduct(geom: seq[int]): int		86
+nim	validateSimdGrid	simd/simdlayout.html#validateSimdGrid,openArray[int],openArray[int],openArray[int]	proc validateSimdGrid(globalGeom, mpiGrid, simdGrid: openArray[int]): tuple[\n    valid: bool, message: string]		91
+nim	computeLocalGeom	simd/simdlayout.html#computeLocalGeom,openArray[int],openArray[int]	proc computeLocalGeom(globalGeom, mpiGrid: openArray[int]): seq[int]		127
+nim	newSimdLatticeLayout	simd/simdlayout.html#newSimdLatticeLayout,openArray[int],openArray[int]	proc newSimdLatticeLayout(localGeom: openArray[int]; simdGrid: openArray[int]): SimdLatticeLayout		142
+nim	newSimdLatticeLayout	simd/simdlayout.html#newSimdLatticeLayout,openArray[int],int	proc newSimdLatticeLayout(localGeom: openArray[int]; simdWidth: int): SimdLatticeLayout		182
+nim	lexicographicToCoords	simd/simdlayout.html#lexicographicToCoords,int,seq[int],seq[int]	proc lexicographicToCoords(idx: int; strides: seq[int]; geom: seq[int]): seq[int]		216
+nim	coordsToLexicographic	simd/simdlayout.html#coordsToLexicographic,seq[int],seq[int]	proc coordsToLexicographic(coords: seq[int]; strides: seq[int]): int		224
+nim	outerInnerToLocal	simd/simdlayout.html#outerInnerToLocal,int,int,SimdLatticeLayout	proc outerInnerToLocal(outerIdx, innerIdx: int; layout: SimdLatticeLayout): int		230
+nim	localToOuterInner	simd/simdlayout.html#localToOuterInner,int,SimdLatticeLayout	proc localToOuterInner(localIdx: int; layout: SimdLatticeLayout): tuple[\n    outer, inner: int]		253
+nim	simdLanes	simd/simdlayout.html#simdLanes,SimdLatticeLayout	proc simdLanes(layout: SimdLatticeLayout): int		273
+nim	vectorGroups	simd/simdlayout.html#vectorGroups,SimdLatticeLayout	proc vectorGroups(layout: SimdLatticeLayout): int		277
+nim	`$`	simd/simdlayout.html#$,SimdLatticeLayout	proc `$`(layout: SimdLatticeLayout): string		281
+nim	aosoaIndex	simd/simdlayout.html#aosoaIndex,int,int,int,int,int	proc aosoaIndex(outerIdx, innerIdx, elemIdx, elemsPerSite, nSitesInner: int): int		294
+nim	aosoaIndexFromLocal	simd/simdlayout.html#aosoaIndexFromLocal,int,int,int,SimdLatticeLayout	proc aosoaIndexFromLocal(localIdx, elemIdx, elemsPerSite: int;\n                    layout: SimdLatticeLayout): int		305
+nim	generateCoordTable	simd/simdlayout.html#generateCoordTable,SimdLatticeLayout	proc generateCoordTable(layout: SimdLatticeLayout): seq[seq[int]]		314
+nimgrp	newsimdlatticelayout	simd/simdlayout.html#newSimdLatticeLayout-procs-all	proc		142

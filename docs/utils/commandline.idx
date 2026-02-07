@@ -1,0 +1,3 @@
+nimTitle	commandline	utils/commandline.html	module utils/commandline		0
+nim	cargc	utils/commandline.html#cargc	proc cargc(): cint		33
+nim	cargv	utils/commandline.html#cargv,cint	proc cargv(argc: cint): cstringArray		35

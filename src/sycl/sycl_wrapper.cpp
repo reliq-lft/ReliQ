@@ -362,6 +362,86 @@ void kernel_complex_matvec_impl(sycl::queue& q, T* mat, T* x, T* y,
 }
 
 // ============================================================================
+// Stencil Gather Kernel - copies from neighbor sites using offset table
+// ============================================================================
+
+template<typename T>
+void kernel_stencil_copy_impl(sycl::queue& q, T* src, T* dst,
+                              const int32_t* offsets, int pointIdx, int nPoints,
+                              size_t numSites, int elemsPerSite, int vectorWidth) {
+    // offsets layout: offsets[site * nPoints + pointIdx] = neighbor site index
+    // AoSoA layout: group = site / VW, lane = site % VW
+    // element i at site s is at: (s/VW) * (elemsPerSite * VW) + i * VW + (s % VW)
+    q.parallel_for(sycl::range<1>(numSites), [=](sycl::id<1> idx) {
+        size_t site = idx;
+        int nbrSite = offsets[site * nPoints + pointIdx];
+        
+        size_t dstGroup = site / vectorWidth;
+        size_t dstLane  = site % vectorWidth;
+        size_t nbrGroup = nbrSite / vectorWidth;
+        size_t nbrLane  = nbrSite % vectorWidth;
+        
+        size_t dstBase = dstGroup * (elemsPerSite * vectorWidth);
+        size_t srcBase = nbrGroup * (elemsPerSite * vectorWidth);
+        
+        for (int e = 0; e < elemsPerSite; e++) {
+            dst[dstBase + e * vectorWidth + dstLane] = 
+                src[srcBase + e * vectorWidth + nbrLane];
+        }
+    });
+}
+
+// Stencil scalar multiply: dst[n] = scalar * src[neighbor(n)]
+template<typename T>
+void kernel_stencil_scalar_mul_impl(sycl::queue& q, T* src, T scalar, T* dst,
+                                    const int32_t* offsets, int pointIdx, int nPoints,
+                                    size_t numSites, int elemsPerSite, int vectorWidth) {
+    q.parallel_for(sycl::range<1>(numSites), [=](sycl::id<1> idx) {
+        size_t site = idx;
+        int nbrSite = offsets[site * nPoints + pointIdx];
+        
+        size_t dstGroup = site / vectorWidth;
+        size_t dstLane  = site % vectorWidth;
+        size_t nbrGroup = nbrSite / vectorWidth;
+        size_t nbrLane  = nbrSite % vectorWidth;
+        
+        size_t dstBase = dstGroup * (elemsPerSite * vectorWidth);
+        size_t srcBase = nbrGroup * (elemsPerSite * vectorWidth);
+        
+        for (int e = 0; e < elemsPerSite; e++) {
+            dst[dstBase + e * vectorWidth + dstLane] = 
+                scalar * src[srcBase + e * vectorWidth + nbrLane];
+        }
+    });
+}
+
+// Stencil add: dst[n] = srcA[n] + srcB[neighbor(n)]
+template<typename T>
+void kernel_stencil_add_impl(sycl::queue& q, T* srcA, T* srcB, T* dst,
+                             const int32_t* offsets, int pointIdx, int nPoints,
+                             size_t numSites, int elemsPerSite, int vectorWidth) {
+    q.parallel_for(sycl::range<1>(numSites), [=](sycl::id<1> idx) {
+        size_t site = idx;
+        int nbrSite = offsets[site * nPoints + pointIdx];
+        
+        size_t dstGroup = site / vectorWidth;
+        size_t dstLane  = site % vectorWidth;
+        size_t nbrGroup = nbrSite / vectorWidth;
+        size_t nbrLane  = nbrSite % vectorWidth;
+        
+        size_t dstBase = dstGroup * (elemsPerSite * vectorWidth);
+        size_t srcABase = dstGroup * (elemsPerSite * vectorWidth);  // srcA uses same site
+        size_t srcBBase = nbrGroup * (elemsPerSite * vectorWidth);
+        
+        for (int e = 0; e < elemsPerSite; e++) {
+            dst[dstBase + e * vectorWidth + dstLane] = 
+                srcA[srcABase + e * vectorWidth + dstLane] +
+                srcB[srcBBase + e * vectorWidth + nbrLane];
+        }
+    });
+}
+
+// ============================================================================
 // Extern "C" Entry Points
 // ============================================================================
 
@@ -699,5 +779,52 @@ DEFINE_BASIC_KERNELS(i64, int64_t)
 DEFINE_MATRIX_KERNELS(i64, int64_t)
 DEFINE_ELEMENT_WRITE_KERNELS(i64, int64_t)
 // No complex kernels for integers
+
+// ============================================================================
+// Stencil Gather Kernels
+// ============================================================================
+
+#define DEFINE_STENCIL_KERNELS(SUFFIX, TYPE) \
+void sycl_kernel_stencil_copy_##SUFFIX(void* queue, void* bufSrc, void* bufDst, \
+                                        void* bufOffsets, int pointIdx, int nPoints, \
+                                        size_t numSites, int elemsPerSite, int vectorWidth) { \
+    if (!queue || !bufSrc || !bufDst || !bufOffsets || numSites == 0) return; \
+    auto q = static_cast<SyclQueueWrapper*>(queue); \
+    auto* src = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufSrc)->ptr); \
+    auto* dst = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufDst)->ptr); \
+    auto* offsets = static_cast<int32_t*>(static_cast<SyclBufferWrapper*>(bufOffsets)->ptr); \
+    kernel_stencil_copy_impl(q->queue, src, dst, offsets, pointIdx, nPoints, \
+                             numSites, elemsPerSite, vectorWidth); \
+} \
+\
+void sycl_kernel_stencil_scalar_mul_##SUFFIX(void* queue, void* bufSrc, TYPE scalar, void* bufDst, \
+                                              void* bufOffsets, int pointIdx, int nPoints, \
+                                              size_t numSites, int elemsPerSite, int vectorWidth) { \
+    if (!queue || !bufSrc || !bufDst || !bufOffsets || numSites == 0) return; \
+    auto q = static_cast<SyclQueueWrapper*>(queue); \
+    auto* src = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufSrc)->ptr); \
+    auto* dst = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufDst)->ptr); \
+    auto* offsets = static_cast<int32_t*>(static_cast<SyclBufferWrapper*>(bufOffsets)->ptr); \
+    kernel_stencil_scalar_mul_impl(q->queue, src, scalar, dst, offsets, pointIdx, nPoints, \
+                                   numSites, elemsPerSite, vectorWidth); \
+} \
+\
+void sycl_kernel_stencil_add_##SUFFIX(void* queue, void* bufSrcA, void* bufSrcB, void* bufDst, \
+                                       void* bufOffsets, int pointIdx, int nPoints, \
+                                       size_t numSites, int elemsPerSite, int vectorWidth) { \
+    if (!queue || !bufSrcA || !bufSrcB || !bufDst || !bufOffsets || numSites == 0) return; \
+    auto q = static_cast<SyclQueueWrapper*>(queue); \
+    auto* srcA = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufSrcA)->ptr); \
+    auto* srcB = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufSrcB)->ptr); \
+    auto* dst = static_cast<TYPE*>(static_cast<SyclBufferWrapper*>(bufDst)->ptr); \
+    auto* offsets = static_cast<int32_t*>(static_cast<SyclBufferWrapper*>(bufOffsets)->ptr); \
+    kernel_stencil_add_impl(q->queue, srcA, srcB, dst, offsets, pointIdx, nPoints, \
+                            numSites, elemsPerSite, vectorWidth); \
+}
+
+DEFINE_STENCIL_KERNELS(f32, float)
+DEFINE_STENCIL_KERNELS(f64, double)
+DEFINE_STENCIL_KERNELS(i32, int32_t)
+DEFINE_STENCIL_KERNELS(i64, int64_t)
 
 } // extern "C"

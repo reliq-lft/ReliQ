@@ -40,6 +40,9 @@ import std/strutils  # for join
 const UseSycl* {.booldefine.} = false
 const UseOpenMP* {.booldefine.} = false
 
+when UseOpenMP:
+  import ../simd/simdlayout
+
 #[ Vector type - compile-time sized ]#
 
 type Vec*[N: static[int], T] = object
@@ -250,6 +253,10 @@ type
       hostPtr*: pointer      # Direct host memory pointer
       shape*: seq[int]       # Tensor shape
       elemsPerSite*: int     # Elements per site
+      hasSimdLayout*: bool   # True if data uses AoSoA layout
+      # SIMD layout fields for AoSoA indexing
+      simdLayoutPtr*: pointer  # Pointer to SimdLatticeLayout
+      nSitesInner*: int        # Number of inner sites (simd lane count)
 
   TensorElementProxy*[L, T] = object
     ## Proxy type returned by TensorSiteProxy[] - represents single element at site
@@ -352,40 +359,44 @@ when UseOpenMP:
         result += indices[i] * stride
       stride *= shape[i]
   
+  # Helper to compute element offset for proxy (handles AoS and AoSoA)
+  proc proxyElemOffset[L, T](proxy: TensorSiteProxy[L, T], elemIdx: int): int {.inline.} =
+    if proxy.hasSimdLayout:
+      let layout = cast[ptr SimdLatticeLayout](proxy.simdLayoutPtr)
+      let (outer, inner) = localToOuterInner(proxy.site, layout[])
+      outer * proxy.nSitesInner * proxy.elemsPerSite + elemIdx * proxy.nSitesInner + inner
+    else:
+      proxy.site * proxy.elemsPerSite + elemIdx
+  
   # TensorSiteProxy[] for vectors: view[n][i] - read element
   proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i: int): T {.inline.} =
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-    let elemIdx = proxy.site * proxy.elemsPerSite + i
-    hostData[elemIdx]
+    hostData[proxy.proxyElemOffset(i)]
   
   # TensorSiteProxy[] for matrices: view[n][i, j] - read element
   proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int): T {.inline.} =
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
     let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
     let localIdx = i * cols + j
-    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
-    hostData[elemIdx]
+    hostData[proxy.proxyElemOffset(localIdx)]
   
   # TensorSiteProxy[] for 3D tensors: view[n][i, j, k] - read element
   proc `[]`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int): T {.inline.} =
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
     let localIdx = computeElementIndex(proxy.shape, i, j, k)
-    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
-    hostData[elemIdx]
+    hostData[proxy.proxyElemOffset(localIdx)]
   
   # TensorSiteProxy[]= for vectors: view[n][i] = value
   proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i: int, value: T) {.inline.} =
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-    let elemIdx = proxy.site * proxy.elemsPerSite + i
-    hostData[elemIdx] = value
+    hostData[proxy.proxyElemOffset(i)] = value
   
   # TensorSiteProxy[]= for matrices: view[n][i, j] = value
   proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j: int, value: T) {.inline.} =
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
     let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
     let localIdx = i * cols + j
-    let elemIdx = proxy.site * proxy.elemsPerSite + localIdx
-    hostData[elemIdx] = value
+    hostData[proxy.proxyElemOffset(localIdx)] = value
   
   # TensorSiteProxy[]= for 3D tensors: view[n][i, j, k] = value
   proc `[]=`*[L, T](proxy: TensorSiteProxy[L, T], i, j, k: int, value: T) {.inline.} =
@@ -461,11 +472,7 @@ when UseOpenMP:
   # Helper to compute matrix multiply and store result
   proc computeMatMul*[L, T](m: var MatMulResult[L, T]) =
     ## Compute the matrix multiply and store in computed buffer
-    let srcAData = cast[ptr UncheckedArray[T]](m.proxyA.hostPtr)
-    let srcBData = cast[ptr UncheckedArray[T]](m.proxyB.hostPtr)
     let elemsPerSite = m.proxyA.elemsPerSite
-    let srcABase = m.proxyA.site * elemsPerSite
-    let srcBBase = m.proxyB.site * elemsPerSite
     
     let rows = m.proxyA.shape[0]
     let cols = if m.proxyB.shape.len > 1: m.proxyB.shape[1] else: 1
@@ -476,9 +483,11 @@ when UseOpenMP:
       for j in 0..<cols:
         var sum: T = T(0)
         for k in 0..<innerDim:
-          let aIdx = srcABase + i * innerDim + k
-          let bIdx = srcBBase + k * cols + j
-          sum = sum + srcAData[aIdx] * srcBData[bIdx]
+          let aElemIdx = i * innerDim + k
+          let bElemIdx = k * cols + j
+          let srcAData = cast[ptr UncheckedArray[T]](m.proxyA.hostPtr)
+          let srcBData = cast[ptr UncheckedArray[T]](m.proxyB.hostPtr)
+          sum = sum + srcAData[m.proxyA.proxyElemOffset(aElemIdx)] * srcBData[m.proxyB.proxyElemOffset(bElemIdx)]
         m.computed[i * cols + j] = sum
     m.hasComputed = true
 

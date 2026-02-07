@@ -85,6 +85,14 @@ type
     isSubtract: bool   # For ekMatAdd: true if subtraction
     scalar: string     # For scalar ops: the scalar value as string
     left, right: ref ExprInfo  # For binary ops
+    isNeighborAccess: bool  # True if this accesses a neighbor via stencil
+  
+  # Stencil neighbor variable binding:
+  # Maps variable name (e.g. "nbrIdx") to its stencil point index
+  StencilBinding = object
+    varName: string     # The let-bound variable name
+    stencilSym: NimNode # The stencil symbol from the AST
+    pointIdx: int       # The stencil point index (e.g. 0 for fwd-x)
   
   KernelInfo = object
     views: seq[ViewInfo]
@@ -95,6 +103,8 @@ type
     outputRank: int    # Rank of output tensor (1=vector, 2=matrix)
     outputRows: int    # Number of rows in output
     outputCols: int    # Number of cols in output (1 for vectors)
+    stencilBindings: seq[StencilBinding]  # Stencil neighbor variables
+    hasStencil: bool   # True if stencil neighbor access detected
 
 proc getElementTypeFromNode(typeNode: NimNode): ElementType =
   ## Extract element type from a type node (compile-time)
@@ -149,9 +159,10 @@ proc extractViewSym(n: NimNode): NimNode =
   else: discard
   return nil
 
-proc analyzeExpr(n: NimNode, viewNames: seq[string]): ExprInfo =
+proc analyzeExpr(n: NimNode, viewNames: seq[string], nbrVarNames: seq[string] = @[]): ExprInfo =
   ## Analyze an expression to determine its type and structure
   ## Works directly with AST structure, not type names
+  ## nbrVarNames: variable names that are stencil neighbor indices
   
   case n.kind
   of nnkCall:
@@ -160,26 +171,37 @@ proc analyzeExpr(n: NimNode, viewNames: seq[string]): ExprInfo =
       
       # view[site] access: Call(Sym "[]", Sym "view", Sym "site")
       if opName == "[]":
+        var viewName = ""
         if n[1].kind == nnkSym:
-          return ExprInfo(kind: ekSiteProxy, viewName: n[1].strVal)
-        let viewSym = extractViewSym(n[1])
-        if viewSym != nil:
-          return ExprInfo(kind: ekSiteProxy, viewName: viewSym.strVal)
-        return ExprInfo(kind: ekSiteProxy, viewName: "unknown")
+          viewName = n[1].strVal
+        else:
+          let viewSym = extractViewSym(n[1])
+          if viewSym != nil:
+            viewName = viewSym.strVal
+          else:
+            viewName = "unknown"
+        
+        # Check if the index argument is a stencil neighbor variable
+        var isNbr = false
+        if n.len >= 3 and n[2].kind == nnkSym:
+          let idxName = n[2].strVal
+          if idxName in nbrVarNames:
+            isNbr = true
+        return ExprInfo(kind: ekSiteProxy, viewName: viewName, isNeighborAccess: isNbr)
       
       # Binary operators as calls
       if opName in ["+", "-"] and n.len >= 3:
         var leftInfo = new ExprInfo
         var rightInfo = new ExprInfo
-        leftInfo[] = analyzeExpr(n[1], viewNames)
-        rightInfo[] = analyzeExpr(n[2], viewNames)
+        leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+        rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
         return ExprInfo(kind: ekMatAdd, isSubtract: opName == "-", left: leftInfo, right: rightInfo)
       
       if opName == "*" and n.len >= 3:
         var leftInfo = new ExprInfo
         var rightInfo = new ExprInfo
-        leftInfo[] = analyzeExpr(n[1], viewNames)
-        rightInfo[] = analyzeExpr(n[2], viewNames)
+        leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+        rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
         
         # Determine if scalar or matrix multiply based on children
         let leftIsScalar = leftInfo.kind == ekLiteral
@@ -203,8 +225,8 @@ proc analyzeExpr(n: NimNode, viewNames: seq[string]): ExprInfo =
       
       var leftInfo = new ExprInfo
       var rightInfo = new ExprInfo
-      leftInfo[] = analyzeExpr(n[1], viewNames)
-      rightInfo[] = analyzeExpr(n[2], viewNames)
+      leftInfo[] = analyzeExpr(n[1], viewNames, nbrVarNames)
+      rightInfo[] = analyzeExpr(n[2], viewNames, nbrVarNames)
       
       if opName in ["+", "-"]:
         return ExprInfo(kind: ekMatAdd, isSubtract: opName == "-", left: leftInfo, right: rightInfo)
@@ -246,17 +268,42 @@ proc analyzeExpr(n: NimNode, viewNames: seq[string]): ExprInfo =
   return ExprInfo(kind: ekUnknown)
 
 proc gatherViewInfo(body: NimNode, loopVar: NimNode): KernelInfo =
-  ## Analyze body to find all TensorFieldView accesses
+  ## Analyze body to find all TensorFieldView accesses and stencil bindings
   result = KernelInfo(
     loopVar: loopVar,
     loopVarStr: loopVar.strVal,
     elemType: etFloat64,  # Default to double
     outputRank: 0,
     outputRows: 0,
-    outputCols: 0
+    outputCols: 0,
+    hasStencil: false
   )
   result.viewRanks = initTable[string, int]()
   var viewTable = initTable[string, ViewInfo]()
+  
+  # First pass: detect stencil let-bindings
+  # Pattern: LetSection(IdentDefs(Sym "nbrIdx", Empty, Call(Sym "neighbor", Sym "stencil", Sym "n", IntLit N)))
+  if body.kind == nnkStmtList:
+    for child in body:
+      if child.kind == nnkLetSection:
+        for identDefs in child:
+          if identDefs.kind == nnkIdentDefs and identDefs.len >= 3:
+            let varSym = identDefs[0]
+            let valueExpr = identDefs[2]
+            # Check for Call(neighbor, stencil, loopVar, pointIdx)
+            if valueExpr.kind == nnkCall and valueExpr.len >= 4 and
+               valueExpr[0].kind == nnkSym and valueExpr[0].strVal == "neighbor":
+              let stencilSym = valueExpr[1]
+              let pointArg = valueExpr[3]
+              var pointIdx = 0
+              if pointArg.kind in {nnkIntLit..nnkInt64Lit}:
+                pointIdx = pointArg.intVal.int
+              result.stencilBindings.add StencilBinding(
+                varName: varSym.strVal,
+                stencilSym: stencilSym,
+                pointIdx: pointIdx
+              )
+              result.hasStencil = true
   
   proc analyzeNode(n: NimNode, isLHS: bool = false) =
     case n.kind
@@ -313,7 +360,7 @@ proc gatherViewInfo(body: NimNode, loopVar: NimNode): KernelInfo =
    OpenCL Kernel Code Generation
    ============================================================================ ]#
 
-proc generateExprCode(expr: ExprInfo, rowVar, colVar: string): string =
+proc generateExprCode(expr: ExprInfo, rowVar, colVar: string, loopVarStr: string = ""): string =
   ## Generate OpenCL code for an expression that computes a single element [row, col]
   ## of the result matrix/tensor.
   
@@ -321,7 +368,11 @@ proc generateExprCode(expr: ExprInfo, rowVar, colVar: string): string =
   of ekSiteProxy:
     # Direct element access - use view-specific elems
     let viewElems = expr.viewName & "_elems"
-    result = expr.viewName & "_data[group * (VW * " & viewElems & ") + (" & rowVar & " * outCols + " & colVar & ") * VW + lane]"
+    if expr.isNeighborAccess:
+      # Access neighbor site using nbrGroup/nbrLane computed from offsets table
+      result = expr.viewName & "_data[nbrGroup * (VW * " & viewElems & ") + (" & rowVar & " * outCols + " & colVar & ") * VW + nbrLane]"
+    else:
+      result = expr.viewName & "_data[group * (VW * " & viewElems & ") + (" & rowVar & " * outCols + " & colVar & ") * VW + lane]"
   
   of ekMatMul, ekMatVec:
     # Matrix multiplication: sum_k(A[row,k] * B[k,col]) or matvec: sum_k(A[row,k] * v[k])
@@ -330,20 +381,20 @@ proc generateExprCode(expr: ExprInfo, rowVar, colVar: string): string =
     result = "matmul_element(" & leftView & "_data, " & rightView & "_data, " & rowVar & ", " & colVar & ", outRows, " & leftView & "_elems, " & rightView & "_elems, group, lane, VW)"
   
   of ekMatAdd:
-    let leftCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar) else: "0.0"
-    let rightCode = if expr.right != nil: generateExprCode(expr.right[], rowVar, colVar) else: "0.0"
+    let leftCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar, loopVarStr) else: "0.0"
+    let rightCode = if expr.right != nil: generateExprCode(expr.right[], rowVar, colVar, loopVarStr) else: "0.0"
     let op = if expr.isSubtract: " - " else: " + "
     result = "(" & leftCode & op & rightCode & ")"
   
   of ekScalarMul:
-    let tensorCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar)
-                     elif expr.right != nil: generateExprCode(expr.right[], rowVar, colVar)
+    let tensorCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar, loopVarStr)
+                     elif expr.right != nil: generateExprCode(expr.right[], rowVar, colVar, loopVarStr)
                      else: "0.0"
     result = "(" & expr.scalar & " * " & tensorCode & ")"
   
   of ekScalarAdd:
-    let tensorCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar)
-                     elif expr.right != nil: generateExprCode(expr.right[], rowVar, colVar)
+    let tensorCode = if expr.left != nil: generateExprCode(expr.left[], rowVar, colVar, loopVarStr)
+                     elif expr.right != nil: generateExprCode(expr.right[], rowVar, colVar, loopVarStr)
                      else: "0.0"
     result = "(" & tensorCode & " + " & expr.scalar & ")"
   
@@ -507,6 +558,11 @@ proc generateKernelSource(
   for v in info.views:
     viewNames.add v.nameStr
   
+  # Collect stencil neighbor variable names for expression analysis
+  var nbrVarNames: seq[string]
+  for sb in info.stencilBindings:
+    nbrVarNames.add sb.varName
+  
   # Collect all statements from the body
   var statements: seq[NimNode]
   if body.kind == nnkStmtList:
@@ -533,15 +589,22 @@ proc generateKernelSource(
   var usesMatMul = false
   
   if not hasElementWrites:
-    # The body can be either a StmtList containing the call, or the call directly
-    var stmt: NimNode
-    if body.kind == nnkStmtList and body.len > 0:
-      stmt = body[0]
-    else:
-      stmt = body
+    # Find the assignment statement (skip LetSection and other non-assignment stmts)
+    var stmt: NimNode = nil
+    for s in statements:
+      if s.kind == nnkCall and s.len >= 4 and s[0].kind == nnkSym and s[0].strVal == "[]=":
+        stmt = s
+        break
+    
+    if stmt == nil:
+      # Fallback: try body[0] as before
+      if body.kind == nnkStmtList and body.len > 0:
+        stmt = body[0]
+      else:
+        stmt = body
     
     # Now check if this is an assignment call: []=
-    if stmt.kind == nnkCall and stmt.len >= 4 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
+    if stmt != nil and stmt.kind == nnkCall and stmt.len >= 4 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
       # stmt[1] is the view symbol directly (not a call)
       if stmt[1].kind == nnkSym:
         lhsViewName = stmt[1].strVal
@@ -551,7 +614,7 @@ proc generateKernelSource(
           lhsViewName = viewSym.strVal
       
       # stmt[3] is the RHS expression
-      rhsExpr = analyzeExpr(stmt[3], viewNames)
+      rhsExpr = analyzeExpr(stmt[3], viewNames, nbrVarNames)
     
     usesMatMul = hasMatMul(rhsExpr)
   
@@ -608,6 +671,10 @@ proc generateKernelSource(
   params.add "const int numSites"
   params.add "const int outRows"
   params.add "const int outCols"
+  # Stencil offsets buffer (if stencil is used)
+  if info.hasStencil:
+    params.add "__global const int* stencil_offsets"
+    params.add "const int stencil_nPoints"
   
   src &= "__kernel void " & kernelName & "(\n"
   src &= "    " & params.join(",\n    ")
@@ -624,6 +691,16 @@ proc generateKernelSource(
   src &= "  const int lane = " & loopVarStr & " % VW;\n\n"
   
   src &= "  int outElems = " & lhsViewName & "_elems;\n\n"
+  
+  # Stencil neighbor index computation
+  if info.hasStencil and info.stencilBindings.len > 0:
+    # Use the first stencil binding's point index for the neighbor computation
+    # For multiple stencil bindings, we'd need multiple nbrGroup/nbrLane pairs
+    let pointIdx = info.stencilBindings[0].pointIdx
+    src &= "  // Stencil neighbor computation (point " & $pointIdx & ")\n"
+    src &= "  int nbrIdx = stencil_offsets[" & loopVarStr & " * stencil_nPoints + " & $pointIdx & "];\n"
+    src &= "  int nbrGroup = nbrIdx / VW;\n"
+    src &= "  int nbrLane = nbrIdx % VW;\n\n"
   
   if hasElementWrites:
     # Element-level writes: generate individual assignments
@@ -649,7 +726,7 @@ proc generateKernelSource(
     src &= "      int outIdx = group * (VW * outElems) + (_row * outCols + _col) * VW + lane;\n"
     
     # Generate the RHS computation - pass info for view-specific indexing
-    let rhsCode = generateExprCode(rhsExpr, "_row", "_col")
+    let rhsCode = generateExprCode(rhsExpr, "_row", "_col", loopVarStr)
     src &= "      " & lhsViewName & "_data[outIdx] = " & rhsCode & ";\n"
     
     src &= "    }\n"
@@ -742,6 +819,43 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
   let outRowsIdx = newLit(info.views.len * 2 + 1)
   let outColsIdx = newLit(info.views.len * 2 + 2)
   
+  # Stencil kernel arg indices (after the standard args)
+  let stencilOffsetsIdx = newLit(info.views.len * 2 + 3)
+  let stencilNPointsIdx = newLit(info.views.len * 2 + 4)
+  
+  # Build stencil buffer upload code if stencil is used
+  var stencilSetupStmts = newStmtList()
+  var stencilArgStmts = newStmtList()
+  var stencilCleanupStmts = newStmtList()
+  
+  let stencilBufSym = genSym(nskVar, "stencilBuf")
+  let stencilOffsetsCopySym = genSym(nskVar, "stencilOffsetsCopy")
+  
+  if info.hasStencil and info.stencilBindings.len > 0:
+    let stencilSym = info.stencilBindings[0].stencilSym
+    
+    # Setup: create GPU buffer and upload offsets
+    stencilSetupStmts.add quote do:
+      # Convert int32 offsets to int32 seq for upload (offsets are already int32)
+      var `stencilOffsetsCopySym` = newSeq[int32](`stencilSym`.offsets.len)
+      for i in 0..<`stencilSym`.offsets.len:
+        `stencilOffsetsCopySym`[i] = `stencilSym`.offsets[i]
+      # Create GPU buffer for offsets
+      var `stencilBufSym` = gpuBufferLike(clContext, `stencilOffsetsCopySym`, MEM_READ_ONLY)
+      # Upload to first queue (offsets are the same for all devices)
+      clQueues[0].write(`stencilOffsetsCopySym`, `stencilBufSym`)
+      check clwrap.finish(clQueues[0])
+    
+    # Args: set kernel arguments for stencil buffer
+    stencilArgStmts.add quote do:
+      `kernelSym`.setArg(`stencilBufSym`, `stencilOffsetsIdx`)
+      var npArg = `stencilSym`.nPoints.int32
+      `kernelSym`.setArg(npArg, `stencilNPointsIdx`)
+    
+    # Cleanup: release GPU buffer
+    stencilCleanupStmts.add quote do:
+      release(`stencilBufSym`)
+  
   result = quote do:
     block:
       when DebugKernels:
@@ -761,6 +875,9 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
       let outRows = if outRank >= 1: outShape[0] else: 1
       let outCols = if outRank >= 2: outShape[1] else: 1
       
+      # Stencil buffer setup (if stencil is used)
+      `stencilSetupStmts`
+      
       for `devIdxSym` in 0..<numDevices:
         let devSites = sitesPerDev[`devIdxSym`]
         if devSites > 0:
@@ -778,6 +895,9 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
           `kernelSym`.setArg(orArg, `outRowsIdx`)
           `kernelSym`.setArg(ocArg, `outColsIdx`)
           
+          # Set stencil kernel args (if stencil is used)
+          `stencilArgStmts`
+          
           when UseWorkGroups:
             # Use explicit work-group size for debugging
             clQueues[`devIdxSym`].run(`kernelSym`, devSites, VectorWidth)
@@ -789,6 +909,9 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
       
       release(`kernelSym`)
       release(`programSym`)
+      
+      # Stencil buffer cleanup
+      `stencilCleanupStmts`
 
 macro each*(x: ForLoopStmt): untyped =
   ## Transform a for loop over TensorFieldView into an OpenCL kernel dispatch.

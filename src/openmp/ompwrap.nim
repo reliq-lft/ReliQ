@@ -15,6 +15,7 @@
 
 type
   OmpLoopCallback* = proc(idx: int64, context: pointer) {.cdecl.}
+  OmpChunkCallback* = proc(start, `end`: int64, context: pointer) {.cdecl.}
 
 # ============================================================================
 # Generic callback-based parallel loops
@@ -22,7 +23,13 @@ type
 
 proc ompParallelFor*(start, `end`: int64, callback: OmpLoopCallback, 
                      context: pointer) {.importc: "omp_parallel_for", cdecl.}
-  ## CPU parallel for loop with static scheduling
+  ## CPU parallel for loop with static scheduling (per-iteration callback)
+
+proc ompParallelForChunked*(start, `end`: int64, callback: OmpChunkCallback,
+                            context: pointer) {.importc: "omp_parallel_for_chunked", cdecl.}
+  ## CPU parallel for loop with chunked dispatch (range per thread)
+  ## Each thread receives a contiguous [start, end) range, enabling
+  ## the callback to iterate with compiler auto-vectorization.
 
 # ============================================================================
 # Utility Functions

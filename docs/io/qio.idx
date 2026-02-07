@@ -1,0 +1,33 @@
+nimTitle	qio	io/qio.html	module io/qio		0
+nim	QIOChecksum	io/qio.html#QIOChecksum	object QIOChecksum		52
+nim	initChecksum	io/qio.html#initChecksum	proc initChecksum(): QIOChecksum		57
+nim	update	io/qio.html#update,QIOChecksum,openArray[byte],uint32	proc update(cs: var QIOChecksum; data: openArray[byte]; rank: uint32 = 0)		60
+nim	combine	io/qio.html#combine,QIOChecksum,QIOChecksum	proc combine(cs1, cs2: QIOChecksum): QIOChecksum		68
+nim	`$`	io/qio.html#$,QIOChecksum	proc `$`(cs: QIOChecksum): string		75
+nim	lexIndex	io/qio.html#lexIndex,openArray[int],openArray[int]	proc lexIndex(coords: openArray[int]; dims: openArray[int]): int		82
+nim	lexCoords	io/qio.html#lexCoords,int,openArray[int]	proc lexCoords(index: int; dims: openArray[int]): seq[int]		91
+nim	evenOddIndex	io/qio.html#evenOddIndex,openArray[int],openArray[int]	proc evenOddIndex(coords: openArray[int]; dims: openArray[int]): int		99
+nim	boNative	io/qio.html#boNative	ByteOrder.boNative		122
+nim	boBigEndian	io/qio.html#boBigEndian	ByteOrder.boBigEndian		122
+nim	boLittleEndian	io/qio.html#boLittleEndian	ByteOrder.boLittleEndian		122
+nim	ByteOrder	io/qio.html#ByteOrder	enum ByteOrder		122
+nim	needsSwap	io/qio.html#needsSwap,ByteOrder	proc needsSwap(target: ByteOrder): bool		127
+nim	swapBytes32	io/qio.html#swapBytes32,openArray[byte]	proc swapBytes32(data: var openArray[byte])		134
+nim	swapBytes64	io/qio.html#swapBytes64,openArray[byte]	proc swapBytes64(data: var openArray[byte])		142
+nim	swapBytesFloat32	io/qio.html#swapBytesFloat32,openArray[float32]	proc swapBytesFloat32(data: var openArray[float32])		152
+nim	swapBytesFloat64	io/qio.html#swapBytesFloat64,openArray[float64]	proc swapBytesFloat64(data: var openArray[float64])		160
+nim	QIOFieldReader	io/qio.html#QIOFieldReader	type QIOFieldReader		173
+nim	newQIOFieldReader	io/qio.html#newQIOFieldReader,string	proc newQIOFieldReader[T](filename: string): QIOFieldReader[T]		180
+nim	close	io/qio.html#close,QIOFieldReader[T]	proc close[T](r: QIOFieldReader[T])		190
+nim	dims	io/qio.html#dims,QIOFieldReader[T]	proc dims[T](r: QIOFieldReader[T]): seq[int]		193
+nim	readField	io/qio.html#readField,QIOFieldReader[T],ByteOrder	proc readField[T](r: QIOFieldReader[T]; targetOrder: ByteOrder = boBigEndian): seq[T]		196
+nim	QIOFieldWriter	io/qio.html#QIOFieldWriter	type QIOFieldWriter		237
+nim	newQIOFieldWriter	io/qio.html#newQIOFieldWriter,string,openArray[int]	proc newQIOFieldWriter[T](filename: string; dims: openArray[int]): QIOFieldWriter[T]		242
+nim	close	io/qio.html#close,QIOFieldWriter[T]	proc close[T](w: QIOFieldWriter[T]): LimeStatus		253
+nim	writeField	io/qio.html#writeField,QIOFieldWriter[T],openArray[T],int,int,int,string,ByteOrder	proc writeField[T](w: QIOFieldWriter[T]; data: openArray[T]; colors: int = 3;\n              spins: int = 0; datacount: int = 4; userXml: string = "";\n              sourceOrder: ByteOrder = boNative): LimeStatus		256
+nim	GaugeField	io/qio.html#GaugeField	object GaugeField		316
+nim	PropagatorField	io/qio.html#PropagatorField	object PropagatorField		321
+nim	volume	io/qio.html#volume,array[,int]	proc volume(dims: array[4, int]): int		326
+nim	readGaugeField	io/qio.html#readGaugeField,string	proc readGaugeField(filename: string): GaugeField[float64]		329
+nim	writeGaugeField	io/qio.html#writeGaugeField,string,GaugeField[float64],string	proc writeGaugeField(filename: string; field: GaugeField[float64];\n                userXml: string = ""): LimeStatus		340
+nimgrp	close	io/qio.html#close-procs-all	proc		190

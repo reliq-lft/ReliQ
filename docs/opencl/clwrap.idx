@@ -1,0 +1,449 @@
+nimTitle	clwrap	opencl/clwrap.html	module opencl/clwrap		0
+nim	Pplatform_id	opencl/clwrap.html#Pplatform_id	type Pplatform_id		91
+nim	Pdevice_id	opencl/clwrap.html#Pdevice_id	type Pdevice_id		92
+nim	Pcontext	opencl/clwrap.html#Pcontext	type Pcontext		93
+nim	Pcommand_queue	opencl/clwrap.html#Pcommand_queue	type Pcommand_queue		94
+nim	Pmem	opencl/clwrap.html#Pmem	type Pmem		95
+nim	Pprogram	opencl/clwrap.html#Pprogram	type Pprogram		96
+nim	Pkernel	opencl/clwrap.html#Pkernel	type Pkernel		97
+nim	Pevent	opencl/clwrap.html#Pevent	type Pevent		98
+nim	Psampler	opencl/clwrap.html#Psampler	type Psampler		99
+nim	Tbool	opencl/clwrap.html#Tbool	type Tbool		100
+nim	Tbitfield	opencl/clwrap.html#Tbitfield	type Tbitfield		106
+nim	Tplatform_info	opencl/clwrap.html#Tplatform_info	type Tplatform_info		108
+nim	Tdevice_info	opencl/clwrap.html#Tdevice_info	type Tdevice_info		109
+nim	Tdevice_fp_config	opencl/clwrap.html#Tdevice_fp_config	type Tdevice_fp_config		110
+nim	Tdevice_mem_cache_type	opencl/clwrap.html#Tdevice_mem_cache_type	type Tdevice_mem_cache_type		111
+nim	Tdevice_local_mem_type	opencl/clwrap.html#Tdevice_local_mem_type	type Tdevice_local_mem_type		112
+nim	Tdevice_exec_capabilities	opencl/clwrap.html#Tdevice_exec_capabilities	type Tdevice_exec_capabilities		113
+nim	Tcommand_queue_properties	opencl/clwrap.html#Tcommand_queue_properties	type Tcommand_queue_properties		114
+nim	Tdevice_partition_property	opencl/clwrap.html#Tdevice_partition_property	type Tdevice_partition_property		115
+nim	Tdevice_affinity_domain	opencl/clwrap.html#Tdevice_affinity_domain	type Tdevice_affinity_domain		116
+nim	Tcontext_properties	opencl/clwrap.html#Tcontext_properties	type Tcontext_properties		117
+nim	Tcontext_info	opencl/clwrap.html#Tcontext_info	type Tcontext_info		118
+nim	Tcommand_queue_info	opencl/clwrap.html#Tcommand_queue_info	type Tcommand_queue_info		119
+nim	Tchannel_order	opencl/clwrap.html#Tchannel_order	type Tchannel_order		120
+nim	Tchannel_type	opencl/clwrap.html#Tchannel_type	type Tchannel_type		121
+nim	Tmem_flags	opencl/clwrap.html#Tmem_flags	type Tmem_flags		122
+nim	Tmem_object_type	opencl/clwrap.html#Tmem_object_type	type Tmem_object_type		123
+nim	Tmem_info	opencl/clwrap.html#Tmem_info	type Tmem_info		124
+nim	Tmem_migration_flags	opencl/clwrap.html#Tmem_migration_flags	type Tmem_migration_flags		125
+nim	Timage_info	opencl/clwrap.html#Timage_info	type Timage_info		126
+nim	Tbuffer_create_type	opencl/clwrap.html#Tbuffer_create_type	type Tbuffer_create_type		127
+nim	Taddressing_mode	opencl/clwrap.html#Taddressing_mode	type Taddressing_mode		128
+nim	Tfilter_mode	opencl/clwrap.html#Tfilter_mode	type Tfilter_mode		129
+nim	Tsampler_info	opencl/clwrap.html#Tsampler_info	type Tsampler_info		130
+nim	Tmap_flags	opencl/clwrap.html#Tmap_flags	type Tmap_flags		131
+nim	Tprogram_info	opencl/clwrap.html#Tprogram_info	type Tprogram_info		132
+nim	Tprogram_build_info	opencl/clwrap.html#Tprogram_build_info	type Tprogram_build_info		133
+nim	Tprogram_binary_type	opencl/clwrap.html#Tprogram_binary_type	type Tprogram_binary_type		134
+nim	Tbuild_status	opencl/clwrap.html#Tbuild_status	type Tbuild_status		135
+nim	Tkernel_info	opencl/clwrap.html#Tkernel_info	type Tkernel_info		136
+nim	Tkernel_arg_info	opencl/clwrap.html#Tkernel_arg_info	type Tkernel_arg_info		137
+nim	Tkernel_arg_address_qualifier	opencl/clwrap.html#Tkernel_arg_address_qualifier	type Tkernel_arg_address_qualifier		138
+nim	Tkernel_arg_access_qualifier	opencl/clwrap.html#Tkernel_arg_access_qualifier	type Tkernel_arg_access_qualifier		139
+nim	Tkernel_arg_type_qualifier	opencl/clwrap.html#Tkernel_arg_type_qualifier	type Tkernel_arg_type_qualifier		140
+nim	Tkernel_work_group_info	opencl/clwrap.html#Tkernel_work_group_info	type Tkernel_work_group_info		141
+nim	Tevent_info	opencl/clwrap.html#Tevent_info	type Tevent_info		142
+nim	Tcommand_type	opencl/clwrap.html#Tcommand_type	type Tcommand_type		143
+nim	Timage_format	opencl/clwrap.html#Timage_format	object Timage_format		144
+nim	Timage_desc	opencl/clwrap.html#Timage_desc	object Timage_desc		148
+nim	Tbuffer_region	opencl/clwrap.html#Tbuffer_region	object Tbuffer_region		160
+nim	TClResult	opencl/clwrap.html#TClResult	enum TClResult		168
+nim	EOpenCL	opencl/clwrap.html#EOpenCL	object EOpenCL		230
+nim	raiseEOpenCL	opencl/clwrap.html#raiseEOpenCL,TClResult	proc raiseEOpenCL(x: TClResult)		232
+nim	check	opencl/clwrap.html#check.t,TClResult	template check(a: TClResult)		235
+nim	VERSION_1_0	opencl/clwrap.html#VERSION_1_0	const VERSION_1_0		242
+nim	VERSION_1_1	opencl/clwrap.html#VERSION_1_1	const VERSION_1_1		243
+nim	VERSION_1_2	opencl/clwrap.html#VERSION_1_2	const VERSION_1_2		244
+nim	CL_FALSE	opencl/clwrap.html#CL_FALSE	const CL_FALSE		249
+nim	CL_TRUE	opencl/clwrap.html#CL_TRUE	const CL_TRUE		250
+nim	BLOCKING	opencl/clwrap.html#BLOCKING	const BLOCKING		251
+nim	NON_BLOCKING	opencl/clwrap.html#NON_BLOCKING	const NON_BLOCKING		252
+nim	PLATFORM_PROFILE	opencl/clwrap.html#PLATFORM_PROFILE	const PLATFORM_PROFILE		257
+nim	PLATFORM_VERSION	opencl/clwrap.html#PLATFORM_VERSION	const PLATFORM_VERSION		258
+nim	PLATFORM_NAME	opencl/clwrap.html#PLATFORM_NAME	const PLATFORM_NAME		259
+nim	PLATFORM_VENDOR	opencl/clwrap.html#PLATFORM_VENDOR	const PLATFORM_VENDOR		260
+nim	PLATFORM_EXTENSIONS	opencl/clwrap.html#PLATFORM_EXTENSIONS	const PLATFORM_EXTENSIONS		261
+nim	TDeviceType	opencl/clwrap.html#TDeviceType	type TDeviceType		266
+nim	DEVICE_TYPE_DEFAULT	opencl/clwrap.html#DEVICE_TYPE_DEFAULT	const DEVICE_TYPE_DEFAULT		269
+nim	DEVICE_TYPE_CPU	opencl/clwrap.html#DEVICE_TYPE_CPU	const DEVICE_TYPE_CPU		270
+nim	DEVICE_TYPE_GPU	opencl/clwrap.html#DEVICE_TYPE_GPU	const DEVICE_TYPE_GPU		271
+nim	DEVICE_TYPE_ACCELERATOR	opencl/clwrap.html#DEVICE_TYPE_ACCELERATOR	const DEVICE_TYPE_ACCELERATOR		272
+nim	DEVICE_TYPE_CUSTOM	opencl/clwrap.html#DEVICE_TYPE_CUSTOM	const DEVICE_TYPE_CUSTOM		273
+nim	DEVICE_TYPE_ALL	opencl/clwrap.html#DEVICE_TYPE_ALL	const DEVICE_TYPE_ALL		274
+nim	DEVICE_TYPE	opencl/clwrap.html#DEVICE_TYPE	const DEVICE_TYPE		279
+nim	DEVICE_VENDOR_ID	opencl/clwrap.html#DEVICE_VENDOR_ID	const DEVICE_VENDOR_ID		280
+nim	DEVICE_MAX_COMPUTE_UNITS	opencl/clwrap.html#DEVICE_MAX_COMPUTE_UNITS	const DEVICE_MAX_COMPUTE_UNITS		281
+nim	DEVICE_MAX_WORK_ITEM_DIMENSIONS	opencl/clwrap.html#DEVICE_MAX_WORK_ITEM_DIMENSIONS	const DEVICE_MAX_WORK_ITEM_DIMENSIONS		282
+nim	DEVICE_MAX_WORK_GROUP_SIZE	opencl/clwrap.html#DEVICE_MAX_WORK_GROUP_SIZE	const DEVICE_MAX_WORK_GROUP_SIZE		283
+nim	DEVICE_MAX_WORK_ITEM_SIZES	opencl/clwrap.html#DEVICE_MAX_WORK_ITEM_SIZES	const DEVICE_MAX_WORK_ITEM_SIZES		284
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_CHAR	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_CHAR	const DEVICE_PREFERRED_VECTOR_WIDTH_CHAR		285
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_SHORT	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_SHORT	const DEVICE_PREFERRED_VECTOR_WIDTH_SHORT		286
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_INT	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_INT	const DEVICE_PREFERRED_VECTOR_WIDTH_INT		287
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_LONG	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_LONG	const DEVICE_PREFERRED_VECTOR_WIDTH_LONG		288
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT	const DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT		289
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE	const DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE		290
+nim	DEVICE_MAX_CLOCK_FREQUENCY	opencl/clwrap.html#DEVICE_MAX_CLOCK_FREQUENCY	const DEVICE_MAX_CLOCK_FREQUENCY		291
+nim	DEVICE_ADDRESS_BITS	opencl/clwrap.html#DEVICE_ADDRESS_BITS	const DEVICE_ADDRESS_BITS		292
+nim	DEVICE_MAX_READ_IMAGE_ARGS	opencl/clwrap.html#DEVICE_MAX_READ_IMAGE_ARGS	const DEVICE_MAX_READ_IMAGE_ARGS		293
+nim	DEVICE_MAX_WRITE_IMAGE_ARGS	opencl/clwrap.html#DEVICE_MAX_WRITE_IMAGE_ARGS	const DEVICE_MAX_WRITE_IMAGE_ARGS		294
+nim	DEVICE_MAX_MEM_ALLOC_SIZE	opencl/clwrap.html#DEVICE_MAX_MEM_ALLOC_SIZE	const DEVICE_MAX_MEM_ALLOC_SIZE		295
+nim	DEVICE_IMAGE2D_MAX_WIDTH	opencl/clwrap.html#DEVICE_IMAGE2D_MAX_WIDTH	const DEVICE_IMAGE2D_MAX_WIDTH		296
+nim	DEVICE_IMAGE2D_MAX_HEIGHT	opencl/clwrap.html#DEVICE_IMAGE2D_MAX_HEIGHT	const DEVICE_IMAGE2D_MAX_HEIGHT		297
+nim	DEVICE_IMAGE3D_MAX_WIDTH	opencl/clwrap.html#DEVICE_IMAGE3D_MAX_WIDTH	const DEVICE_IMAGE3D_MAX_WIDTH		298
+nim	DEVICE_IMAGE3D_MAX_HEIGHT	opencl/clwrap.html#DEVICE_IMAGE3D_MAX_HEIGHT	const DEVICE_IMAGE3D_MAX_HEIGHT		299
+nim	DEVICE_IMAGE3D_MAX_DEPTH	opencl/clwrap.html#DEVICE_IMAGE3D_MAX_DEPTH	const DEVICE_IMAGE3D_MAX_DEPTH		300
+nim	DEVICE_IMAGE_SUPPORT	opencl/clwrap.html#DEVICE_IMAGE_SUPPORT	const DEVICE_IMAGE_SUPPORT		301
+nim	DEVICE_MAX_PARAMETER_SIZE	opencl/clwrap.html#DEVICE_MAX_PARAMETER_SIZE	const DEVICE_MAX_PARAMETER_SIZE		302
+nim	DEVICE_MAX_SAMPLERS	opencl/clwrap.html#DEVICE_MAX_SAMPLERS	const DEVICE_MAX_SAMPLERS		303
+nim	DEVICE_MEM_BASE_ADDR_ALIGN	opencl/clwrap.html#DEVICE_MEM_BASE_ADDR_ALIGN	const DEVICE_MEM_BASE_ADDR_ALIGN		304
+nim	DEVICE_MIN_DATA_TYPE_ALIGN_SIZE	opencl/clwrap.html#DEVICE_MIN_DATA_TYPE_ALIGN_SIZE	const DEVICE_MIN_DATA_TYPE_ALIGN_SIZE		305
+nim	DEVICE_SINGLE_FP_CONFIG	opencl/clwrap.html#DEVICE_SINGLE_FP_CONFIG	const DEVICE_SINGLE_FP_CONFIG		306
+nim	DEVICE_GLOBAL_MEM_CACHE_TYPE	opencl/clwrap.html#DEVICE_GLOBAL_MEM_CACHE_TYPE	const DEVICE_GLOBAL_MEM_CACHE_TYPE		307
+nim	DEVICE_GLOBAL_MEM_CACHELINE_SIZE	opencl/clwrap.html#DEVICE_GLOBAL_MEM_CACHELINE_SIZE	const DEVICE_GLOBAL_MEM_CACHELINE_SIZE		308
+nim	DEVICE_GLOBAL_MEM_CACHE_SIZE	opencl/clwrap.html#DEVICE_GLOBAL_MEM_CACHE_SIZE	const DEVICE_GLOBAL_MEM_CACHE_SIZE		309
+nim	DEVICE_GLOBAL_MEM_SIZE	opencl/clwrap.html#DEVICE_GLOBAL_MEM_SIZE	const DEVICE_GLOBAL_MEM_SIZE		310
+nim	DEVICE_MAX_CONSTANT_BUFFER_SIZE	opencl/clwrap.html#DEVICE_MAX_CONSTANT_BUFFER_SIZE	const DEVICE_MAX_CONSTANT_BUFFER_SIZE		311
+nim	DEVICE_MAX_CONSTANT_ARGS	opencl/clwrap.html#DEVICE_MAX_CONSTANT_ARGS	const DEVICE_MAX_CONSTANT_ARGS		312
+nim	DEVICE_LOCAL_MEM_TYPE	opencl/clwrap.html#DEVICE_LOCAL_MEM_TYPE	const DEVICE_LOCAL_MEM_TYPE		313
+nim	DEVICE_LOCAL_MEM_SIZE	opencl/clwrap.html#DEVICE_LOCAL_MEM_SIZE	const DEVICE_LOCAL_MEM_SIZE		314
+nim	DEVICE_ERROR_CORRECTION_SUPPORT	opencl/clwrap.html#DEVICE_ERROR_CORRECTION_SUPPORT	const DEVICE_ERROR_CORRECTION_SUPPORT		315
+nim	DEVICE_PROFILING_TIMER_RESOLUTION	opencl/clwrap.html#DEVICE_PROFILING_TIMER_RESOLUTION	const DEVICE_PROFILING_TIMER_RESOLUTION		316
+nim	DEVICE_ENDIAN_LITTLE	opencl/clwrap.html#DEVICE_ENDIAN_LITTLE	const DEVICE_ENDIAN_LITTLE		317
+nim	DEVICE_AVAILABLE	opencl/clwrap.html#DEVICE_AVAILABLE	const DEVICE_AVAILABLE		318
+nim	DEVICE_COMPILER_AVAILABLE	opencl/clwrap.html#DEVICE_COMPILER_AVAILABLE	const DEVICE_COMPILER_AVAILABLE		319
+nim	DEVICE_EXECUTION_CAPABILITIES	opencl/clwrap.html#DEVICE_EXECUTION_CAPABILITIES	const DEVICE_EXECUTION_CAPABILITIES		320
+nim	DEVICE_QUEUE_PROPERTIES	opencl/clwrap.html#DEVICE_QUEUE_PROPERTIES	const DEVICE_QUEUE_PROPERTIES		321
+nim	DEVICE_NAME	opencl/clwrap.html#DEVICE_NAME	const DEVICE_NAME		322
+nim	DEVICE_VENDOR	opencl/clwrap.html#DEVICE_VENDOR	const DEVICE_VENDOR		323
+nim	DRIVER_VERSION	opencl/clwrap.html#DRIVER_VERSION	const DRIVER_VERSION		324
+nim	DEVICE_PROFILE	opencl/clwrap.html#DEVICE_PROFILE	const DEVICE_PROFILE		325
+nim	DEVICE_VERSION	opencl/clwrap.html#DEVICE_VERSION	const DEVICE_VERSION		326
+nim	DEVICE_EXTENSIONS	opencl/clwrap.html#DEVICE_EXTENSIONS	const DEVICE_EXTENSIONS		327
+nim	DEVICE_PLATFORM	opencl/clwrap.html#DEVICE_PLATFORM	const DEVICE_PLATFORM		328
+nim	DEVICE_DOUBLE_FP_CONFIG	opencl/clwrap.html#DEVICE_DOUBLE_FP_CONFIG	const DEVICE_DOUBLE_FP_CONFIG		329
+nim	DEVICE_PREFERRED_VECTOR_WIDTH_HALF	opencl/clwrap.html#DEVICE_PREFERRED_VECTOR_WIDTH_HALF	const DEVICE_PREFERRED_VECTOR_WIDTH_HALF		334
+nim	DEVICE_HOST_UNIFIED_MEMORY	opencl/clwrap.html#DEVICE_HOST_UNIFIED_MEMORY	const DEVICE_HOST_UNIFIED_MEMORY		335
+nim	DEVICE_NATIVE_VECTOR_WIDTH_CHAR	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_CHAR	const DEVICE_NATIVE_VECTOR_WIDTH_CHAR		336
+nim	DEVICE_NATIVE_VECTOR_WIDTH_SHORT	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_SHORT	const DEVICE_NATIVE_VECTOR_WIDTH_SHORT		337
+nim	DEVICE_NATIVE_VECTOR_WIDTH_INT	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_INT	const DEVICE_NATIVE_VECTOR_WIDTH_INT		338
+nim	DEVICE_NATIVE_VECTOR_WIDTH_LONG	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_LONG	const DEVICE_NATIVE_VECTOR_WIDTH_LONG		339
+nim	DEVICE_NATIVE_VECTOR_WIDTH_FLOAT	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_FLOAT	const DEVICE_NATIVE_VECTOR_WIDTH_FLOAT		340
+nim	DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE	const DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE		341
+nim	DEVICE_NATIVE_VECTOR_WIDTH_HALF	opencl/clwrap.html#DEVICE_NATIVE_VECTOR_WIDTH_HALF	const DEVICE_NATIVE_VECTOR_WIDTH_HALF		342
+nim	DEVICE_OPENCL_C_VERSION	opencl/clwrap.html#DEVICE_OPENCL_C_VERSION	const DEVICE_OPENCL_C_VERSION		343
+nim	DEVICE_LINKER_AVAILABLE	opencl/clwrap.html#DEVICE_LINKER_AVAILABLE	const DEVICE_LINKER_AVAILABLE		344
+nim	DEVICE_BUILT_IN_KERNELS	opencl/clwrap.html#DEVICE_BUILT_IN_KERNELS	const DEVICE_BUILT_IN_KERNELS		345
+nim	DEVICE_IMAGE_MAX_BUFFER_SIZE	opencl/clwrap.html#DEVICE_IMAGE_MAX_BUFFER_SIZE	const DEVICE_IMAGE_MAX_BUFFER_SIZE		346
+nim	DEVICE_IMAGE_MAX_ARRAY_SIZE	opencl/clwrap.html#DEVICE_IMAGE_MAX_ARRAY_SIZE	const DEVICE_IMAGE_MAX_ARRAY_SIZE		347
+nim	DEVICE_PARENT_DEVICE	opencl/clwrap.html#DEVICE_PARENT_DEVICE	const DEVICE_PARENT_DEVICE		348
+nim	DEVICE_PARTITION_MAX_SUB_DEVICES	opencl/clwrap.html#DEVICE_PARTITION_MAX_SUB_DEVICES	const DEVICE_PARTITION_MAX_SUB_DEVICES		349
+nim	DEVICE_PARTITION_PROPERTIES	opencl/clwrap.html#DEVICE_PARTITION_PROPERTIES	const DEVICE_PARTITION_PROPERTIES		350
+nim	DEVICE_PARTITION_AFFINITY_DOMAIN	opencl/clwrap.html#DEVICE_PARTITION_AFFINITY_DOMAIN	const DEVICE_PARTITION_AFFINITY_DOMAIN		351
+nim	DEVICE_PARTITION_TYPE	opencl/clwrap.html#DEVICE_PARTITION_TYPE	const DEVICE_PARTITION_TYPE		352
+nim	DEVICE_REFERENCE_COUNT	opencl/clwrap.html#DEVICE_REFERENCE_COUNT	const DEVICE_REFERENCE_COUNT		353
+nim	DEVICE_PREFERRED_INTEROP_USER_SYNC	opencl/clwrap.html#DEVICE_PREFERRED_INTEROP_USER_SYNC	const DEVICE_PREFERRED_INTEROP_USER_SYNC		354
+nim	DEVICE_PRINTF_BUFFER_SIZE	opencl/clwrap.html#DEVICE_PRINTF_BUFFER_SIZE	const DEVICE_PRINTF_BUFFER_SIZE		355
+nim	DEVICE_IMAGE_PITCH_ALIGNMENT	opencl/clwrap.html#DEVICE_IMAGE_PITCH_ALIGNMENT	const DEVICE_IMAGE_PITCH_ALIGNMENT		356
+nim	DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT	opencl/clwrap.html#DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT	const DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT		357
+nim	FP_DENORM	opencl/clwrap.html#FP_DENORM	const FP_DENORM		362
+nim	FP_INF_NAN	opencl/clwrap.html#FP_INF_NAN	const FP_INF_NAN		363
+nim	FP_ROUND_TO_NEAREST	opencl/clwrap.html#FP_ROUND_TO_NEAREST	const FP_ROUND_TO_NEAREST		364
+nim	FP_ROUND_TO_ZERO	opencl/clwrap.html#FP_ROUND_TO_ZERO	const FP_ROUND_TO_ZERO		365
+nim	FP_ROUND_TO_INF	opencl/clwrap.html#FP_ROUND_TO_INF	const FP_ROUND_TO_INF		366
+nim	FP_FMA	opencl/clwrap.html#FP_FMA	const FP_FMA		367
+nim	FP_SOFT_FLOAT	opencl/clwrap.html#FP_SOFT_FLOAT	const FP_SOFT_FLOAT		368
+nim	FP_CORRECTLY_ROUNDED_DIVIDE_SQRT	opencl/clwrap.html#FP_CORRECTLY_ROUNDED_DIVIDE_SQRT	const FP_CORRECTLY_ROUNDED_DIVIDE_SQRT		369
+nim	NONE	opencl/clwrap.html#NONE	const NONE		374
+nim	READ_ONLY_CACHE	opencl/clwrap.html#READ_ONLY_CACHE	const READ_ONLY_CACHE		375
+nim	READ_WRITE_CACHE	opencl/clwrap.html#READ_WRITE_CACHE	const READ_WRITE_CACHE		376
+nim	LOCAL	opencl/clwrap.html#LOCAL	const LOCAL		381
+nim	GLOBAL	opencl/clwrap.html#GLOBAL	const GLOBAL		382
+nim	EXEC_KERNEL	opencl/clwrap.html#EXEC_KERNEL	const EXEC_KERNEL		387
+nim	EXEC_NATIVE_KERNEL	opencl/clwrap.html#EXEC_NATIVE_KERNEL	const EXEC_NATIVE_KERNEL		388
+nim	QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE	opencl/clwrap.html#QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE	const QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE		393
+nim	QUEUE_PROFILING_ENABLE	opencl/clwrap.html#QUEUE_PROFILING_ENABLE	const QUEUE_PROFILING_ENABLE		394
+nim	CONTEXT_REFERENCE_COUNT	opencl/clwrap.html#CONTEXT_REFERENCE_COUNT	const CONTEXT_REFERENCE_COUNT		399
+nim	CONTEXT_DEVICES	opencl/clwrap.html#CONTEXT_DEVICES	const CONTEXT_DEVICES		400
+nim	CONTEXT_PROPERTIES	opencl/clwrap.html#CONTEXT_PROPERTIES	const CONTEXT_PROPERTIES		401
+nim	CONTEXT_NUM_DEVICES	opencl/clwrap.html#CONTEXT_NUM_DEVICES	const CONTEXT_NUM_DEVICES		402
+nim	CONTEXT_PLATFORM	opencl/clwrap.html#CONTEXT_PLATFORM	const CONTEXT_PLATFORM		407
+nim	CONTEXT_INTEROP_USER_SYNC	opencl/clwrap.html#CONTEXT_INTEROP_USER_SYNC	const CONTEXT_INTEROP_USER_SYNC		408
+nim	DEVICE_PARTITION_EQUALLY	opencl/clwrap.html#DEVICE_PARTITION_EQUALLY	const DEVICE_PARTITION_EQUALLY		413
+nim	DEVICE_PARTITION_BY_COUNTS	opencl/clwrap.html#DEVICE_PARTITION_BY_COUNTS	const DEVICE_PARTITION_BY_COUNTS		414
+nim	DEVICE_PARTITION_BY_COUNTS_LIST_END	opencl/clwrap.html#DEVICE_PARTITION_BY_COUNTS_LIST_END	const DEVICE_PARTITION_BY_COUNTS_LIST_END		415
+nim	DEVICE_PARTITION_BY_AFFINITY_DOMAIN	opencl/clwrap.html#DEVICE_PARTITION_BY_AFFINITY_DOMAIN	const DEVICE_PARTITION_BY_AFFINITY_DOMAIN		416
+nim	DEVICE_AFFINITY_DOMAIN_NUMA	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_NUMA	const DEVICE_AFFINITY_DOMAIN_NUMA		421
+nim	DEVICE_AFFINITY_DOMAIN_L4_CACHE	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_L4_CACHE	const DEVICE_AFFINITY_DOMAIN_L4_CACHE		422
+nim	DEVICE_AFFINITY_DOMAIN_L3_CACHE	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_L3_CACHE	const DEVICE_AFFINITY_DOMAIN_L3_CACHE		423
+nim	DEVICE_AFFINITY_DOMAIN_L2_CACHE	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_L2_CACHE	const DEVICE_AFFINITY_DOMAIN_L2_CACHE		424
+nim	DEVICE_AFFINITY_DOMAIN_L1_CACHE	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_L1_CACHE	const DEVICE_AFFINITY_DOMAIN_L1_CACHE		425
+nim	DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE	opencl/clwrap.html#DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE	const DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE		426
+nim	QUEUE_CONTEXT	opencl/clwrap.html#QUEUE_CONTEXT	const QUEUE_CONTEXT		431
+nim	QUEUE_DEVICE	opencl/clwrap.html#QUEUE_DEVICE	const QUEUE_DEVICE		432
+nim	QUEUE_REFERENCE_COUNT	opencl/clwrap.html#QUEUE_REFERENCE_COUNT	const QUEUE_REFERENCE_COUNT		433
+nim	QUEUE_PROPERTIES	opencl/clwrap.html#QUEUE_PROPERTIES	const QUEUE_PROPERTIES		434
+nim	MEM_READ_WRITE	opencl/clwrap.html#MEM_READ_WRITE	const MEM_READ_WRITE		439
+nim	MEM_WRITE_ONLY	opencl/clwrap.html#MEM_WRITE_ONLY	const MEM_WRITE_ONLY		440
+nim	MEM_READ_ONLY	opencl/clwrap.html#MEM_READ_ONLY	const MEM_READ_ONLY		441
+nim	MEM_USE_HOST_PTR	opencl/clwrap.html#MEM_USE_HOST_PTR	const MEM_USE_HOST_PTR		442
+nim	MEM_ALLOC_HOST_PTR	opencl/clwrap.html#MEM_ALLOC_HOST_PTR	const MEM_ALLOC_HOST_PTR		443
+nim	MEM_COPY_HOST_PTR	opencl/clwrap.html#MEM_COPY_HOST_PTR	const MEM_COPY_HOST_PTR		444
+nim	MEM_HOST_WRITE_ONLY	opencl/clwrap.html#MEM_HOST_WRITE_ONLY	const MEM_HOST_WRITE_ONLY		449
+nim	MEM_HOST_READ_ONLY	opencl/clwrap.html#MEM_HOST_READ_ONLY	const MEM_HOST_READ_ONLY		450
+nim	MEM_HOST_NO_ACCESS	opencl/clwrap.html#MEM_HOST_NO_ACCESS	const MEM_HOST_NO_ACCESS		451
+nim	MIGRATE_MEM_OBJECT_HOST	opencl/clwrap.html#MIGRATE_MEM_OBJECT_HOST	const MIGRATE_MEM_OBJECT_HOST		456
+nim	MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED	opencl/clwrap.html#MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED	const MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED		457
+nim	CL_R	opencl/clwrap.html#CL_R	const CL_R		462
+nim	CL_A	opencl/clwrap.html#CL_A	const CL_A		463
+nim	CL_RG	opencl/clwrap.html#CL_RG	const CL_RG		464
+nim	CL_RA	opencl/clwrap.html#CL_RA	const CL_RA		465
+nim	CL_RGB	opencl/clwrap.html#CL_RGB	const CL_RGB		466
+nim	CL_RGBA	opencl/clwrap.html#CL_RGBA	const CL_RGBA		467
+nim	CL_BGRA	opencl/clwrap.html#CL_BGRA	const CL_BGRA		468
+nim	CL_ARGB	opencl/clwrap.html#CL_ARGB	const CL_ARGB		469
+nim	INTENSITY	opencl/clwrap.html#INTENSITY	const INTENSITY		470
+nim	LUMINANCE	opencl/clwrap.html#LUMINANCE	const LUMINANCE		471
+nim	CL_Rx	opencl/clwrap.html#CL_Rx	const CL_Rx		472
+nim	CL_RGx	opencl/clwrap.html#CL_RGx	const CL_RGx		473
+nim	CL_RGBx	opencl/clwrap.html#CL_RGBx	const CL_RGBx		474
+nim	DEPTH	opencl/clwrap.html#DEPTH	const DEPTH		475
+nim	DEPTH_STENCIL	opencl/clwrap.html#DEPTH_STENCIL	const DEPTH_STENCIL		476
+nim	CL_SNORM_INT8	opencl/clwrap.html#CL_SNORM_INT8	const CL_SNORM_INT8		481
+nim	CL_SNORM_INT16	opencl/clwrap.html#CL_SNORM_INT16	const CL_SNORM_INT16		482
+nim	CL_UNORM_INT8	opencl/clwrap.html#CL_UNORM_INT8	const CL_UNORM_INT8		483
+nim	CL_UNORM_INT16	opencl/clwrap.html#CL_UNORM_INT16	const CL_UNORM_INT16		484
+nim	CL_UNORM_SHORT_565	opencl/clwrap.html#CL_UNORM_SHORT_565	const CL_UNORM_SHORT_565		485
+nim	CL_UNORM_SHORT_555	opencl/clwrap.html#CL_UNORM_SHORT_555	const CL_UNORM_SHORT_555		486
+nim	CL_UNORM_INT_101010	opencl/clwrap.html#CL_UNORM_INT_101010	const CL_UNORM_INT_101010		487
+nim	CL_SIGNED_INT8	opencl/clwrap.html#CL_SIGNED_INT8	const CL_SIGNED_INT8		488
+nim	CL_SIGNED_INT16	opencl/clwrap.html#CL_SIGNED_INT16	const CL_SIGNED_INT16		489
+nim	CL_SIGNED_INT32	opencl/clwrap.html#CL_SIGNED_INT32	const CL_SIGNED_INT32		490
+nim	CL_UNSIGNED_INT8	opencl/clwrap.html#CL_UNSIGNED_INT8	const CL_UNSIGNED_INT8		491
+nim	CL_UNSIGNED_INT16	opencl/clwrap.html#CL_UNSIGNED_INT16	const CL_UNSIGNED_INT16		492
+nim	CL_UNSIGNED_INT32	opencl/clwrap.html#CL_UNSIGNED_INT32	const CL_UNSIGNED_INT32		493
+nim	CL_HALF_FLOAT	opencl/clwrap.html#CL_HALF_FLOAT	const CL_HALF_FLOAT		494
+nim	CL_FLOAT	opencl/clwrap.html#CL_FLOAT	const CL_FLOAT		495
+nim	CL_UNORM_INT24	opencl/clwrap.html#CL_UNORM_INT24	const CL_UNORM_INT24		496
+nim	MEM_OBJECT_BUFFER	opencl/clwrap.html#MEM_OBJECT_BUFFER	const MEM_OBJECT_BUFFER		501
+nim	MEM_OBJECT_IMAGE2D	opencl/clwrap.html#MEM_OBJECT_IMAGE2D	const MEM_OBJECT_IMAGE2D		502
+nim	MEM_OBJECT_IMAGE3D	opencl/clwrap.html#MEM_OBJECT_IMAGE3D	const MEM_OBJECT_IMAGE3D		503
+nim	MEM_OBJECT_IMAGE2D_ARRAY	opencl/clwrap.html#MEM_OBJECT_IMAGE2D_ARRAY	const MEM_OBJECT_IMAGE2D_ARRAY		504
+nim	MEM_OBJECT_IMAGE1D	opencl/clwrap.html#MEM_OBJECT_IMAGE1D	const MEM_OBJECT_IMAGE1D		505
+nim	MEM_OBJECT_IMAGE1D_ARRAY	opencl/clwrap.html#MEM_OBJECT_IMAGE1D_ARRAY	const MEM_OBJECT_IMAGE1D_ARRAY		506
+nim	MEM_OBJECT_IMAGE1D_BUFFER	opencl/clwrap.html#MEM_OBJECT_IMAGE1D_BUFFER	const MEM_OBJECT_IMAGE1D_BUFFER		507
+nim	MEM_TYPE	opencl/clwrap.html#MEM_TYPE	const MEM_TYPE		512
+nim	MEM_FLAGS	opencl/clwrap.html#MEM_FLAGS	const MEM_FLAGS		513
+nim	MEM_SIZE	opencl/clwrap.html#MEM_SIZE	const MEM_SIZE		514
+nim	MEM_HOST_PTR	opencl/clwrap.html#MEM_HOST_PTR	const MEM_HOST_PTR		515
+nim	MEM_MAP_COUNT	opencl/clwrap.html#MEM_MAP_COUNT	const MEM_MAP_COUNT		516
+nim	MEM_REFERENCE_COUNT	opencl/clwrap.html#MEM_REFERENCE_COUNT	const MEM_REFERENCE_COUNT		517
+nim	MEM_CONTEXT	opencl/clwrap.html#MEM_CONTEXT	const MEM_CONTEXT		518
+nim	MEM_ASSOCIATED_MEMOBJECT	opencl/clwrap.html#MEM_ASSOCIATED_MEMOBJECT	const MEM_ASSOCIATED_MEMOBJECT		519
+nim	MEM_OFFSET	opencl/clwrap.html#MEM_OFFSET	const MEM_OFFSET		520
+nim	IMAGE_FORMAT	opencl/clwrap.html#IMAGE_FORMAT	const IMAGE_FORMAT		525
+nim	IMAGE_ELEMENT_SIZE	opencl/clwrap.html#IMAGE_ELEMENT_SIZE	const IMAGE_ELEMENT_SIZE		526
+nim	IMAGE_ROW_PITCH	opencl/clwrap.html#IMAGE_ROW_PITCH	const IMAGE_ROW_PITCH		527
+nim	IMAGE_SLICE_PITCH	opencl/clwrap.html#IMAGE_SLICE_PITCH	const IMAGE_SLICE_PITCH		528
+nim	IMAGE_WIDTH	opencl/clwrap.html#IMAGE_WIDTH	const IMAGE_WIDTH		529
+nim	IMAGE_HEIGHT	opencl/clwrap.html#IMAGE_HEIGHT	const IMAGE_HEIGHT		530
+nim	IMAGE_DEPTH	opencl/clwrap.html#IMAGE_DEPTH	const IMAGE_DEPTH		531
+nim	IMAGE_ARRAY_SIZE	opencl/clwrap.html#IMAGE_ARRAY_SIZE	const IMAGE_ARRAY_SIZE		532
+nim	IMAGE_BUFFER	opencl/clwrap.html#IMAGE_BUFFER	const IMAGE_BUFFER		533
+nim	IMAGE_NUM_MIP_LEVELS	opencl/clwrap.html#IMAGE_NUM_MIP_LEVELS	const IMAGE_NUM_MIP_LEVELS		534
+nim	IMAGE_NUM_SAMPLES	opencl/clwrap.html#IMAGE_NUM_SAMPLES	const IMAGE_NUM_SAMPLES		535
+nim	ADDRESS_NONE	opencl/clwrap.html#ADDRESS_NONE	const ADDRESS_NONE		540
+nim	ADDRESS_CLAMP_TO_EDGE	opencl/clwrap.html#ADDRESS_CLAMP_TO_EDGE	const ADDRESS_CLAMP_TO_EDGE		541
+nim	ADDRESS_CLAMP	opencl/clwrap.html#ADDRESS_CLAMP	const ADDRESS_CLAMP		542
+nim	ADDRESS_REPEAT	opencl/clwrap.html#ADDRESS_REPEAT	const ADDRESS_REPEAT		543
+nim	ADDRESS_MIRRORED_REPEAT	opencl/clwrap.html#ADDRESS_MIRRORED_REPEAT	const ADDRESS_MIRRORED_REPEAT		544
+nim	FILTER_NEAREST	opencl/clwrap.html#FILTER_NEAREST	const FILTER_NEAREST		549
+nim	FILTER_LINEAR	opencl/clwrap.html#FILTER_LINEAR	const FILTER_LINEAR		550
+nim	SAMPLER_REFERENCE_COUNT	opencl/clwrap.html#SAMPLER_REFERENCE_COUNT	const SAMPLER_REFERENCE_COUNT		555
+nim	SAMPLER_CONTEXT	opencl/clwrap.html#SAMPLER_CONTEXT	const SAMPLER_CONTEXT		556
+nim	SAMPLER_NORMALIZED_COORDS	opencl/clwrap.html#SAMPLER_NORMALIZED_COORDS	const SAMPLER_NORMALIZED_COORDS		557
+nim	SAMPLER_ADDRESSING_MODE	opencl/clwrap.html#SAMPLER_ADDRESSING_MODE	const SAMPLER_ADDRESSING_MODE		558
+nim	SAMPLER_FILTER_MODE	opencl/clwrap.html#SAMPLER_FILTER_MODE	const SAMPLER_FILTER_MODE		559
+nim	MAP_READ	opencl/clwrap.html#MAP_READ	const MAP_READ		564
+nim	MAP_WRITE	opencl/clwrap.html#MAP_WRITE	const MAP_WRITE		565
+nim	MAP_WRITE_INVALIDATE_REGION	opencl/clwrap.html#MAP_WRITE_INVALIDATE_REGION	const MAP_WRITE_INVALIDATE_REGION		566
+nim	PROGRAM_REFERENCE_COUNT	opencl/clwrap.html#PROGRAM_REFERENCE_COUNT	const PROGRAM_REFERENCE_COUNT		571
+nim	PROGRAM_CONTEXT	opencl/clwrap.html#PROGRAM_CONTEXT	const PROGRAM_CONTEXT		572
+nim	PROGRAM_NUM_DEVICES	opencl/clwrap.html#PROGRAM_NUM_DEVICES	const PROGRAM_NUM_DEVICES		573
+nim	PROGRAM_DEVICES	opencl/clwrap.html#PROGRAM_DEVICES	const PROGRAM_DEVICES		574
+nim	PROGRAM_SOURCE	opencl/clwrap.html#PROGRAM_SOURCE	const PROGRAM_SOURCE		575
+nim	PROGRAM_BINARY_SIZES	opencl/clwrap.html#PROGRAM_BINARY_SIZES	const PROGRAM_BINARY_SIZES		576
+nim	PROGRAM_BINARIES	opencl/clwrap.html#PROGRAM_BINARIES	const PROGRAM_BINARIES		577
+nim	PROGRAM_NUM_KERNELS	opencl/clwrap.html#PROGRAM_NUM_KERNELS	const PROGRAM_NUM_KERNELS		578
+nim	PROGRAM_KERNEL_NAMES	opencl/clwrap.html#PROGRAM_KERNEL_NAMES	const PROGRAM_KERNEL_NAMES		579
+nim	PROGRAM_BUILD_STATUS	opencl/clwrap.html#PROGRAM_BUILD_STATUS	const PROGRAM_BUILD_STATUS		584
+nim	PROGRAM_BUILD_OPTIONS	opencl/clwrap.html#PROGRAM_BUILD_OPTIONS	const PROGRAM_BUILD_OPTIONS		585
+nim	PROGRAM_BUILD_LOG	opencl/clwrap.html#PROGRAM_BUILD_LOG	const PROGRAM_BUILD_LOG		586
+nim	PROGRAM_BINARY_TYPE	opencl/clwrap.html#PROGRAM_BINARY_TYPE	const PROGRAM_BINARY_TYPE		587
+nim	PROGRAM_BINARY_TYPE_NONE	opencl/clwrap.html#PROGRAM_BINARY_TYPE_NONE	const PROGRAM_BINARY_TYPE_NONE		592
+nim	PROGRAM_BINARY_TYPE_COMPILED_OBJECT	opencl/clwrap.html#PROGRAM_BINARY_TYPE_COMPILED_OBJECT	const PROGRAM_BINARY_TYPE_COMPILED_OBJECT		593
+nim	PROGRAM_BINARY_TYPE_LIBRARY	opencl/clwrap.html#PROGRAM_BINARY_TYPE_LIBRARY	const PROGRAM_BINARY_TYPE_LIBRARY		594
+nim	PROGRAM_BINARY_TYPE_EXECUTABLE	opencl/clwrap.html#PROGRAM_BINARY_TYPE_EXECUTABLE	const PROGRAM_BINARY_TYPE_EXECUTABLE		595
+nim	BUILD_SUCCESS	opencl/clwrap.html#BUILD_SUCCESS	const BUILD_SUCCESS		600
+nim	BUILD_NONE	opencl/clwrap.html#BUILD_NONE	const BUILD_NONE		601
+nim	BUILD_ERROR	opencl/clwrap.html#BUILD_ERROR	const BUILD_ERROR		602
+nim	BUILD_IN_PROGRESS	opencl/clwrap.html#BUILD_IN_PROGRESS	const BUILD_IN_PROGRESS		603
+nim	KERNEL_FUNCTION_NAME	opencl/clwrap.html#KERNEL_FUNCTION_NAME	const KERNEL_FUNCTION_NAME		608
+nim	KERNEL_NUM_ARGS	opencl/clwrap.html#KERNEL_NUM_ARGS	const KERNEL_NUM_ARGS		609
+nim	KERNEL_REFERENCE_COUNT	opencl/clwrap.html#KERNEL_REFERENCE_COUNT	const KERNEL_REFERENCE_COUNT		610
+nim	KERNEL_CONTEXT	opencl/clwrap.html#KERNEL_CONTEXT	const KERNEL_CONTEXT		611
+nim	KERNEL_PROGRAM	opencl/clwrap.html#KERNEL_PROGRAM	const KERNEL_PROGRAM		612
+nim	KERNEL_ATTRIBUTES	opencl/clwrap.html#KERNEL_ATTRIBUTES	const KERNEL_ATTRIBUTES		613
+nim	KERNEL_ARG_ADDRESS_QUALIFIER	opencl/clwrap.html#KERNEL_ARG_ADDRESS_QUALIFIER	const KERNEL_ARG_ADDRESS_QUALIFIER		618
+nim	KERNEL_ARG_ACCESS_QUALIFIER	opencl/clwrap.html#KERNEL_ARG_ACCESS_QUALIFIER	const KERNEL_ARG_ACCESS_QUALIFIER		619
+nim	KERNEL_ARG_TYPE_NAME	opencl/clwrap.html#KERNEL_ARG_TYPE_NAME	const KERNEL_ARG_TYPE_NAME		620
+nim	KERNEL_ARG_TYPE_QUALIFIER	opencl/clwrap.html#KERNEL_ARG_TYPE_QUALIFIER	const KERNEL_ARG_TYPE_QUALIFIER		621
+nim	KERNEL_ARG_NAME	opencl/clwrap.html#KERNEL_ARG_NAME	const KERNEL_ARG_NAME		622
+nim	KERNEL_ARG_ADDRESS_GLOBAL	opencl/clwrap.html#KERNEL_ARG_ADDRESS_GLOBAL	const KERNEL_ARG_ADDRESS_GLOBAL		627
+nim	KERNEL_ARG_ADDRESS_LOCAL	opencl/clwrap.html#KERNEL_ARG_ADDRESS_LOCAL	const KERNEL_ARG_ADDRESS_LOCAL		628
+nim	KERNEL_ARG_ADDRESS_CONSTANT	opencl/clwrap.html#KERNEL_ARG_ADDRESS_CONSTANT	const KERNEL_ARG_ADDRESS_CONSTANT		629
+nim	KERNEL_ARG_ADDRESS_PRIVATE	opencl/clwrap.html#KERNEL_ARG_ADDRESS_PRIVATE	const KERNEL_ARG_ADDRESS_PRIVATE		630
+nim	KERNEL_ARG_ACCESS_READ_ONLY	opencl/clwrap.html#KERNEL_ARG_ACCESS_READ_ONLY	const KERNEL_ARG_ACCESS_READ_ONLY		635
+nim	KERNEL_ARG_ACCESS_WRITE_ONLY	opencl/clwrap.html#KERNEL_ARG_ACCESS_WRITE_ONLY	const KERNEL_ARG_ACCESS_WRITE_ONLY		636
+nim	KERNEL_ARG_ACCESS_READ_WRITE	opencl/clwrap.html#KERNEL_ARG_ACCESS_READ_WRITE	const KERNEL_ARG_ACCESS_READ_WRITE		637
+nim	KERNEL_ARG_ACCESS_NONE	opencl/clwrap.html#KERNEL_ARG_ACCESS_NONE	const KERNEL_ARG_ACCESS_NONE		638
+nim	KERNEL_ARG_TYPE_NONE	opencl/clwrap.html#KERNEL_ARG_TYPE_NONE	const KERNEL_ARG_TYPE_NONE		643
+nim	KERNEL_ARG_TYPE_CONST	opencl/clwrap.html#KERNEL_ARG_TYPE_CONST	const KERNEL_ARG_TYPE_CONST		644
+nim	KERNEL_ARG_TYPE_RESTRICT	opencl/clwrap.html#KERNEL_ARG_TYPE_RESTRICT	const KERNEL_ARG_TYPE_RESTRICT		645
+nim	KERNEL_ARG_TYPE_VOLATILE	opencl/clwrap.html#KERNEL_ARG_TYPE_VOLATILE	const KERNEL_ARG_TYPE_VOLATILE		646
+nim	KERNEL_WORK_GROUP_SIZE	opencl/clwrap.html#KERNEL_WORK_GROUP_SIZE	const KERNEL_WORK_GROUP_SIZE		651
+nim	KERNEL_COMPILE_WORK_GROUP_SIZE	opencl/clwrap.html#KERNEL_COMPILE_WORK_GROUP_SIZE	const KERNEL_COMPILE_WORK_GROUP_SIZE		652
+nim	KERNEL_LOCAL_MEM_SIZE	opencl/clwrap.html#KERNEL_LOCAL_MEM_SIZE	const KERNEL_LOCAL_MEM_SIZE		653
+nim	KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE	opencl/clwrap.html#KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE	const KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE		654
+nim	KERNEL_PRIVATE_MEM_SIZE	opencl/clwrap.html#KERNEL_PRIVATE_MEM_SIZE	const KERNEL_PRIVATE_MEM_SIZE		655
+nim	KERNEL_GLOBAL_WORK_SIZE	opencl/clwrap.html#KERNEL_GLOBAL_WORK_SIZE	const KERNEL_GLOBAL_WORK_SIZE		656
+nim	EVENT_COMMAND_QUEUE	opencl/clwrap.html#EVENT_COMMAND_QUEUE	const EVENT_COMMAND_QUEUE		661
+nim	EVENT_COMMAND_TYPE	opencl/clwrap.html#EVENT_COMMAND_TYPE	const EVENT_COMMAND_TYPE		662
+nim	EVENT_REFERENCE_COUNT	opencl/clwrap.html#EVENT_REFERENCE_COUNT	const EVENT_REFERENCE_COUNT		663
+nim	EVENT_COMMAND_EXECUTION_STATUS	opencl/clwrap.html#EVENT_COMMAND_EXECUTION_STATUS	const EVENT_COMMAND_EXECUTION_STATUS		664
+nim	EVENT_CONTEXT	opencl/clwrap.html#EVENT_CONTEXT	const EVENT_CONTEXT		665
+nim	COMMAND_NDRANGE_KERNEL	opencl/clwrap.html#COMMAND_NDRANGE_KERNEL	const COMMAND_NDRANGE_KERNEL		670
+nim	COMMAND_TASK	opencl/clwrap.html#COMMAND_TASK	const COMMAND_TASK		671
+nim	COMMAND_NATIVE_KERNEL	opencl/clwrap.html#COMMAND_NATIVE_KERNEL	const COMMAND_NATIVE_KERNEL		672
+nim	COMMAND_READ_BUFFER	opencl/clwrap.html#COMMAND_READ_BUFFER	const COMMAND_READ_BUFFER		673
+nim	COMMAND_WRITE_BUFFER	opencl/clwrap.html#COMMAND_WRITE_BUFFER	const COMMAND_WRITE_BUFFER		674
+nim	COMMAND_COPY_BUFFER	opencl/clwrap.html#COMMAND_COPY_BUFFER	const COMMAND_COPY_BUFFER		675
+nim	COMMAND_READ_IMAGE	opencl/clwrap.html#COMMAND_READ_IMAGE	const COMMAND_READ_IMAGE		676
+nim	COMMAND_WRITE_IMAGE	opencl/clwrap.html#COMMAND_WRITE_IMAGE	const COMMAND_WRITE_IMAGE		677
+nim	COMMAND_COPY_IMAGE	opencl/clwrap.html#COMMAND_COPY_IMAGE	const COMMAND_COPY_IMAGE		678
+nim	COMMAND_COPY_IMAGE_TO_BUFFER	opencl/clwrap.html#COMMAND_COPY_IMAGE_TO_BUFFER	const COMMAND_COPY_IMAGE_TO_BUFFER		679
+nim	COMMAND_COPY_BUFFER_TO_IMAGE	opencl/clwrap.html#COMMAND_COPY_BUFFER_TO_IMAGE	const COMMAND_COPY_BUFFER_TO_IMAGE		680
+nim	COMMAND_MAP_BUFFER	opencl/clwrap.html#COMMAND_MAP_BUFFER	const COMMAND_MAP_BUFFER		681
+nim	COMMAND_MAP_IMAGE	opencl/clwrap.html#COMMAND_MAP_IMAGE	const COMMAND_MAP_IMAGE		682
+nim	COMMAND_UNMAP_MEM_OBJECT	opencl/clwrap.html#COMMAND_UNMAP_MEM_OBJECT	const COMMAND_UNMAP_MEM_OBJECT		683
+nim	COMMAND_MARKER	opencl/clwrap.html#COMMAND_MARKER	const COMMAND_MARKER		684
+nim	COMMAND_ACQUIRE_GL_OBJECTS	opencl/clwrap.html#COMMAND_ACQUIRE_GL_OBJECTS	const COMMAND_ACQUIRE_GL_OBJECTS		685
+nim	COMMAND_RELEASE_GL_OBJECTS	opencl/clwrap.html#COMMAND_RELEASE_GL_OBJECTS	const COMMAND_RELEASE_GL_OBJECTS		686
+nim	COMMAND_READ_BUFFER_RECT	opencl/clwrap.html#COMMAND_READ_BUFFER_RECT	const COMMAND_READ_BUFFER_RECT		687
+nim	COMMAND_WRITE_BUFFER_RECT	opencl/clwrap.html#COMMAND_WRITE_BUFFER_RECT	const COMMAND_WRITE_BUFFER_RECT		688
+nim	COMMAND_COPY_BUFFER_RECT	opencl/clwrap.html#COMMAND_COPY_BUFFER_RECT	const COMMAND_COPY_BUFFER_RECT		689
+nim	COMMAND_USER	opencl/clwrap.html#COMMAND_USER	const COMMAND_USER		690
+nim	COMMAND_BARRIER	opencl/clwrap.html#COMMAND_BARRIER	const COMMAND_BARRIER		691
+nim	COMMAND_MIGRATE_MEM_OBJECTS	opencl/clwrap.html#COMMAND_MIGRATE_MEM_OBJECTS	const COMMAND_MIGRATE_MEM_OBJECTS		692
+nim	COMMAND_FILL_BUFFER	opencl/clwrap.html#COMMAND_FILL_BUFFER	const COMMAND_FILL_BUFFER		693
+nim	COMMAND_FILL_IMAGE	opencl/clwrap.html#COMMAND_FILL_IMAGE	const COMMAND_FILL_IMAGE		694
+nim	COMPLETE	opencl/clwrap.html#COMPLETE	const COMPLETE		699
+nim	RUNNING	opencl/clwrap.html#RUNNING	const RUNNING		700
+nim	SUBMITTED	opencl/clwrap.html#SUBMITTED	const SUBMITTED		701
+nim	QUEUED	opencl/clwrap.html#QUEUED	const QUEUED		702
+nim	BUFFER_CREATE_TYPE_REGION	opencl/clwrap.html#BUFFER_CREATE_TYPE_REGION	const BUFFER_CREATE_TYPE_REGION		707
+nim	Tprofiling_info	opencl/clwrap.html#Tprofiling_info	enum Tprofiling_info		710
+nim	getPlatformIDs	opencl/clwrap.html#getPlatformIDs,uint32,ptr.Pplatform_id,ptr.uint32	proc getPlatformIDs(num_entries: uint32; platforms: ptr Pplatform_id;\n               num_platforms: ptr uint32): TClResult		718
+nim	getPlatformInfo	opencl/clwrap.html#getPlatformInfo,Pplatform_id,Tplatform_info,int,pointer,ptr.int	proc getPlatformInfo(platform: Pplatform_id; param_name: Tplatform_info;\n                param_value_size: int; param_value: pointer;\n                param_value_size_ret: ptr int): TClResult		721
+nim	getDeviceIDs	opencl/clwrap.html#getDeviceIDs,Pplatform_id,TDeviceType,uint32,ptr.Pdevice_id,ptr.uint32	proc getDeviceIDs(platform: Pplatform_id; device_type: TDeviceType;\n             num_entries: uint32; devices: ptr Pdevice_id;\n             num_devices: ptr uint32): TClResult		727
+nim	getDeviceInfo	opencl/clwrap.html#getDeviceInfo,Pdevice_id,Tdevice_info,int,pointer,ptr.int	proc getDeviceInfo(device: Pdevice_id; param_name: Tdevice_info;\n              param_value_size: int; param_value: pointer;\n              param_value_size_ret: ptr int): TClResult		731
+nim	createSubDevices	opencl/clwrap.html#createSubDevices,Pdevice_id,ptr.Tdevice_partition_property,uint32,ptr.Pdevice_id,ptr.uint32	proc createSubDevices(in_device: Pdevice_id;\n                 properties: ptr Tdevice_partition_property;\n                 num_devices: uint32; out_devices: ptr Pdevice_id;\n                 num_devices_ret: ptr uint32): TClResult		735
+nim	retainDevice	opencl/clwrap.html#retainDevice,Pdevice_id	proc retainDevice(device: Pdevice_id): TClResult		740
+nim	releaseDevice	opencl/clwrap.html#releaseDevice,Pdevice_id	proc releaseDevice(device: Pdevice_id): TClResult		742
+nim	TCreateContextCb	opencl/clwrap.html#TCreateContextCb	type TCreateContextCb		747
+nim	createContext	opencl/clwrap.html#createContext,ptr.Tcontext_properties,uint32,ptr.Pdevice_id,TCreateContextCb,pointer,ptr.TClResult	proc createContext(properties: ptr Tcontext_properties; num_devices: uint32;\n              devices: ptr Pdevice_id; pfn_notify: TCreateContextCb;\n              user_data: pointer; errcode_ret: ptr TClResult): Pcontext		750
+nim	createContextFromType	opencl/clwrap.html#createContextFromType,ptr.Tcontext_properties,TDeviceType,TCreateContextCb,pointer,ptr.TClResult	proc createContextFromType(properties: ptr Tcontext_properties;\n                      device_type: TDeviceType; pfn_notify: TCreateContextCb;\n                      user_data: pointer; errcode_ret: ptr TClResult): Pcontext		754
+nim	retainContext	opencl/clwrap.html#retainContext,Pcontext	proc retainContext(context: Pcontext): TClResult		759
+nim	releaseContext	opencl/clwrap.html#releaseContext,Pcontext	proc releaseContext(context: Pcontext): TClResult		761
+nim	getContextInfo	opencl/clwrap.html#getContextInfo,Pcontext,Tcontext_info,int,pointer,ptr.int	proc getContextInfo(context: Pcontext; param_name: Tcontext_info;\n               param_value_size: int; param_value: pointer;\n               param_value_size_ret: ptr int): TClResult		763
+nim	createCommandQueue	opencl/clwrap.html#createCommandQueue,Pcontext,Pdevice_id,Tcommand_queue_properties,ptr.TClResult	proc createCommandQueue(context: Pcontext; device: Pdevice_id;\n                   properties: Tcommand_queue_properties;\n                   errcode_ret: ptr TClResult): Pcommand_queue		769
+nim	retainCommandQueue	opencl/clwrap.html#retainCommandQueue,Pcommand_queue	proc retainCommandQueue(command_queue: Pcommand_queue): TClResult		773
+nim	releaseCommandQueue	opencl/clwrap.html#releaseCommandQueue,Pcommand_queue	proc releaseCommandQueue(command_queue: Pcommand_queue): TClResult		775
+nim	getCommandQueueInfo	opencl/clwrap.html#getCommandQueueInfo,Pcommand_queue,Tcommand_queue_info,int,pointer,ptr.int	proc getCommandQueueInfo(command_queue: Pcommand_queue;\n                    param_name: Tcommand_queue_info; param_value_size: int;\n                    param_value: pointer; param_value_size_ret: ptr int): TClResult		777
+nim	createBuffer	opencl/clwrap.html#createBuffer,Pcontext,Tmem_flags,int,pointer,ptr.TClResult	proc createBuffer(context: Pcontext; flags: Tmem_flags; size: int; host_ptr: pointer;\n             errcode_ret: ptr TClResult): Pmem		784
+nim	createSubBuffer	opencl/clwrap.html#createSubBuffer,Pmem,Tmem_flags,Tbuffer_create_type,pointer,ptr.TClResult	proc createSubBuffer(buffer: Pmem; flags: Tmem_flags;\n                buffer_create_type: Tbuffer_create_type;\n                buffer_create_info: pointer; errcode_ret: ptr TClResult): Pmem		787
+nim	createImage	opencl/clwrap.html#createImage,Pcontext,Tmem_flags,ptr.Timage_format,ptr.Timage_desc,pointer,ptr.TClResult	proc createImage(context: Pcontext; flags: Tmem_flags;\n            image_format: ptr Timage_format; image_desc: ptr Timage_desc;\n            host_ptr: pointer; errcode_ret: ptr TClResult): Pmem		791
+nim	retainMemObject	opencl/clwrap.html#retainMemObject,Pmem	proc retainMemObject(memobj: Pmem): TClResult		795
+nim	releaseMemObject	opencl/clwrap.html#releaseMemObject,Pmem	proc releaseMemObject(memobj: Pmem): TClResult		797
+nim	getSupportedImageFormats	opencl/clwrap.html#getSupportedImageFormats,Pcontext,Tmem_flags,Tmem_object_type,uint32,ptr.Timage_format,ptr.uint32	proc getSupportedImageFormats(context: Pcontext; flags: Tmem_flags;\n                         image_type: Tmem_object_type; num_entries: uint32;\n                         image_formats: ptr Timage_format;\n                         num_image_formats: ptr uint32): TClResult		799
+nim	getMemObjectInfo	opencl/clwrap.html#getMemObjectInfo,Pmem,Tmem_info,int,pointer,ptr.int	proc getMemObjectInfo(memobj: Pmem; param_name: Tmem_info; param_value_size: int;\n                 param_value: pointer; param_value_size_ret: ptr int): TClResult		805
+nim	getImageInfo	opencl/clwrap.html#getImageInfo,Pmem,Timage_info,int,pointer,ptr.int	proc getImageInfo(image: Pmem; param_name: Timage_info; param_value_size: int;\n             param_value: pointer; param_value_size_ret: ptr int): TClResult		809
+nim	TMemObjectDestructorCb	opencl/clwrap.html#TMemObjectDestructorCb	type TMemObjectDestructorCb		813
+nim	setMemObjectDestructorCallback	opencl/clwrap.html#setMemObjectDestructorCallback,Pmem,TMemObjectDestructorCb,pointer	proc setMemObjectDestructorCallback(memobj: Pmem; pfn_notify: TMemObjectDestructorCb;\n                               user_data: pointer): TClResult		815
+nim	createSampler	opencl/clwrap.html#createSampler,Pcontext,Tbool,Taddressing_mode,Tfilter_mode,ptr.TClResult	proc createSampler(context: Pcontext; normalized_coords: Tbool;\n              addressing_mode: Taddressing_mode; filter_mode: Tfilter_mode;\n              errcode_ret: ptr TClResult): Psampler		821
+nim	retainSampler	opencl/clwrap.html#retainSampler,Psampler	proc retainSampler(sampler: Psampler): TClResult		825
+nim	releaseSampler	opencl/clwrap.html#releaseSampler,Psampler	proc releaseSampler(sampler: Psampler): TClResult		827
+nim	getSamplerInfo	opencl/clwrap.html#getSamplerInfo,Psampler,Tsampler_info,int,pointer,ptr.int	proc getSamplerInfo(sampler: Psampler; param_name: Tsampler_info;\n               param_value_size: int; param_value: pointer;\n               param_value_size_ret: ptr int): TClResult		829
+nim	createProgramWithSource	opencl/clwrap.html#createProgramWithSource,Pcontext,uint32,cstringArray,ptr.int,ptr.TClResult	proc createProgramWithSource(context: Pcontext; count: uint32; strings: cstringArray;\n                        lengths: ptr int; errcode_ret: ptr TClResult): Pprogram		835
+nim	createProgramWithBinary	opencl/clwrap.html#createProgramWithBinary,Pcontext,uint32,ptr.Pdevice_id,ptr.int,ptr.ptr.uint8,ptr.int32,ptr.TClResult	proc createProgramWithBinary(context: Pcontext; num_devices: uint32;\n                        device_list: ptr Pdevice_id; lengths: ptr int;\n                        binaries: ptr ptr uint8; binary_status: ptr int32;\n                        errcode_ret: ptr TClResult): Pprogram		839
+nim	createProgramWithBuiltInKernels	opencl/clwrap.html#createProgramWithBuiltInKernels,Pcontext,uint32,ptr.Pdevice_id,cstring,ptr.TClResult	proc createProgramWithBuiltInKernels(context: Pcontext; num_devices: uint32;\n                                device_list: ptr Pdevice_id;\n                                kernel_names: cstring;\n                                errcode_ret: ptr TClResult): Pprogram		844
+nim	retainProgram	opencl/clwrap.html#retainProgram,Pprogram	proc retainProgram(program: Pprogram): TClResult		849
+nim	releaseProgram	opencl/clwrap.html#releaseProgram,Pprogram	proc releaseProgram(program: Pprogram): TClResult		851
+nim	TProgramCb	opencl/clwrap.html#TProgramCb	type TProgramCb		855
+nim	buildProgram	opencl/clwrap.html#buildProgram,Pprogram,uint32,ptr.Pdevice_id,cstring,TProgramCb,pointer	proc buildProgram(program: Pprogram; num_devices: uint32;\n             device_list: ptr Pdevice_id; options: cstring;\n             pfn_notify: TProgramCb; user_data: pointer): TClResult		857
+nim	compileProgram	opencl/clwrap.html#compileProgram,Pprogram,uint32,ptr.Pdevice_id,cstring,uint32,ptr.Pprogram,cstringArray,TProgramCb,pointer	proc compileProgram(program: Pprogram; num_devices: uint32;\n               device_list: ptr Pdevice_id; options: cstring;\n               num_input_headers: uint32; input_headers: ptr Pprogram;\n               header_include_names: cstringArray; pfn_notify: TProgramCb;\n               user_data: pointer): TClResult		861
+nim	linkProgram	opencl/clwrap.html#linkProgram,Pcontext,uint32,ptr.Pdevice_id,cstring,uint32,ptr.Pprogram,TProgramCb,pointer,ptr.TClResult	proc linkProgram(context: Pcontext; num_devices: uint32; device_list: ptr Pdevice_id;\n            options: cstring; num_input_programs: uint32;\n            input_programs: ptr Pprogram; pfn_notify: TProgramCb;\n            user_data: pointer; errcode_ret: ptr TClResult): Pprogram		867
+nim	unloadPlatformCompiler	opencl/clwrap.html#unloadPlatformCompiler,Pplatform_id	proc unloadPlatformCompiler(platform: Pplatform_id): TClResult		873
+nim	getProgramInfo	opencl/clwrap.html#getProgramInfo,Pprogram,Tprogram_info,int,pointer,ptr.int	proc getProgramInfo(program: Pprogram; param_name: Tprogram_info;\n               param_value_size: int; param_value: pointer;\n               param_value_size_ret: ptr int): TClResult		875
+nim	getProgramBuildInfo	opencl/clwrap.html#getProgramBuildInfo,Pprogram,Pdevice_id,Tprogram_build_info,int,pointer,ptr.int	proc getProgramBuildInfo(program: Pprogram; device: Pdevice_id;\n                    param_name: Tprogram_build_info; param_value_size: int;\n                    param_value: pointer; param_value_size_ret: ptr int): TClResult		879
+nim	createKernel	opencl/clwrap.html#createKernel,Pprogram,cstring,ptr.TClResult	proc createKernel(program: Pprogram; kernel_name: cstring; errcode_ret: ptr TClResult): Pkernel		886
+nim	createKernelsInProgram	opencl/clwrap.html#createKernelsInProgram,Pprogram,uint32,ptr.Pkernel,ptr.uint32	proc createKernelsInProgram(program: Pprogram; num_kernels: uint32;\n                       kernels: ptr Pkernel; num_kernels_ret: ptr uint32): TClResult		889
+nim	retainKernel	opencl/clwrap.html#retainKernel,Pkernel	proc retainKernel(kernel: Pkernel): TClResult		892
+nim	releaseKernel	opencl/clwrap.html#releaseKernel,Pkernel	proc releaseKernel(kernel: Pkernel): TClResult		894
+nim	setKernelArg	opencl/clwrap.html#setKernelArg,Pkernel,uint32,int,pointer	proc setKernelArg(kernel: Pkernel; arg_index: uint32; arg_size: int;\n             arg_value: pointer): TClResult		896
+nim	getKernelInfo	opencl/clwrap.html#getKernelInfo,Pkernel,Tkernel_info,int,pointer,ptr.int	proc getKernelInfo(kernel: Pkernel; param_name: Tkernel_info; param_value_size: int;\n              param_value: pointer; param_value_size_ret: ptr int): TClResult		899
+nim	getKernelArgInfo	opencl/clwrap.html#getKernelArgInfo,Pkernel,uint32,Tkernel_arg_info,int,pointer,ptr.int	proc getKernelArgInfo(kernel: Pkernel; arg_indx: uint32;\n                 param_name: Tkernel_arg_info; param_value_size: int;\n                 param_value: pointer; param_value_size_ret: ptr int): TClResult		903
+nim	getKernelWorkGroupInfo	opencl/clwrap.html#getKernelWorkGroupInfo,Pkernel,Pdevice_id,Tkernel_work_group_info,int,pointer,ptr.int	proc getKernelWorkGroupInfo(kernel: Pkernel; device: Pdevice_id;\n                       param_name: Tkernel_work_group_info;\n                       param_value_size: int; param_value: pointer;\n                       param_value_size_ret: ptr int): TClResult		907
+nim	waitForEvents	opencl/clwrap.html#waitForEvents,uint32,ptr.Pevent	proc waitForEvents(num_events: uint32; event_list: ptr Pevent): TClResult		914
+nim	getEventInfo	opencl/clwrap.html#getEventInfo,Pevent,Tevent_info,int,pointer,ptr.int	proc getEventInfo(event: Pevent; param_name: Tevent_info; param_value_size: int;\n             param_value: pointer; param_value_size_ret: ptr int): TClResult		916
+nim	createUserEvent	opencl/clwrap.html#createUserEvent,Pcontext,ptr.TClResult	proc createUserEvent(context: Pcontext; errcode_ret: ptr TClResult): Pevent		920
+nim	retainEvent	opencl/clwrap.html#retainEvent,Pevent	proc retainEvent(event: Pevent): TClResult		922
+nim	releaseEvent	opencl/clwrap.html#releaseEvent,Pevent	proc releaseEvent(event: Pevent): TClResult		924
+nim	setUserEventStatus	opencl/clwrap.html#setUserEventStatus,Pevent,int32	proc setUserEventStatus(event: Pevent; execution_status: int32): TClResult		926
+nim	TEventCb	opencl/clwrap.html#TEventCb	type TEventCb		930
+nim	setEventCallback	opencl/clwrap.html#setEventCallback,Pevent,int32,TEventCb,pointer	proc setEventCallback(event: Pevent; command_exec_callback_type: int32;\n                 pfn_notify: TEventCb; user_data: pointer): TClResult		932
+nim	getEventProfilingInfo	opencl/clwrap.html#getEventProfilingInfo,Pevent,Tprofiling_info,int,pointer,ptr.int	proc getEventProfilingInfo(event: Pevent; param_name: Tprofiling_info;\n                      param_value_size: int; param_value: pointer;\n                      param_value_size_ret: ptr int): TClResult		937
+nim	flush	opencl/clwrap.html#flush,Pcommand_queue	proc flush(command_queue: Pcommand_queue): TClResult		943
+nim	finish	opencl/clwrap.html#finish,Pcommand_queue	proc finish(command_queue: Pcommand_queue): TClResult		945
+nim	enqueueReadBuffer	opencl/clwrap.html#enqueueReadBuffer,Pcommand_queue,Pmem,Tbool,int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueReadBuffer(command_queue: Pcommand_queue; buffer: Pmem;\n                  blocking_read: Tbool; offset: int; size: int; theptr: pointer;\n                  num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n                  event: ptr Pevent): TClResult		949
+nim	enqueueReadBufferRect	opencl/clwrap.html#enqueueReadBufferRect,Pcommand_queue,Pmem,Tbool,ptr.int,ptr.int,ptr.int,int,int,int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueReadBufferRect(command_queue: Pcommand_queue; buffer: Pmem;\n                      blocking_read: Tbool; buffer_offset: ptr int;\n                      host_offset: ptr int; region: ptr int;\n                      buffer_row_pitch: int; buffer_slice_pitch: int;\n                      host_row_pitch: int; host_slice_pitch: int;\n                      theptr: pointer; num_events_in_wait_list: uint32;\n                      event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		954
+nim	enqueueWriteBuffer	opencl/clwrap.html#enqueueWriteBuffer,Pcommand_queue,Pmem,Tbool,int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueWriteBuffer(command_queue: Pcommand_queue; buffer: Pmem;\n                   blocking_write: Tbool; offset: int; size: int;\n                   theptr: pointer; num_events_in_wait_list: uint32;\n                   event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		962
+nim	enqueueWriteBufferRect	opencl/clwrap.html#enqueueWriteBufferRect,Pcommand_queue,Pmem,Tbool,ptr.int,ptr.int,ptr.int,int,int,int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueWriteBufferRect(command_queue: Pcommand_queue; buffer: Pmem;\n                       blocking_write: Tbool; buffer_offset: ptr int;\n                       host_offset: ptr int; region: ptr int;\n                       buffer_row_pitch: int; buffer_slice_pitch: int;\n                       host_row_pitch: int; host_slice_pitch: int;\n                       theptr: pointer; num_events_in_wait_list: uint32;\n                       event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		967
+nim	enqueueFillBuffer	opencl/clwrap.html#enqueueFillBuffer,Pcommand_queue,Pmem,pointer,int,int,int,uint32,ptr.Pevent,ptr.Pevent	proc enqueueFillBuffer(command_queue: Pcommand_queue; buffer: Pmem; pattern: pointer;\n                  pattern_size: int; offset: int; size: int;\n                  num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n                  event: ptr Pevent): TClResult		975
+nim	enqueueCopyBuffer	opencl/clwrap.html#enqueueCopyBuffer,Pcommand_queue,Pmem,Pmem,int,int,int,uint32,ptr.Pevent,ptr.Pevent	proc enqueueCopyBuffer(command_queue: Pcommand_queue; src_buffer: Pmem;\n                  dst_buffer: Pmem; src_offset: int; dst_offset: int; size: int;\n                  num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n                  event: ptr Pevent): TClResult		980
+nim	enqueueCopyBufferRect	opencl/clwrap.html#enqueueCopyBufferRect,Pcommand_queue,Pmem,Pmem,ptr.int,ptr.int,ptr.int,int,int,int,int,uint32,ptr.Pevent,ptr.Pevent	proc enqueueCopyBufferRect(command_queue: Pcommand_queue; src_buffer: Pmem;\n                      dst_buffer: Pmem; src_origin: ptr int;\n                      dst_origin: ptr int; region: ptr int; src_row_pitch: int;\n                      src_slice_pitch: int; dst_row_pitch: int;\n                      dst_slice_pitch: int; num_events_in_wait_list: uint32;\n                      event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		985
+nim	enqueueReadImage	opencl/clwrap.html#enqueueReadImage,Pcommand_queue,Pmem,Tbool,array[,ptr.int],array[,ptr.int],int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueReadImage(command_queue: Pcommand_queue; image: Pmem;\n                 blocking_read: Tbool; origin: array[3, ptr int];\n                 region: array[3, ptr int]; row_pitch: int; slice_pitch: int;\n                 theptr: pointer; num_events_in_wait_list: uint32;\n                 event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		993
+nim	enqueueWriteImage	opencl/clwrap.html#enqueueWriteImage,Pcommand_queue,Pmem,Tbool,array[,ptr.int],array[,ptr.int],int,int,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueWriteImage(command_queue: Pcommand_queue; image: Pmem;\n                  blocking_write: Tbool; origin: array[3, ptr int];\n                  region: array[3, ptr int]; input_row_pitch: int;\n                  input_slice_pitch: int; theptr: pointer;\n                  num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n                  event: ptr Pevent): TClResult		1000
+nim	enqueueFillImage	opencl/clwrap.html#enqueueFillImage,Pcommand_queue,Pmem,pointer,array[,ptr.int],array[,ptr.int],uint32,ptr.Pevent,ptr.Pevent	proc enqueueFillImage(command_queue: Pcommand_queue; image: Pmem;\n                 fill_color: pointer; origin: array[3, ptr int];\n                 region: array[3, ptr int]; num_events_in_wait_list: uint32;\n                 event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1007
+nim	enqueueCopyImage	opencl/clwrap.html#enqueueCopyImage,Pcommand_queue,Pmem,Pmem,array[,ptr.int],array[,ptr.int],array[,ptr.int],uint32,ptr.Pevent,ptr.Pevent	proc enqueueCopyImage(command_queue: Pcommand_queue; src_image: Pmem;\n                 dst_image: Pmem; src_origin: array[3, ptr int];\n                 dst_origin: array[3, ptr int]; region: array[3, ptr int];\n                 num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n                 event: ptr Pevent): TClResult		1013
+nim	enqueueCopyImageToBuffer	opencl/clwrap.html#enqueueCopyImageToBuffer,Pcommand_queue,Pmem,Pmem,array[,ptr.int],array[,ptr.int],int,uint32,ptr.Pevent,ptr.Pevent	proc enqueueCopyImageToBuffer(command_queue: Pcommand_queue; src_image: Pmem;\n                         dst_buffer: Pmem; src_origin: array[3, ptr int];\n                         region: array[3, ptr int]; dst_offset: int;\n                         num_events_in_wait_list: uint32;\n                         event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1019
+nim	enqueueCopyBufferToImage	opencl/clwrap.html#enqueueCopyBufferToImage,Pcommand_queue,Pmem,Pmem,int,array[,ptr.int],array[,ptr.int],uint32,ptr.Pevent,ptr.Pevent	proc enqueueCopyBufferToImage(command_queue: Pcommand_queue; src_buffer: Pmem;\n                         dst_image: Pmem; src_offset: int;\n                         dst_origin: array[3, ptr int];\n                         region: array[3, ptr int];\n                         num_events_in_wait_list: uint32;\n                         event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1025
+nim	enqueueMapBuffer	opencl/clwrap.html#enqueueMapBuffer,Pcommand_queue,Pmem,Tbool,Tmap_flags,int,int,uint32,ptr.Pevent,ptr.Pevent,ptr.TClResult	proc enqueueMapBuffer(command_queue: Pcommand_queue; buffer: Pmem;\n                 blocking_map: Tbool; map_flags: Tmap_flags; offset: int;\n                 size: int; num_events_in_wait_list: uint32;\n                 event_wait_list: ptr Pevent; event: ptr Pevent;\n                 errcode_ret: ptr TClResult): pointer		1032
+nim	enqueueMapImage	opencl/clwrap.html#enqueueMapImage,Pcommand_queue,Pmem,Tbool,Tmap_flags,array[,ptr.int],array[,ptr.int],ptr.int,ptr.int,uint32,ptr.Pevent,ptr.Pevent,ptr.TClResult	proc enqueueMapImage(command_queue: Pcommand_queue; image: Pmem; blocking_map: Tbool;\n                map_flags: Tmap_flags; origin: array[3, ptr int];\n                region: array[3, ptr int]; image_row_pitch: ptr int;\n                image_slice_pitch: ptr int; num_events_in_wait_list: uint32;\n                event_wait_list: ptr Pevent; event: ptr Pevent;\n                errcode_ret: ptr TClResult): pointer		1038
+nim	enqueueUnmapMemObject	opencl/clwrap.html#enqueueUnmapMemObject,Pcommand_queue,Pmem,pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueUnmapMemObject(command_queue: Pcommand_queue; memobj: Pmem;\n                      mapped_ptr: pointer; num_events_in_wait_list: uint32;\n                      event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1046
+nim	enqueueMigrateMemObjects	opencl/clwrap.html#enqueueMigrateMemObjects,Pcommand_queue,uint32,ptr.Pmem,Tmem_migration_flags,uint32,ptr.Pevent,ptr.Pevent	proc enqueueMigrateMemObjects(command_queue: Pcommand_queue; num_mem_objects: uint32;\n                         mem_objects: ptr Pmem; flags: Tmem_migration_flags;\n                         num_events_in_wait_list: uint32;\n                         event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1051
+nim	enqueueNDRangeKernel	opencl/clwrap.html#enqueueNDRangeKernel,Pcommand_queue,Pkernel,uint32,ptr.int,ptr.int,ptr.int,uint32,ptr.Pevent,ptr.Pevent	proc enqueueNDRangeKernel(command_queue: Pcommand_queue; kernel: Pkernel;\n                     work_dim: uint32; global_work_offset: ptr int;\n                     global_work_size: ptr int; local_work_size: ptr int;\n                     num_events_in_wait_list: uint32;\n                     event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1057
+nim	enqueueTask	opencl/clwrap.html#enqueueTask,Pcommand_queue,Pkernel,uint32,ptr.Pevent,ptr.Pevent	proc enqueueTask(command_queue: Pcommand_queue; kernel: Pkernel;\n            num_events_in_wait_list: uint32; event_wait_list: ptr Pevent;\n            event: ptr Pevent): TClResult		1063
+nim	TUserCb	opencl/clwrap.html#TUserCb	type TUserCb		1069
+nim	enqueueNativeKernel	opencl/clwrap.html#enqueueNativeKernel,Pcommand_queue,TUserCb,pointer,int,uint32,ptr.Pmem,ptr.pointer,uint32,ptr.Pevent,ptr.Pevent	proc enqueueNativeKernel(command_queue: Pcommand_queue; user_func: TUserCb;\n                    args: pointer; cb_args: int; num_mem_objects: uint32;\n                    mem_list: ptr Pmem; args_mem_loc: ptr pointer;\n                    num_events_in_wait_list: uint32;\n                    event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1071
+nim	enqueueMarkerWithWaitList	opencl/clwrap.html#enqueueMarkerWithWaitList,Pcommand_queue,uint32,ptr.Pevent,ptr.Pevent	proc enqueueMarkerWithWaitList(command_queue: Pcommand_queue;\n                          num_events_in_wait_list: uint32;\n                          event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1077
+nim	enqueueBarrierWithWaitList	opencl/clwrap.html#enqueueBarrierWithWaitList,Pcommand_queue,uint32,ptr.Pevent,ptr.Pevent	proc enqueueBarrierWithWaitList(command_queue: Pcommand_queue;\n                           num_events_in_wait_list: uint32;\n                           event_wait_list: ptr Pevent; event: ptr Pevent): TClResult		1081
+nim	getExtensionFunctionAddressForPlatform	opencl/clwrap.html#getExtensionFunctionAddressForPlatform,Pplatform_id,cstring	proc getExtensionFunctionAddressForPlatform(platform: Pplatform_id;\n                                       func_name: cstring): pointer		1093
+nim	createImage2D	opencl/clwrap.html#createImage2D,Pcontext,Tmem_flags,ptr.Timage_format,int,int,int,pointer,ptr.TClResult	proc createImage2D(context: Pcontext; flags: Tmem_flags;\n              image_format: ptr Timage_format; image_width: int;\n              image_height: int; image_row_pitch: int; host_ptr: pointer;\n              errcode_ret: ptr TClResult): Pmem		1098
+nim	createImage3D	opencl/clwrap.html#createImage3D,Pcontext,Tmem_flags,ptr.Timage_format,int,int,int,int,int,pointer,ptr.TClResult	proc createImage3D(context: Pcontext; flags: Tmem_flags;\n              image_format: ptr Timage_format; image_width: int;\n              image_height: int; image_depth: int; image_row_pitch: int;\n              image_slice_pitch: int; host_ptr: pointer;\n              errcode_ret: ptr TClResult): Pmem		1103
+nim	enqueueMarker	opencl/clwrap.html#enqueueMarker,Pcommand_queue,ptr.Pevent	proc enqueueMarker(command_queue: Pcommand_queue; event: ptr Pevent): TClResult		1109
+nim	enqueueWaitForEvents	opencl/clwrap.html#enqueueWaitForEvents,Pcommand_queue,uint32,ptr.Pevent	proc enqueueWaitForEvents(command_queue: Pcommand_queue; num_events: uint32;\n                     event_list: ptr Pevent): TClResult		1111
+nim	enqueueBarrier	opencl/clwrap.html#enqueueBarrier,Pcommand_queue	proc enqueueBarrier(command_queue: Pcommand_queue): TClResult		1114
+nim	unloadCompiler	opencl/clwrap.html#unloadCompiler	proc unloadCompiler(): TClResult		1116
+nim	getExtensionFunctionAddress	opencl/clwrap.html#getExtensionFunctionAddress,cstring	proc getExtensionFunctionAddress(func_name: cstring): pointer		1118

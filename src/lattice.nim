@@ -28,16 +28,9 @@
 ]#
 
 import lattice/[simplecubiclattice]
+import lattice/[stencil]
+import lattice/[latticeconcept]
 
 export simplecubiclattice
-
-type Lattice*[D: static[int]] = concept x
-  ## Lattice concept
-  ##
-  ## A concept that any lattice type must satisfy.
-  ##
-  ## Requirements:
-  ## - Must have `globalGrid`, `mpiGrid`, and `ghostGrid` fields of type `array[D, int]`.
-  x.globalGrid is array[D, int]
-  x.mpiGrid is array[D, int]
-  x.ghostGrid is array[D, int]
+export stencil
+export latticeconcept

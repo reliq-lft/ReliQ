@@ -63,6 +63,7 @@ export kernelMatAdd, kernelComplexMatAdd
 export kernelVecAdd, kernelComplexVecAdd
 export kernelTensorScalarMul, kernelComplexTensorScalarMul, kernelTensorScalarAdd
 export kernelSetElement, kernelSetElements
+export kernelStencilCopy, kernelStencilScalarMul, kernelStencilAdd
 
 # Compatibility with OpenCL result checking
 type TClResult* = enum

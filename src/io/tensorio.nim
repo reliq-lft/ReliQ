@@ -72,8 +72,8 @@ import ../utils/[complex]
 # ===========================================================================
 
 proc globalLexIndex*[D: static[int]](coords: array[D, int], dims: array[D, int]): int =
-  ## Convert lattice coordinates to global lexicographic index
-  ## QIO order: x + Lx*(y + Ly*(z + Lz*t))
+  ## Convert lattice coordinates to global lexicographic index.
+  ## QIO order: ``x + Lx * (y + Ly * (z + Lz * t))``
   result = 0
   var stride = 1
   for i in 0..<D:

@@ -1,0 +1,3 @@
+nimTitle	omplocal	openmp/omplocal.html	module openmp/omplocal		0
+nim	hasEchoStatement	openmp/omplocal.html#hasEchoStatement,NimNode	proc hasEchoStatement(node: NimNode): bool		50
+nim	all	openmp/omplocal.html#all.m,ForLoopStmt	macro all(forLoop: ForLoopStmt): untyped		78
