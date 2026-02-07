@@ -1,0 +1,22 @@
+markupTitle	backends_guide.md	backends_guide.html	backends_guide.md		0
+heading	Compute Backends	backends_guide.html#compute-backends	 Compute Backends		0
+heading	Backend Comparison	backends_guide.html#backend-comparison	  Backend Comparison		0
+heading	OpenCL Backend (Default)	backends_guide.html#opencl-backend-default	  OpenCL Backend (Default)		0
+heading	How It Works	backends_guide.html#how-it-works	   How It Works		0
+heading	Expression Kinds	backends_guide.html#expression-kinds	   Expression Kinds		0
+heading	Debug Kernels	backends_guide.html#debug-kernels	   Debug Kernels		0
+heading	Modules	backends_guide.html#modules	   Modules		0
+heading	OpenCL Base Layer	backends_guide.html#opencl-base-layer	   OpenCL Base Layer		0
+heading	SYCL Backend	backends_guide.html#sycl-backend	  SYCL Backend		0
+heading	How It Works	backends_guide.html#how-it-works	   How It Works		0
+heading	Building the SYCL Wrapper	backends_guide.html#building-the-sycl-wrapper	   Building the SYCL Wrapper		0
+heading	Type-Specialized Kernels	backends_guide.html#typeminusspecialized-kernels	   Type-Specialized Kernels		0
+heading	Stencil Kernels	backends_guide.html#stencil-kernels	   Stencil Kernels		0
+heading	Modules	backends_guide.html#modules	   Modules		0
+heading	OpenMP Backend	backends_guide.html#openmp-backend	  OpenMP Backend		0
+heading	How It Works	backends_guide.html#how-it-works	   How It Works		0
+heading	SIMD-Vectorized Views	backends_guide.html#simdminusvectorized-views	   SIMD-Vectorized Views		0
+heading	Loop Patterns	backends_guide.html#loop-patterns	   Loop Patterns		0
+heading	SIMD Intrinsics	backends_guide.html#simd-intrinsics	   SIMD Intrinsics		0
+heading	Modules	backends_guide.html#modules	   Modules		0
+heading	Building and Testing	backends_guide.html#building-and-testing	  Building and Testing		0

@@ -1,0 +1,15 @@
+markupTitle	lattice_guide.md	lattice_guide.html	lattice_guide.md		0
+heading	Lattice Infrastructure	lattice_guide.html#lattice-infrastructure	 Lattice Infrastructure		0
+heading	Lattice Concept	lattice_guide.html#lattice-concept	  Lattice Concept		0
+heading	SimpleCubicLattice	lattice_guide.html#simplecubiclattice	  SimpleCubicLattice		0
+heading	Construction	lattice_guide.html#construction	   Construction		0
+heading	Properties	lattice_guide.html#properties	   Properties		0
+heading	Coordinate Indexing	lattice_guide.html#coordinate-indexing	  Coordinate Indexing		0
+heading	Stencil Operations	lattice_guide.html#stencil-operations	  Stencil Operations		0
+heading	Stencil Patterns	lattice_guide.html#stencil-patterns	   Stencil Patterns		0
+heading	LatticeStencil	lattice_guide.html#latticestencil	   LatticeStencil		0
+heading	Neighbor Access	lattice_guide.html#neighbor-access	   Neighbor Access		0
+heading	Path-Based Stencils	lattice_guide.html#pathminusbased-stencils	   Path-Based Stencils		0
+heading	Direction Types	lattice_guide.html#direction-types	   Direction Types		0
+heading	Backend Detection	lattice_guide.html#backend-detection	   Backend Detection		0
+heading	Module Reference	lattice_guide.html#module-reference	  Module Reference		0

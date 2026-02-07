@@ -1,0 +1,17 @@
+markupTitle	simd_guide.md	simd_guide.html	simd_guide.md		0
+heading	SIMD Infrastructure	simd_guide.html#simd-infrastructure	 SIMD Infrastructure		0
+heading	SIMD Vector Types	simd_guide.html#simd-vector-types	  SIMD Vector Types		0
+heading	Static-Width Vectors	simd_guide.html#staticminuswidth-vectors	   Static-Width Vectors		0
+heading	Pre-Defined Type Aliases	simd_guide.html#preminusdefined-type-aliases	   Pre-Defined Type Aliases		0
+heading	Arithmetic Operations	simd_guide.html#arithmetic-operations	   Arithmetic Operations		0
+heading	Memory Operations	simd_guide.html#memory-operations	   Memory Operations		0
+heading	Hardware Intrinsics	simd_guide.html#hardware-intrinsics	   Hardware Intrinsics		0
+heading	Dynamic-Width Vectors	simd_guide.html#dynamicminuswidth-vectors	   Dynamic-Width Vectors		0
+heading	SIMD Lattice Layout	simd_guide.html#simd-lattice-layout	  SIMD Lattice Layout		0
+heading	Key Concepts	simd_guide.html#key-concepts	   Key Concepts		0
+heading	Construction	simd_guide.html#construction	   Construction		0
+heading	Properties	simd_guide.html#properties	   Properties		0
+heading	Index Conversions	simd_guide.html#index-conversions	   Index Conversions		0
+heading	AoSoA Index Formula	simd_guide.html#aosoa-index-formula	   AoSoA Index Formula		0
+heading	Validation	simd_guide.html#validation	   Validation		0
+heading	Module Reference	simd_guide.html#module-reference	  Module Reference		0

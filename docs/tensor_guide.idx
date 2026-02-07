@@ -1,0 +1,27 @@
+markupTitle	tensor_guide.md	tensor_guide.html	tensor_guide.md		0
+heading	Tensor Fields	tensor_guide.html#tensor-fields	 Tensor Fields		0
+heading	Data Flow	tensor_guide.html#data-flow	  Data Flow		0
+heading	TensorField (Distributed)	tensor_guide.html#tensorfield-distributed	  TensorField (Distributed)		0
+heading	Creation	tensor_guide.html#creation	   Creation		0
+heading	GA Memory Layout	tensor_guide.html#ga-memory-layout	   GA Memory Layout		0
+heading	Ghost Exchange	tensor_guide.html#ghost-exchange	   Ghost Exchange		0
+heading	Direct Local Access	tensor_guide.html#direct-local-access	   Direct Local Access		0
+heading	LocalTensorField (Host Buffer)	tensor_guide.html#localtensorfield-host-buffer	  LocalTensorField (Host Buffer)		0
+heading	Creation and Release	tensor_guide.html#creation-and-release	   Creation and Release		0
+heading	Properties	tensor_guide.html#properties	   Properties		0
+heading	Element Access	tensor_guide.html#element-access	   Element Access		0
+heading	The all Loop	tensor_guide.html#the-all-loop	   The <tt class="docutils literal"><span class="pre">all</span></tt> Loop		0
+heading	TensorFieldView (Device-Side)	tensor_guide.html#tensorfieldview-deviceminusside	  TensorFieldView (Device-Side)		0
+heading	Creation	tensor_guide.html#creation	   Creation		0
+heading	The each Macro	tensor_guide.html#the-each-macro	   The <tt class="docutils literal"><span class="pre">each</span></tt> Macro		0
+heading	Supported each Operations	tensor_guide.html#supported-each-operations	   Supported <tt class="docutils literal"><span class="pre">each</span></tt> Operations		0
+heading	AoSoA Memory Layout	tensor_guide.html#aosoa-memory-layout	   AoSoA Memory Layout		0
+heading	Site Tensor Types	tensor_guide.html#site-tensor-types	  Site Tensor Types		0
+heading	Type Aliases	tensor_guide.html#type-aliases	   Type Aliases		0
+heading	Operations	tensor_guide.html#operations	   Operations		0
+heading	Transport Infrastructure	tensor_guide.html#transport-infrastructure	  Transport Infrastructure		0
+heading	Shifter (Single-Rank)	tensor_guide.html#shifter-singleminusrank	   Shifter (Single-Rank)		0
+heading	Transporter (Gauge Link Multiplication)	tensor_guide.html#transporter-gauge-link-multiplication	   Transporter (Gauge Link Multiplication)		0
+heading	GlobalShifter (MPI-Level)	tensor_guide.html#globalshifter-mpiminuslevel	   GlobalShifter (MPI-Level)		0
+heading	Two Transport Layers	tensor_guide.html#two-transport-layers	   Two Transport Layers		0
+heading	Module Reference	tensor_guide.html#module-reference	  Module Reference		0

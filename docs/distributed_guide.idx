@@ -1,0 +1,14 @@
+markupTitle	distributed_guide.md	distributed_guide.html	distributed_guide.md		0
+heading	Distributed Memory	distributed_guide.html#distributed-memory	 Distributed Memory		0
+heading	Architecture	distributed_guide.html#architecture	  Architecture		0
+heading	GlobalArray Type	distributed_guide.html#globalarray-type	  GlobalArray Type		0
+heading	Properties	distributed_guide.html#properties	   Properties		0
+heading	Local Data Access	distributed_guide.html#local-data-access	   Local Data Access		0
+heading	Ghost Exchange	distributed_guide.html#ghost-exchange	   Ghost Exchange		0
+heading	MPI Integration	distributed_guide.html#mpi-integration	  MPI Integration		0
+heading	Initialization	distributed_guide.html#initialization	   Initialization		0
+heading	Collective Operations	distributed_guide.html#collective-operations	   Collective Operations		0
+heading	The parallel Template	distributed_guide.html#the-parallel-template	  The <tt class="docutils literal"><span class="pre">parallel</span></tt> Template		0
+heading	Running with MPI	distributed_guide.html#running-with-mpi	  Running with MPI		0
+heading	Data Transfer Between GA and Host	distributed_guide.html#data-transfer-between-ga-and-host	  Data Transfer Between GA and Host		0
+heading	Module Reference	distributed_guide.html#module-reference	  Module Reference		0
