@@ -92,20 +92,19 @@ relative to the center site:
 ```nim
 import reliq
 
-# Built-in nearest-neighbor stencil for 4D
-let nn = nearestNeighborStencil[4]()
+let lat = newSimpleCubicLattice([8, 8, 8, 16])
+
+# Built-in nearest-neighbor stencil (infers D from lattice)
+let nn = nearestNeighborStencil(lat)
 echo nn.name      # "nearest_neighbor"
 echo nn.nPoints   # 8  (±1 in each of 4 dims)
 
 # Built-in Laplacian stencil
-let lap = laplacianStencil[4]()
-
-# Lattice-inferred patterns (reads D from lattice type)
-let lat = newSimpleCubicLattice([8, 8, 8, 16])
-let nn2 = nearestNeighborStencil(lat)
+let lap = laplacianStencil(lat)
 
 # Custom patterns
-var custom = newStencilPattern[2]("custom")
+let lat2D = newSimpleCubicLattice([8, 8])
+var custom = newStencilPattern(lat2D, "custom")
 custom.addPoint([2, 0])   # Two steps in x
 custom.addPoint([0, 2])   # Two steps in y
 ```
@@ -120,8 +119,8 @@ import reliq
 
 let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 1], [1, 1, 1, 1])
 
-# Create stencil from pattern
-let stencil = newLatticeStencil(nearestNeighborStencil[4](), lat)
+# Create stencil from pattern and lattice
+let stencil = newLatticeStencil(nearestNeighborStencil(lat), lat)
 
 # Direct construction from lattice (uses nearest-neighbor by default)
 let stencil2 = newLatticeStencil(lat)
@@ -156,7 +155,7 @@ let path = plaquettePath(0, 1)  # xy-plaquette
 let rect = rectanglePath(0, 1, 2, 1)  # 2×1 rectangle in xy-plane
 
 # Convert path to stencil pattern
-let pattern = pathToStencil[4](path)
+let pattern = pathToStencil(path, lat)
 ```
 
 ### Direction Types

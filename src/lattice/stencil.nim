@@ -448,7 +448,7 @@ proc newLatticeStencil*[D: static int](
   ## Create a unified lattice stencil with explicit parameters
   ##
   ## Parameters:
-  ##   pattern: Stencil pattern (e.g., nearestNeighborStencil[4]())
+  ##   pattern: Stencil pattern (e.g., nearestNeighborStencil(lat))
   ##   localGeom: Local lattice dimensions (without ghosts)
   ##   ghostWidth: Ghost width in each dimension
   ##   simdGrid: SIMD grid for vectorization (use [1,1,1,1] for no SIMD)
@@ -534,6 +534,23 @@ proc backwardStencil*[D: static int, L: Lattice[D]](lat: L): StencilPattern[D] =
   ## Create a backward-only stencil, inferring D from the lattice
   backwardStencil[D]()
 
+proc newStencilPattern*[D: static int, L: Lattice[D]](lat: L, name: string = ""): StencilPattern[D] =
+  ## Create an empty stencil pattern, inferring D from the lattice
+  ##
+  ## Example:
+  ##   let lat = newSimpleCubicLattice([8, 8, 8, 16])
+  ##   var custom = newStencilPattern(lat, "custom")
+  ##   custom.addPoint([2, 0, 0, 0])
+  newStencilPattern[D](name)
+
+proc pathToStencil*[D: static int, L: Lattice[D]](path: openArray[PathStep], lat: L): StencilPattern[D] =
+  ## Convert a path to a stencil pattern, inferring D from the lattice
+  ##
+  ## Example:
+  ##   let lat = newSimpleCubicLattice([8, 8, 8, 16])
+  ##   let pattern = pathToStencil(plaquettePath(0, 1), lat)
+  pathToStencil[D](path)
+
 import globalarrays/[gatypes]
 
 proc newLatticeStencil*[D: static int, L: Lattice[D]](
@@ -549,7 +566,7 @@ proc newLatticeStencil*[D: static int, L: Lattice[D]](
   ## Example:
   ## ```nim
   ## let lat = newSimpleCubicLattice([16, 16, 16, 32], [2, 2, 2, 4], [1, 1, 1, 1])
-  ## let stencil = newLatticeStencil(nearestNeighborStencil[4](), lat)
+  ## let stencil = newLatticeStencil(nearestNeighborStencil(lat), lat)
   ## ```
   var localGeom: array[D, int]
   var needsQuery = false
@@ -1014,8 +1031,9 @@ when isMainModule:
       check path.len == 4
       
     test "Path to stencil":
+      let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 1])
       let path = plaquettePath(0, 1)
-      let s = pathToStencil[4](path)
+      let s = pathToStencil(path, lat)
       check s.nPoints == 5  # Origin + 4 steps
 
   suite "Legacy Compatibility":

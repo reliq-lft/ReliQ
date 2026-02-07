@@ -383,7 +383,7 @@ proc newLatticeStencil*[D: static[int], R: static[int], L: Lattice[D], T](
   ## let lat = newSimpleCubicLattice([16, 16, 16, 32], [1, 1, 1, 4], [1, 1, 1, 1])
   ## var field = lat.newTensorField([3, 3]): Complex64
   ## 
-  ## let stencil = field.newLatticeStencil(nearestNeighborStencil[4]())
+  ## let stencil = field.newLatticeStencil(nearestNeighborStencil(lat))
   ## 
   ## # Use stencil with views in each loop
   ## var local = field.newLocalTensorField()

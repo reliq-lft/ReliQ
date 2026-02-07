@@ -50,7 +50,7 @@ parallel:
 
     # Host-side initialization with "for all" loop
     for n in all 0..<localA.numSites():
-      var siteA = localA.getSite(n)
+      var siteA = localA[n]
       siteA[0, 0] = 1.0  # Set matrix element (0,0)
 
     # Create device views for backend dispatch
@@ -302,7 +302,7 @@ parallel:
 ### Stencil Neighbor Access
 
 ```nim
-    let stencil = newLatticeStencil(nearestNeighborStencil[4](), lat)
+    let stencil = newLatticeStencil(lat)
 
     for n in each 0..<vC.numSites():
       let fwd = stencil.fwd(n, 0)     # Forward x-neighbor
@@ -331,14 +331,14 @@ site-level operations using ``LocalSiteProxy``:
 ```nim
     # Initialize via site proxy
     for n in all 0..<localA.numSites():
-      var site = localA.getSite(n)
+      var site = localA[n]
       site[0, 0] = 1.0   # Set matrix element (row, col)
 
     # Arithmetic operations
     for n in all 0..<localC.numSites():
-      localC[n] = localA.getSite(n) + localB.getSite(n)   # add
-      localC[n] = localA.getSite(n) * localB.getSite(n)   # multiply
-      localC[n] = 2.5 * localA.getSite(n)                 # scale
+      localC[n] = localA[n] + localB[n]   # add
+      localC[n] = localA[n] * localB[n]   # multiply
+      localC[n] = 2.5 * localA[n]                 # scale
 
 ```
 

@@ -47,8 +47,8 @@
 ##
 ## - **Construction**: `newLocalTensorField` obtains a direct pointer to
 ##   rank-local GA memory and precomputes ``siteOffsets``
-## - **Element access**: `[]` / `[]=` for per-element and per-site reads
-##   and writes
+## - **Element access**: `[]` for per-site proxy access, `getElement` /
+##   `setElement` for per-element reads and writes
 ## - **Arithmetic**: site-level ``+``, ``-``, ``*``, compound ``+=``, ``-=`` on
 ##   vector and matrix payloads
 ## - **Copy / zero**: `copy`, `zero` for bulk operations
@@ -61,7 +61,7 @@
 ##   var field = lat.newTensorField([3, 3]): Complex64
 ##   var local = field.newLocalTensorField()
 ##   for n in all 0..<local.numSites():
-##     var site = local.getSite(n)
+##     var site = local[n]
 ##     site[0, 0] = 1.0
 ##   # writes go directly to GA — no flush required
 
@@ -181,7 +181,7 @@ proc numElements*[D: static[int], R: static[int], L: Lattice[D], T](
   for d in 0..<view.shape.len:
     result *= view.shape[d]
 
-proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
+proc getElement*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: LocalTensorField[D, R, L, T], idx: int
 ): T {.inline.} =
   ## Element access by flat index
@@ -192,7 +192,7 @@ proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
   else:
     tensor.data[idx]
 
-proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
+proc setElement*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], idx: int, value: T
 ) {.inline.} =
   ## Element assignment by flat index
@@ -223,7 +223,7 @@ proc tensorElementsPerSite*[D: static[int], R: static[int], L: Lattice[D], T](
   for d in 0..<R:
     result *= tensor.shape[d]
 
-proc getSite*[D: static[int], R: static[int], L: Lattice[D], T](
+proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: LocalTensorField[D, R, L, T], site: int
 ): LocalSiteProxy[D, R, L, T] {.inline.} =
   ## Get a site proxy for the given site index (for "for all" loops)
@@ -351,7 +351,7 @@ when isMainModule:
       
       # C = A + B using for all loop
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + localB.getSite(n)
+        localC[n] = localA[n] + localB[n]
       
       # Verify: C = [5, 7, 9]
       for site in 0..<numSites:
@@ -385,7 +385,7 @@ when isMainModule:
       
       # C = A - B using for all loop
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) - localB.getSite(n)
+        localC[n] = localA[n] - localB[n]
       
       # Verify: C = [9, 18, 27, 36]
       for site in 0..<numSites:
@@ -413,7 +413,7 @@ when isMainModule:
       
       # C = 2.5 * A using for all loop
       for n in all 0..<localC.numSites():
-        localC[n] = 2.5 * localA.getSite(n)
+        localC[n] = 2.5 * localA[n]
       
       # Verify: C = [2.5, 5.0, 7.5]
       for site in 0..<numSites:
@@ -443,7 +443,7 @@ when isMainModule:
       
       # C = A * B using for all loop
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) * localB.getSite(n)
+        localC[n] = localA[n] * localB[n]
       
       # Verify: C = A (multiplied by identity)
       for site in 0..<numSites:
@@ -461,7 +461,7 @@ when isMainModule:
       
       # Set via site proxy element access
       for n in all 0..<localA.numSites():
-        var proxy = localA.getSite(n)
+        var proxy = localA[n]
         proxy[0, 0] = 1.0
         proxy[0, 1] = 2.0
         proxy[1, 0] = 3.0
@@ -500,7 +500,7 @@ when isMainModule:
       
       # C = A + B
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + localB.getSite(n)
+        localC[n] = localA[n] + localB[n]
       
       # Verify: C = [[6,8],[10,12]]
       for site in 0..<numSites:
@@ -531,7 +531,7 @@ when isMainModule:
       
       # C = A - B
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) - localB.getSite(n)
+        localC[n] = localA[n] - localB[n]
       
       # Verify: C = [[9,18],[27,36]]
       for site in 0..<numSites:
@@ -566,7 +566,7 @@ when isMainModule:
       
       # C = A * B
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) * localB.getSite(n)
+        localC[n] = localA[n] * localB[n]
       
       # Verify: C = A
       for site in 0..<numSites:
@@ -602,7 +602,7 @@ when isMainModule:
       
       # C = A * B
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) * localB.getSite(n)
+        localC[n] = localA[n] * localB[n]
       
       # Verify: C = [[1*2+2*1, 1*0+2*3], [3*2+4*1, 3*0+4*3]] = [[4,6],[10,12]]
       for site in 0..<numSites:
@@ -633,7 +633,7 @@ when isMainModule:
       
       # C = 3.0 * A
       for n in all 0..<localC.numSites():
-        localC[n] = 3.0 * localA.getSite(n)
+        localC[n] = 3.0 * localA[n]
       
       # Verify: C = [[3,6],[9,12]]
       for site in 0..<numSites:
@@ -661,7 +661,7 @@ when isMainModule:
       
       # C = A + 10.0
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + 10.0
+        localC[n] = localA[n] + 10.0
       
       # Verify: C = [11, 12, 13]
       for site in 0..<numSites:
@@ -687,7 +687,7 @@ when isMainModule:
       
       # C = 5.0 + A
       for n in all 0..<localC.numSites():
-        localC[n] = 5.0 + localA.getSite(n)
+        localC[n] = 5.0 + localA[n]
       
       # Verify: C = [[6,7],[8,9]]
       for site in 0..<numSites:
@@ -709,7 +709,7 @@ when isMainModule:
       
       # Write elements
       for n in all 0..<localA.numSites():
-        var proxy = localA.getSite(n)
+        var proxy = localA[n]
         proxy[0] = 10.0
         proxy[1] = 20.0
         proxy[2] = 30.0
@@ -725,7 +725,7 @@ when isMainModule:
       
       # Verify via proxy read
       for n in all 0..<localA.numSites():
-        let proxy = localA.getSite(n)
+        let proxy = localA[n]
         check proxy[0] == 10.0
         check proxy[1] == 20.0
         check proxy[2] == 30.0
@@ -739,7 +739,7 @@ when isMainModule:
       
       # Write identity matrix via proxy
       for n in all 0..<localA.numSites():
-        var proxy = localA.getSite(n)
+        var proxy = localA[n]
         for i in 0..<3:
           for j in 0..<3:
             if i == j:
@@ -781,7 +781,7 @@ when isMainModule:
       # Print first 2 sites
       for n in all 0..<localM.numSites():
         if n < 2:
-          echo "  Site ", n, " matrix:\n", $localM.getSite(n)
+          echo "  Site ", n, " matrix:\n", $localM[n]
       
       # Verify data is still correct
       for site in 0..<numSites:
@@ -807,7 +807,7 @@ when isMainModule:
       # Print first 2 sites
       for n in all 0..<localV.numSites():
         if n < 2:
-          echo "  Site ", n, " vector: ", $localV.getSite(n)
+          echo "  Site ", n, " vector: ", $localV[n]
       
       # Verify data
       for site in 0..<numSites:
@@ -841,7 +841,7 @@ when isMainModule:
         localB.data[base + 2] = 1.5'f32
       
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + localB.getSite(n)
+        localC[n] = localA[n] + localB[n]
       
       for site in 0..<numSites:
         let base = localC.siteOffsets[site]
@@ -864,7 +864,7 @@ when isMainModule:
         localA.data[base + 1] = 4.0'f32
       
       for n in all 0..<localB.numSites():
-        localB[n] = 2.5'f32 * localA.getSite(n)
+        localB[n] = 2.5'f32 * localA[n]
       
       for site in 0..<numSites:
         let base = localB.siteOffsets[site]
@@ -891,7 +891,7 @@ when isMainModule:
         localB.data[base + 2] = 0.0'f32; localB.data[base + 3] = 2.0'f32
       
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) * localB.getSite(n)
+        localC[n] = localA[n] * localB[n]
       
       for site in 0..<numSites:
         let base = localC.siteOffsets[site]
@@ -921,7 +921,7 @@ when isMainModule:
         localB.data[base + 2] = 25'i32
       
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + localB.getSite(n)
+        localC[n] = localA[n] + localB[n]
       
       for site in 0..<numSites:
         let base = localC.siteOffsets[site]
@@ -948,7 +948,7 @@ when isMainModule:
         localB.data[base + 1] = 20'i32
       
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) - localB.getSite(n)
+        localC[n] = localA[n] - localB[n]
       
       for site in 0..<numSites:
         let base = localC.siteOffsets[site]
@@ -978,7 +978,7 @@ when isMainModule:
         localB.data[base + 1] = 200'i64
       
       for n in all 0..<localC.numSites():
-        localC[n] = localA.getSite(n) + localB.getSite(n)
+        localC[n] = localA[n] + localB[n]
       
       for site in 0..<numSites:
         let base = localC.siteOffsets[site]
@@ -1000,7 +1000,7 @@ when isMainModule:
         localA.data[base + 1] = 2_000_000'i64
       
       for n in all 0..<localB.numSites():
-        localB[n] = 3'i64 * localA.getSite(n)
+        localB[n] = 3'i64 * localA[n]
       
       for site in 0..<numSites:
         let base = localB.siteOffsets[site]
@@ -1043,11 +1043,11 @@ when isMainModule:
       var localTemp = tensorTemp.newLocalTensorField()
       
       for n in all 0..<localTemp.numSites():
-        localTemp[n] = localA.getSite(n) * localB.getSite(n)
+        localTemp[n] = localA[n] * localB[n]
       
       # Then: R = temp + C
       for n in all 0..<localR.numSites():
-        localR[n] = localTemp.getSite(n) + localC.getSite(n)
+        localR[n] = localTemp[n] + localC[n]
       
       # Verify: R = [[3,4],[5,6]]
       for site in 0..<numSites:
@@ -1079,7 +1079,7 @@ when isMainModule:
       
       # Out = C + A
       for n in all 0..<localOut.numSites():
-        localOut[n] = localC.getSite(n) + localA.getSite(n)
+        localOut[n] = localC[n] + localA[n]
       
       # Verify: Out = [11, 22]
       for site in 0..<numSites:

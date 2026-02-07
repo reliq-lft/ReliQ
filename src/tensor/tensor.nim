@@ -113,8 +113,8 @@ when isMainModule:
         var lcf3 = cf3.newLocalTensorField()
 
         for i in all 0..<lcf1.numElements():
-          lcf1[i] = complex64(float64(i), 0.0)
-          lcf2[i] = complex64(float64(i * 2), 0.0)
+          lcf1.setElement(i, complex64(float64(i), 0.0))
+          lcf2.setElement(i, complex64(float64(i * 2), 0.0))
 
         # Create views for reading and writing.
         # Views with iokWrite have buffers allocated automatically.

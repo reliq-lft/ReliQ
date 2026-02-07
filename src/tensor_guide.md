@@ -117,7 +117,7 @@ var local = field.newLocalTensorField()
 
 # Access data — writes go directly to the GA
 for n in all 0..<local.numSites():
-  var site = local.getSite(n)
+  var site = local[n]
   site[0, 0] = 1.0
 
 # No manual flush needed — data is already in the GA
@@ -139,12 +139,12 @@ are visible to the distributed array immediately.  There is no
 ### Element Access
 
 ```nim
-# Direct element access
-local[idx] = 3.14       # Write element at flat index
-let x = local[idx]      # Read element at flat index
+# Direct element access (by flat index)
+local.setElement(idx, 3.14)   # Write element at flat index
+let x = local.getElement(idx) # Read element at flat index
 
 # Site proxy access (preferred for the "all" loop)
-var site = local.getSite(n)
+var site = local[n]
 site[i, j] = 1.0        # Matrix element (row, col)
 site[i] = 2.0           # Vector element (index)
 let v = site[i, j]      # Read matrix element
@@ -157,28 +157,28 @@ The ``all`` loop provides parallelized iteration over local sites:
 ```nim
 # Element initialization
 for n in all 0..<local.numSites():
-  var site = local.getSite(n)
+  var site = local[n]
   for i in 0..<3:
     for j in 0..<3:
       site[i, j] = if i == j: 1.0 else: 0.0
 
 # Arithmetic via LocalSiteProxy
 for n in all 0..<localC.numSites():
-  localC[n] = localA.getSite(n) + localB.getSite(n)
-  localC[n] = localA.getSite(n) * localB.getSite(n)
-  localC[n] = 2.5 * localA.getSite(n)
+  localC[n] = localA[n] + localB[n]
+  localC[n] = localA[n] * localB[n]
+  localC[n] = 2.5 * localA[n]
 ```
 
 Supported proxy operations:
 
 | Operation | Syntax |
 |-----------|--------|
-| Addition | ``localC[n] = a.getSite(n) + b.getSite(n)`` |
-| Subtraction | ``localC[n] = a.getSite(n) - b.getSite(n)`` |
-| Multiplication | ``localC[n] = a.getSite(n) * b.getSite(n)`` |
-| Scalar multiply | ``localC[n] = 3.0 * a.getSite(n)`` |
-| Scalar add | ``localC[n] = a.getSite(n) + 3.0`` |
-| Chaining | ``localC[n] = a.getSite(n) * b.getSite(n) + c.getSite(n)`` |
+| Addition | ``localC[n] = a[n] + b[n]`` |
+| Subtraction | ``localC[n] = a[n] - b[n]`` |
+| Multiplication | ``localC[n] = a[n] * b[n]`` |
+| Scalar multiply | ``localC[n] = 3.0 * a[n]`` |
+| Scalar add | ``localC[n] = a[n] + 3.0`` |
+| Chaining | ``localC[n] = a[n] * b[n] + c[n]`` |
 
 ## TensorFieldView (Device-Side)
 

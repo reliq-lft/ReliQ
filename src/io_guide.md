@@ -48,7 +48,7 @@ parallel:
     # Initialize field — writes go directly to the GA
     var local = field.newLocalTensorField()
     for n in all 0..<local.numSites():
-      var site = local.getSite(n)
+      var site = local[n]
       site[0, 0] = 1.0
 
     # Write to LIME/SciDAC format

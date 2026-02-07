@@ -35,7 +35,7 @@
 ##
 ## Usage:
 ##   for n in all 0..<local.numSites():
-##     localC[n] = localA.getSite(n) + localB.getSite(n)
+##     localC[n] = localA[n] + localB[n]
 ##
 ## The `all` macro is exported by parallel.nim for general use.
 ## For the corresponding GPU iterator, see `each` in ompdisp.nim.
@@ -82,7 +82,7 @@ macro all*(forLoop: ForLoopStmt): untyped =
   ##
   ## Usage:
   ##   for n in all 0..<local.numSites():
-  ##     localC[n] = localA.getSite(n) + localB.getSite(n)
+  ##     localC[n] = localA[n] + localB[n]
   
   let loopVar = forLoop[0]
   let loopRangeNode = forLoop[1][1]  # Skip 'all' wrapper
