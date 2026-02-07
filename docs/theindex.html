@@ -25,7 +25,7 @@
   <div class="document" id="documentId">
     <div class="container">
       <h1 class="title">Index</h1>
-      Documents: <a href="index.html">index.md</a>.<br/><p />Modules: <a href="globalarrays/gabase.html">globalarrays/gabase</a>, <a href="globalarrays/gampi.html">globalarrays/gampi</a>, <a href="globalarrays/gatypes.html">globalarrays/gatypes</a>, <a href="globalarrays/gawrap.html">globalarrays/gawrap</a>, <a href="globalarrays/globalarrays.html">globalarrays/globalarrays</a>, <a href="io/io.html">io/io</a>, <a href="io/lime.html">io/lime</a>, <a href="io/qio.html">io/qio</a>, <a href="io/scidac.html">io/scidac</a>, <a href="io/tensorio.html">io/tensorio</a>, <a href="lattice.html">lattice</a>, <a href="lattice/latticeconcept.html">lattice/latticeconcept</a>, <a href="lattice/simplecubiclattice.html">lattice/simplecubiclattice</a>, <a href="lattice/stencil.html">lattice/stencil</a>, <a href="opencl/clbase.html">opencl/clbase</a>, <a href="opencl/cldisp.html">opencl/cldisp</a>, <a href="opencl/clwrap.html">opencl/clwrap</a>, <a href="opencl/opencl.html">opencl/opencl</a>, <a href="openmp/ompbase.html">openmp/ompbase</a>, <a href="openmp/omplocal.html">openmp/omplocal</a>, <a href="openmp/ompwrap.html">openmp/ompwrap</a>, <a href="parallel.html">parallel</a>, <a href="reliq.html">reliq</a>, <a href="simd/simdlayout.html">simd/simdlayout</a>, <a href="tensor/globaltensor.html">tensor/globaltensor</a>, <a href="tensor/localtensor.html">tensor/localtensor</a>, <a href="tensor/sitetensor.html">tensor/sitetensor</a>, <a href="tensor/tensor.html">tensor/tensor</a>, <a href="tensor/tensorview.html">tensor/tensorview</a>, <a href="utils/commandline.html">utils/commandline</a>, <a href="utils/complex.html">utils/complex</a>, <a href="utils/private.html">utils/private</a>.<br/><p /><h2>API symbols</h2>
+      Documents: <a href="backends_guide.html">backends_guide.md</a>, <a href="distributed_guide.html">distributed_guide.md</a>, <a href="index.html">index.md</a>, <a href="io_guide.html">io_guide.md</a>, <a href="lattice_guide.html">lattice_guide.md</a>, <a href="simd_guide.html">simd_guide.md</a>, <a href="tensor_guide.html">tensor_guide.md</a>.<br/><p />Modules: <a href="globalarrays/gabase.html">globalarrays/gabase</a>, <a href="globalarrays/gampi.html">globalarrays/gampi</a>, <a href="globalarrays/gatypes.html">globalarrays/gatypes</a>, <a href="globalarrays/gawrap.html">globalarrays/gawrap</a>, <a href="globalarrays/globalarrays.html">globalarrays/globalarrays</a>, <a href="io/io.html">io/io</a>, <a href="io/lime.html">io/lime</a>, <a href="io/qio.html">io/qio</a>, <a href="io/scidac.html">io/scidac</a>, <a href="io/tensorio.html">io/tensorio</a>, <a href="lattice.html">lattice</a>, <a href="lattice/latticeconcept.html">lattice/latticeconcept</a>, <a href="lattice/simplecubiclattice.html">lattice/simplecubiclattice</a>, <a href="lattice/stencil.html">lattice/stencil</a>, <a href="opencl/clbase.html">opencl/clbase</a>, <a href="opencl/cldisp.html">opencl/cldisp</a>, <a href="opencl/clwrap.html">opencl/clwrap</a>, <a href="opencl/opencl.html">opencl/opencl</a>, <a href="openmp/ompbase.html">openmp/ompbase</a>, <a href="openmp/omplocal.html">openmp/omplocal</a>, <a href="openmp/ompwrap.html">openmp/ompwrap</a>, <a href="parallel.html">parallel</a>, <a href="reliq.html">reliq</a>, <a href="simd/simdlayout.html">simd/simdlayout</a>, <a href="tensor/globaltensor.html">tensor/globaltensor</a>, <a href="tensor/localtensor.html">tensor/localtensor</a>, <a href="tensor/sitetensor.html">tensor/sitetensor</a>, <a href="tensor/tensor.html">tensor/tensor</a>, <a href="tensor/tensorview.html">tensor/tensorview</a>, <a href="utils/commandline.html">utils/commandline</a>, <a href="utils/complex.html">utils/complex</a>, <a href="utils/private.html">utils/private</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="qio: proc `$`(cs: QIOChecksum): string" href="io/qio.html#%24%2CQIOChecksum">qio: proc `$`(cs: QIOChecksum): string</a></li>
@@ -2154,6 +2154,10 @@
 <li><a class="reference external"
           data-doc-search-tag="gawrap: proc GA_Update_ghost_dir(g_a: cint; dir: cint; side: cint; update_corners: cint)" href="globalarrays/gawrap.html#GA_Update_ghost_dir%2Ccint%2Ccint%2Ccint%2Ccint">gawrap: proc GA_Update_ghost_dir(g_a: cint; dir: cint; side: cint; update_corners: cint)</a></li>
           </ul></dd>
+<dt><a name="GA_Update_ghosts" href="#GA_Update_ghosts"><span>GA_Update_ghosts:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gawrap: proc GA_Update_ghosts(g_a: cint)" href="globalarrays/gawrap.html#GA_Update_ghosts%2Ccint">gawrap: proc GA_Update_ghosts(g_a: cint)</a></li>
+          </ul></dd>
 <dt><a name="generateChecksumXml" href="#generateChecksumXml"><span>generateChecksumXml:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="scidac: proc generateChecksumXml(cs: SciDACChecksum): string" href="io/scidac.html#generateChecksumXml%2CSciDACChecksum">scidac: proc generateChecksumXml(cs: SciDACChecksum): string</a></li>
@@ -2917,8 +2921,8 @@
 <dt><a name="localSiteOffset" href="#localSiteOffset"><span>localSiteOffset:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="globaltensor: proc localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
-                               innerPaddedBlockSize: int): int" href="tensor/globaltensor.html#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint">globaltensor: proc localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
-                               innerPaddedBlockSize: int): int</a></li>
+                               innerBlockSize: int): int" href="tensor/globaltensor.html#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint">globaltensor: proc localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerBlockSize: int): int</a></li>
           </ul></dd>
 <dt><a name="LocalSiteProxy" href="#LocalSiteProxy"><span>LocalSiteProxy:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -3590,6 +3594,26 @@
 <li><a class="reference external"
           data-doc-search-tag="gawrap: proc NGA_Distribution(g_a: cint; pid: cint; lo: ptr cint; hi: ptr cint)" href="globalarrays/gawrap.html#NGA_Distribution%2Ccint%2Ccint%2Cptr.cint%2Cptr.cint">gawrap: proc NGA_Distribution(g_a: cint; pid: cint; lo: ptr cint; hi: ptr cint)</a></li>
           </ul></dd>
+<dt><a name="NGA_Get" href="#NGA_Get"><span>NGA_Get:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gawrap: proc NGA_Get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)" href="globalarrays/gawrap.html#NGA_Get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint">gawrap: proc NGA_Get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)</a></li>
+          </ul></dd>
+<dt><a name="NGA_Periodic_get" href="#NGA_Periodic_get"><span>NGA_Periodic_get:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gawrap: proc NGA_Periodic_get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)" href="globalarrays/gawrap.html#NGA_Periodic_get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint">gawrap: proc NGA_Periodic_get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)</a></li>
+          </ul></dd>
+<dt><a name="NGA_Periodic_put" href="#NGA_Periodic_put"><span>NGA_Periodic_put:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gawrap: proc NGA_Periodic_put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)" href="globalarrays/gawrap.html#NGA_Periodic_put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint">gawrap: proc NGA_Periodic_put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)</a></li>
+          </ul></dd>
+<dt><a name="NGA_Put" href="#NGA_Put"><span>NGA_Put:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="gawrap: proc NGA_Put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)" href="globalarrays/gawrap.html#NGA_Put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint">gawrap: proc NGA_Put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)</a></li>
+          </ul></dd>
 <dt><a name="NGA_Release" href="#NGA_Release"><span>NGA_Release:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="gawrap: proc NGA_Release(g_a: cint; lo: ptr cint; hi: ptr cint)" href="globalarrays/gawrap.html#NGA_Release%2Ccint%2Cptr.cint%2Cptr.cint">gawrap: proc NGA_Release(g_a: cint; lo: ptr cint; hi: ptr cint)</a></li>
@@ -4095,6 +4119,12 @@
           data-doc-search-tag="globaltensor: proc releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T])" href="tensor/globaltensor.html#releaseLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocal.D%5D%2CT%5D">globaltensor: proc releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T])</a></li>
+          </ul></dd>
+<dt><a name="releaseLocalTensorField" href="#releaseLocalTensorField"><span>releaseLocalTensorField:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="localtensor: proc releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: var LocalTensorField[D, R, L, T])" href="tensor/localtensor.html#releaseLocalTensorField%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocalTensorField.D%5D%2CT%5D">localtensor: proc releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: var LocalTensorField[D, R, L, T])</a></li>
           </ul></dd>
 <dt><a name="releaseMemObject" href="#releaseMemObject"><span>releaseMemObject:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -5068,7 +5098,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
       </div>
     </div>
   </div>

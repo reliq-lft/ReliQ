@@ -78,12 +78,28 @@ proc NGA_Release*(g_a: cint, lo: ptr cint, hi: ptr cint)
 
 # global array halo exchange
 
+proc GA_Update_ghosts*(g_a: cint) {.importc: "GA_Update_ghosts", ga.}
+
 proc GA_Update_ghost_dir*(
   g_a: cint, 
   dir: cint, 
   side: cint,
   update_corners: cint
 ) {.importc: "NGA_Update_ghost_dir", ga.}
+
+# one-sided get/put
+
+proc NGA_Get*(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint) 
+  {.importc: "NGA_Get", ga.}
+
+proc NGA_Put*(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint) 
+  {.importc: "NGA_Put", ga.}
+
+proc NGA_Periodic_get*(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint) 
+  {.importc: "NGA_Periodic_get", ga.}
+
+proc NGA_Periodic_put*(g_a: cint, lo: ptr cint, hi: ptr cint, buf: pointer, ld: ptr cint) 
+  {.importc: "NGA_Periodic_put", ga.}
 
 # synchronization, barriers, fences
 

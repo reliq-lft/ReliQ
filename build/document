@@ -45,9 +45,28 @@ echo "Source:  ${SRC}"
 echo "Output:  ${DOCS}"
 echo ""
 
-# --- Step 1: Generate the main index page from Markdown ---
-echo "[1/4] Generating index page..."
+# --- Step 1: Generate the main index page and guide pages from Markdown ---
+echo "[1/4] Generating index and guide pages..."
 $NIM md2html ${NIMFLAGS} ${MAIN} 2>&1 | grep -v "^Hint:"
+
+GUIDE_PAGES=(
+  "lattice_guide"
+  "tensor_guide"
+  "backends_guide"
+  "simd_guide"
+  "distributed_guide"
+  "io_guide"
+)
+
+for guide in "${GUIDE_PAGES[@]}"; do
+  guide_file="${SRC}/${guide}.md"
+  if [[ -f "$guide_file" ]]; then
+    echo "  md2html: ${guide}"
+    $NIM md2html ${NIMFLAGS} "$guide_file" 2>&1 | grep -v "^Hint:"
+  else
+    echo "  skip (not found): ${guide}"
+  fi
+done
 
 # --- Step 2: Generate API docs from reliq.nim (follows default/OpenCL imports) ---
 echo "[2/4] Generating API docs (default backend path)..."

@@ -218,7 +218,7 @@ define run_test_suite
 endef
 
 test-core:
-	$(call run_test_suite,Core Tests,,simdtypes simdlayout stencil sitetensor localtensor tensor transporter io)
+	$(call run_test_suite,Core Tests,,simdtypes simdlayout stencil sitetensor localtensor tensor transporter globaltensor io)
 
 test-opencl:
 	$(call run_test_suite,OpenCL Backend,,tensorview)

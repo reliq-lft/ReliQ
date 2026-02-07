@@ -497,6 +497,8 @@ when isMainModule:
           for i in 0..<9:
             localA.data[base + i] = float64(site * 10 + i) * 0.001
         
+        localA.releaseLocalTensorField()
+        
         let status = writeTensorField(tensorA, TestTensorFile, "<info>Test real tensor</info>")
         check status == lsSuccess
         
@@ -528,6 +530,8 @@ when isMainModule:
           for i in 0..<9:
             localA.data[base + i * 2] = float64(site * 10 + i) * 0.001
             localA.data[base + i * 2 + 1] = float64(site * 10 + i) * 0.0001
+        
+        localA.releaseLocalTensorField()
         
         let status = writeTensorField(tensorA, TestTensorFile, "<info>Test complex tensor</info>")
         check status == lsSuccess

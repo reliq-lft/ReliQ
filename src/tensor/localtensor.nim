@@ -57,8 +57,10 @@
 ## .. code-block:: nim
 ##   var field = lat.newTensorField([3, 3]): Complex64
 ##   var local = field.newLocalTensorField()
-##   for i in all 0..<local.numElements():
-##     local[i] = complex64(float64(i), 0.0)
+##   for n in all 0..<local.numSites():
+##     var site = local.getSite(n)
+##     site[0, 0] = 1.0
+##   local.releaseLocalTensorField()  # flush back to GA
 
 import lattice
 import globaltensor
@@ -79,6 +81,12 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   ## 
   ## Represents a local tensor field on host memory defined on a lattice with 
   ## specified dimensions and data type.
+  ##
+  ## The ``data`` pointer points to a **contiguous** buffer where elements
+  ## are stored in flat AoS order: ``data[site * elemsPerSite + e]``.
+  ## This is independent of the ghost-padded stride in the underlying GA.
+  ## On construction, real elements are copied out of the padded GA memory;
+  ## on ``releaseLocalTensorField``, they are copied back.
   lattice*: L
   localGrid*: array[D, int]
   shape*: array[R, int]
@@ -86,6 +94,13 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   elif isComplex64(T): data*: HostStorage[float64]
   else: data*: HostStorage[T]
   hasPadding*: bool
+  # --- internal bookkeeping for padded GA copy ---
+  gaPtr: pointer             ## raw pointer from NGA_Access (padded GA memory)
+  paddedGeom: array[D, int]  ## padded lattice geometry
+  innerPadStride: int        ## innerPaddedBlockSize (stride between sites in GA memory)
+  elemsPerSite: int          ## real elements per site (product(shape) * complexFactor)
+  nLocalSites: int           ## product of localGrid
+  ownsBuffer: bool           ## true when we allocated a contiguous buffer
 
 proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T];
@@ -93,7 +108,13 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
 ): LocalTensorField[D, R, L, T] =
   ## Create a new local tensor field from a global tensor field
   ##
-  ## Downcast global tensor to local tensor on node
+  ## Copies rank-local data from the padded GA memory into a contiguous
+  ## host buffer where elements are stored in flat AoS order:
+  ## ``buffer[site * elemsPerSite + e]``.  This decouples the user-facing
+  ## flat indexing from the ghost-padded stride in the underlying GA.
+  ##
+  ## Call ``releaseLocalTensorField`` when done to copy modified data back
+  ## to the GA and free the contiguous buffer.
   const rank = D + R + 1
   let handle = tensor.data.getHandle()
   var paddedGrid: array[rank, cint]
@@ -113,16 +134,82 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   for i in 0..<D:
     localGrid[i] = int(hi[i] - lo[i] + 1)
 
+  # Compute inner block metrics
+  let innerGW = 1  # all inner dims have ghost width 1 (GA requirement)
+  let innerPadded = innerPaddedBlockSize(R, innerGW)
+  let elemsPerSite = innerBlockSize(R, tensor.shape, isComplex(T))
+  
+  # Compute number of local sites and padded geometry
+  var nLocal = 1
+  for d in 0..<D: nLocal *= localGrid[d]
+  var paddedGeomD: array[D, int]
+  let ghostWidth = tensor.ghostWidth()
+  for d in 0..<D:
+    paddedGeomD[d] = localGrid[d] + 2 * ghostWidth[d]
+
+  # Allocate contiguous buffer and copy real elements from padded GA
+  let bufferSize = nLocal * elemsPerSite
+  when isComplex32(T):
+    type Scalar = float32
+  elif isComplex64(T):
+    type Scalar = float64
+  else:
+    type Scalar = T
+  let buf = cast[ptr UncheckedArray[Scalar]](alloc0(bufferSize * sizeof(Scalar)))
+  let gaData = cast[ptr UncheckedArray[Scalar]](p)
+  
+  for site in 0..<nLocal:
+    let coords = lexToCoords(site, localGrid)
+    let gaOff = localSiteOffset(coords, paddedGeomD, innerPadded)
+    let bufOff = site * elemsPerSite
+    for e in 0..<elemsPerSite:
+      buf[bufOff + e] = gaData[gaOff + e]
+
   result = LocalTensorField[D, R, L, T](
     lattice: tensor.lattice,
     localGrid: localGrid,
     shape: tensor.shape,
-    hasPadding: padded
+    hasPadding: padded,
+    gaPtr: p,
+    paddedGeom: paddedGeomD,
+    innerPadStride: innerPadded,
+    elemsPerSite: elemsPerSite,
+    nLocalSites: nLocal,
+    ownsBuffer: true
   )
 
-  when isComplex32(T): result.data = cast[HostStorage[float32]](p)
-  elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
-  else: result.data = cast[HostStorage[T]](p)
+  when isComplex32(T): result.data = cast[HostStorage[float32]](buf)
+  elif isComplex64(T): result.data = cast[HostStorage[float64]](buf)
+  else: result.data = cast[HostStorage[T]](buf)
+
+proc releaseLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: var LocalTensorField[D, R, L, T]
+) =
+  ## Copy modified contiguous data back to the padded GA memory and free the buffer
+  ##
+  ## This must be called after modifying a LocalTensorField to ensure changes
+  ## are reflected in the underlying Global Array.
+  if not tensor.ownsBuffer: return
+  
+  when isComplex32(T):
+    type Scalar = float32
+  elif isComplex64(T):
+    type Scalar = float64
+  else:
+    type Scalar = T
+  
+  let gaData = cast[ptr UncheckedArray[Scalar]](tensor.gaPtr)
+  let buf = cast[ptr UncheckedArray[Scalar]](tensor.data)
+  
+  for site in 0..<tensor.nLocalSites:
+    let coords = lexToCoords(site, tensor.localGrid)
+    let gaOff = localSiteOffset(coords, tensor.paddedGeom, tensor.innerPadStride)
+    let bufOff = site * tensor.elemsPerSite
+    for e in 0..<tensor.elemsPerSite:
+      gaData[gaOff + e] = buf[bufOff + e]
+  
+  dealloc(cast[pointer](tensor.data))
+  tensor.ownsBuffer = false
 
 proc numGlobalSites*[D: static[int], R: static[int], L: Lattice[D], T](
   view: LocalTensorField[D, R, L, T]

@@ -355,6 +355,9 @@ proc readTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
         copyMem(addr val, unsafeAddr data[fileOffset + e * 4], 4)
         localTensor.data[localOffset + e] = val
   
+  # Flush contiguous buffer back to GA
+  localTensor.releaseLocalTensorField()
+  
   # Synchronize global array after writing local portion
   GA_Sync()
 
@@ -676,6 +679,9 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
         copyMem(addr im, unsafeAddr data[fileOffset + e * 16 + 8], 8)
         localTensor.data[localOffset + e * 2] = re
         localTensor.data[localOffset + e * 2 + 1] = im
+    
+    # Flush contiguous buffer back to GA
+    localTensor.releaseLocalTensorField()
   
   GA_Sync()
 

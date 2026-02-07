@@ -71,7 +71,13 @@
     data*: HostStorage[float64]
   else:
     data*: HostStorage[T]
-  hasPadding*: bool">LocalTensorField</a></li>
+  hasPadding*: bool
+  ## raw pointer from NGA_Access (padded GA memory)
+  ## padded lattice geometry
+  ## innerPaddedBlockSize (stride between sites in GA memory)
+  ## real elements per site (product(shape) * complexFactor)
+  ## product of localGrid
+  ## true when we allocated a contiguous buffer">LocalTensorField</a></li>
 
     </ul>
   </details>
@@ -149,6 +155,12 @@
     tensor: LocalTensorField[D, R, L, T]): int</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">releaseLocalTensorField
+  <li><a class="reference" href="#releaseLocalTensorField%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocalTensorField.D%5D%2CT%5D" title="releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: var LocalTensorField[D, R, L, T])">releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
+    tensor: var LocalTensorField[D, R, L, T])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">tensorElementsPerSite
   <li><a class="reference" href="#tensorElementsPerSite%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BtensorElementsPerSite.D%5D%2CT%5D" title="tensorElementsPerSite[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: LocalTensorField[D, R, L, T]): int">tensorElementsPerSite[D: static[int]; R: static[int]; L: Lattice[D]; T](
@@ -180,8 +192,10 @@
 
 <h2><a class="toc-backref" id="localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example" href="#localtensorfield-minus-rankminuslocal-hostminusmemory-tensor-fields-example">Example</a></h2><pre class="listing"><span class="Keyword">var</span> <span class="Identifier">field</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="DecNumber">3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">Complex64</span>
 <span class="Keyword">var</span> <span class="Identifier">local</span> <span class="Operator">=</span> <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">newLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
-<span class="Keyword">for</span> <span class="Identifier">i</span> <span class="Keyword">in</span> <span class="Identifier">all</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">numElements</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
-  <span class="Identifier">local</span><span class="Punctuation">[</span><span class="Identifier">i</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">complex64</span><span class="Punctuation">(</span><span class="Identifier">float64</span><span class="Punctuation">(</span><span class="Identifier">i</span><span class="Punctuation">)</span><span class="Punctuation">,</span> <span class="FloatNumber">0.0</span><span class="Punctuation">)</span></pre></p>
+<span class="Keyword">for</span> <span class="Identifier">n</span> <span class="Keyword">in</span> <span class="Identifier">all</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">numSites</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
+  <span class="Keyword">var</span> <span class="Identifier">site</span> <span class="Operator">=</span> <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>
+  <span class="Identifier">site</span><span class="Punctuation">[</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">0</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="FloatNumber">1.0</span>
+<span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">releaseLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>  <span class="Comment"># flush back to GA</span></pre></p>
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
@@ -210,11 +224,18 @@
     <span class="Identifier">data</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HostStorage</span><span class="Other">[</span><span class="Identifier">float64</span><span class="Other">]</span>
   <span class="Keyword">else</span><span class="Other">:</span>
     <span class="Identifier">data</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HostStorage</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span>
-  <span class="Identifier">hasPadding</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span></pre></dt>
+  <span class="Identifier">hasPadding</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Comment">## raw pointer from NGA_Access (padded GA memory)</span>
+  <span class="Comment">## padded lattice geometry</span>
+  <span class="Comment">## innerPaddedBlockSize (stride between sites in GA memory)</span>
+  <span class="Comment">## real elements per site (product(shape) * complexFactor)</span>
+  <span class="Comment">## product of localGrid</span>
+  <span class="Comment">## true when we allocated a contiguous buffer</span></pre></dt>
   <dd>
     
     <p>Local tensor field on host memory</p>
 <p>Represents a local tensor field on host memory defined on a lattice with specified dimensions and data type.</p>
+<p>The <tt class="docutils literal"><span class="pre">data</span></tt> pointer points to a <strong>contiguous</strong> buffer where elements are stored in flat AoS order: <tt class="docutils literal"><span class="pre">data[site * elemsPerSite + e]</span></tt>. This is independent of the ghost-padded stride in the underlying GA. On construction, real elements are copied out of the padded GA memory; on <tt class="docutils literal"><span class="pre">releaseLocalTensorField</span></tt>, they are copied back.</p>
 
     
   </dd>
@@ -320,7 +341,8 @@
   <dd>
     
     <p>Create a new local tensor field from a global tensor field</p>
-<p>Downcast global tensor to local tensor on node</p>
+<p>Copies rank-local data from the padded GA memory into a contiguous host buffer where elements are stored in flat AoS order: <tt class="docutils literal"><span class="pre">buffer[site * elemsPerSite + e]</span></tt>.  This decouples the user-facing flat indexing from the ghost-padded stride in the underlying GA.</p>
+<p>Call <tt class="docutils literal"><span class="pre">releaseLocalTensorField</span></tt> when done to copy modified data back to the GA and free the contiguous buffer.</p>
 
     
   </dd>
@@ -363,6 +385,20 @@
 </div>
 
 </div>
+<div id="releaseLocalTensorField-procs-all">
+  <div id="releaseLocalTensorField,LocalTensorField[D,R,L: Lattice[releaseLocalTensorField.D],T]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#releaseLocalTensorField%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocalTensorField.D%5D%2CT%5D"><span class="Identifier">releaseLocalTensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
+    <span class="Identifier">tensor</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="localtensor.html#LocalTensorField"><span class="Identifier">LocalTensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    <p>Copy modified contiguous data back to the padded GA memory and free the buffer</p>
+<p>This must be called after modifying a LocalTensorField to ensure changes are reflected in the underlying Global Array.</p>
+
+    
+  </dd>
+</div>
+
+</div>
 <div id="tensorElementsPerSite-procs-all">
   <div id="tensorElementsPerSite,LocalTensorField[D,R,L: Lattice[tensorElementsPerSite.D],T]">
   <dt><pre><span class="Keyword">proc</span> <a href="#tensorElementsPerSite%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BtensorElementsPerSite.D%5D%2CT%5D"><span class="Identifier">tensorElementsPerSite</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">:</span> <a href="../lattice/latticeconcept.html#Lattice"><span class="Identifier">Lattice</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span>
@@ -385,7 +421,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
       </div>
     </div>
   </div>

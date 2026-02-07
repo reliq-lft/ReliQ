@@ -4,6 +4,7 @@ heading	Overview	index.html#overview	  Overview		0
 heading	Key Features	index.html#key-features	   Key Features		0
 heading	Quick Start	index.html#quick-start	  Quick Start		0
 heading	Architecture	index.html#architecture	  Architecture		0
+heading	Data Flow	index.html#data-flow	   Data Flow		0
 heading	Module Reference	index.html#module-reference	  Module Reference		0
 heading	Core Modules	index.html#core-modules	   Core Modules		0
 heading	Lattice	index.html#lattice	   Lattice		0
@@ -19,11 +20,13 @@ heading	Backend Selection	index.html#backend-selection	  Backend Selection		0
 heading	Building	index.html#building	   Building		0
 heading	Running Tests	index.html#running-tests	   Running Tests		0
 heading	The each Macro	index.html#the-each-macro	  The <tt class="docutils literal"><span class="pre">each</span></tt> Macro		0
-heading	Supported Patterns	index.html#supported-patterns	   Supported Patterns		0
+heading	Creating Tensor Fields and Views	index.html#creating-tensor-fields-and-views	   Creating Tensor Fields and Views		0
+heading	Supported Operations	index.html#supported-operations	   Supported Operations		0
+heading	Stencil Neighbor Access	index.html#stencil-neighbor-access	   Stencil Neighbor Access		0
 heading	What Happens Under the Hood	index.html#what-happens-under-the-hood	   What Happens Under the Hood		0
+heading	The all Loop	index.html#the-all-loop	  The <tt class="docutils literal"><span class="pre">all</span></tt> Loop		0
 heading	AoSoA Memory Layout	index.html#aosoa-memory-layout	  AoSoA Memory Layout		0
-heading	Stencil Operations	index.html#stencil-operations	  Stencil Operations		0
-heading	Distributed Transport (GlobalShifter)	index.html#distributed-transport-globalshifter	  Distributed Transport (GlobalShifter)		0
-heading	How it works	index.html#how-it-works	   How it works		0
-heading	Two transport layers	index.html#two-transport-layers	   Two transport layers		0
+heading	Distributed Transport (GlobalShifter)	index.html#distributed-transport-globalshifter	  Distributed Transport (<tt class="docutils literal"><span class="pre">GlobalShifter</span></tt>)		0
+heading	Two Transport Layers	index.html#two-transport-layers	   Two Transport Layers		0
+heading	I/O	index.html#islasho	  I/O		0
 heading	License	index.html#license	  License		0

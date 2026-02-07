@@ -1,114 +1,297 @@
-# ReliQ Lattice Field Theory Framework
-[![License: GPL v2](https://img.shields.io/badge/license-MIT-blue)](https://github.com/reliq-lft/ReliQ/blob/main/LICENSE) 
-[![Python](https://img.shields.io/badge/Python-3.10+-brightgreen.svg)](https://www.python.org)
-> "We all make choices. But in the end our choices make us." - Andrew Ryan (BioShock)
+# ReliQ — Lattice Field Theory Framework
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/reliq-lft/ReliQ/blob/main/LICENSE)
+[![Nim](https://img.shields.io/badge/Nim-2.2.4-orange.svg)](https://nim-lang.org/)
+[![GA](https://img.shields.io/badge/GlobalArrays-5.8-green.svg)](https://globalarrays.github.io/)
+
+> *"We all make choices. But in the end our choices make us."* — Andrew Ryan (BioShock)
 
 ![](https://github.com/reliq-lft/ReliQ/blob/main/reliq/reliq.png)
 
+**ReliQ** is an experimental lattice field theory framework written in [Nim](https://nim-lang.org/), designed for user-friendliness, performance, reliability, and portability across heterogeneous architectures. Distributed memory is handled through a [partitioned global address space](https://en.wikipedia.org/wiki/Partitioned_global_address_space) model backed by [Global Arrays (GA)](https://globalarrays.github.io/), while device-level parallelism dispatches across three backends — OpenCL, SYCL, and OpenMP — through a single user-facing API.
 
-`ReliQ` is an experimental lattice field theory framework written first and foremost with user-friendliness, performance, reliability, and portability across current and future heterogeneous architectures in mind. As such, `ReliQ` is written in the elegant [Nim](https://nim-lang.org/) programming language, and we are experimenting with the use of a [partitioned global address space](https://en.wikipedia.org/wiki/Partitioned_global_address_space) for `ReliQ`'s distributed memory model using the [GlobalArrays (GA)](https://globalarrays.github.io/) distributed memory framework. Each address space operates on the shared memory model implemented by [Kokkos](https://kokkos.org/). 
+> **Early Development** — ReliQ is under active development and is not yet production-ready. Contributions are welcome; contact us at [reliq-lft@proton.me](mailto:reliq-lft@proton.me) or follow us on our [organization page](https://github.com/reliq-lft).
 
-> Please note that `ReliQ` is in the early development stage; it is not ready for production. However, if you like what you're seeing, we could use help; please contact us at [reliq-lft@protonmail.me](reliq-lft@protonmail.me). Otherwise, you can follow us by clicking the `Follow` button in the top right corner of this page or our [organization page](https://github.com/reliq-lft).
->
-> Sections of this document that are labelled "__unstable__" are under active development/testing.
+---
 
-## Documentation (__unstable__)
+## Architecture
 
-Very basic documentation for `ReliQ` can be found [here](https://reliq-lft.github.io/ReliQ/). As we continue to develop `ReliQ`, the documentation page will be updated/improved.
+ReliQ is organized into layered abstractions, each narrowing scope from global distributed data to device-specific kernel execution:
 
-## Installation (__unstable__)
-
-The evolving design of `ReliQ`'s build system centers on ease of use and flexibility. Users can opt to have `ReliQ` figure out what needs to be built/installed or they can build/install the portions of `ReliQ` that they wish, and `ReliQ`'s build system will simply figure out the wiring. 
-
-#### Note on build process and Python
-
-Installing `ReliQ` requires `Python3`, which already exists on most systems. As long as `/user/bin/python3` exists, you should have no problem with the build process. Additionally, the `ReliQ` bootstrap script will perform a local install of the Python modules under `setup/requirements.txt` before it executes; these are needed to help `ReliQ` gather information about available hardware resources. 
-
-### Simplest method
-
-The simplest installation method gives `ReliQ` complete control over the build process; it will figure out what hardware is available, and it will install `Nim`, `UPC++`, and `Kokkos` appropriately. 
-
-#### Step 1: Get `ReliQ`
-
-We first need to clone `ReliQ`.
 ```
-cd <reliq_src>
+┌──────────────────────────────────────────────────────────┐
+│                       User Code                          │
+│            import reliq; each v, n: v[n] = ...           │
+├──────────────────────────────────────────────────────────┤
+│                    Tensor Layer                          │
+│   TensorField ─► LocalTensorField ─► TensorFieldView    │
+│   (GA/MPI)        (host buffer)       (device buffers)   │
+├──────────────────────────────────────────────────────────┤
+│        GlobalShifter · LatticeStencil · Transporter      │
+│        discreteLaplacian · applyStencilShift             │
+├──────────────────────────────────────────────────────────┤
+│                 Backend Dispatch                         │
+│     OpenCL (JIT)  │  SYCL (pre-compiled)  │  OpenMP     │
+│      (cldisp)     │    (sycldisp)         │  (ompdisp)  │
+├──────────────────────────────────────────────────────────┤
+│              Memory & Communication                      │
+│   Global Arrays · MPI · AoSoA Layout · SIMD Intrinsics   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+1. **`TensorField[D,R,L,T]`** — A distributed tensor field stored as a Global Array with ghost (halo) regions for boundary communication across MPI ranks.
+2. **`LocalTensorField[D,R,L,T]`** — A contiguous host-memory copy of the rank-local partition. Created via `newLocalTensorField()`; data flows back to the GA on `releaseLocalTensorField()`.
+3. **`TensorFieldView[L,T]`** — A device-side view optimized for the active backend (AoSoA layout for SIMD, GPU buffers for OpenCL/SYCL). This is the type the `each` macro operates on.
+
+### Three Compute Backends
+
+| Backend | Flag | Best For | Mechanism |
+|---------|------|----------|-----------|
+| **OpenCL** | *(default)* | GPUs, FPGAs | JIT kernel compilation at runtime |
+| **SYCL** | `BACKEND=sycl` | Intel GPUs, oneAPI | Pre-compiled C++ template kernels |
+| **OpenMP** | `BACKEND=openmp` | CPU-only | SIMD-vectorized loops (SSE/AVX2/AVX-512) |
+
+All three backends share the same user-facing API — the `each` macro analyzes loop bodies at compile time and generates the appropriate backend code.
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10+ (for the bootstrap/configure scripts and launcher)
+- A C/C++ compiler (GCC, Clang, or icpx)
+- MPI implementation (OpenMPI, MPICH, etc.)
+
+### Installation
+
+```bash
+# 1. Clone the repository
 git clone https://github.com/reliq-lft/ReliQ.git
+cd ReliQ
+
+# 2. Create a build directory
+mkdir -p /path/to/build && cd /path/to/build
+
+# 3. Bootstrap dependencies (installs Nim, Global Arrays, Kokkos via Spack)
+/path/to/ReliQ/bootstrap
+
+# 4. Configure
+/path/to/ReliQ/configure
 ```
-Replace `<reliq_src>` with the location that you'd like the `ReliQ` source to be located.
 
-#### Step 2: Choose `ReliQ` build location
+The bootstrap script performs a local [Spack](https://spack.io/) installation and uses it to install Nim 2.2.4, Global Arrays 5.8.2, and Kokkos 4.6.01. All dependencies are installed under `<build>/external/`.
 
-Now let's create a local build directory. 
+### Building and Running
+
+```bash
+# Compile a module
+make tensor
+
+# Run tests with the parallel launcher
+./reliq -e tensor -n 1       # 1 MPI rank
+./reliq -e tensor -n 4       # 4 MPI ranks
+
+# Run the full test suite (core + all backends)
+make test
 ```
-mkdir -p <reliq_build>
-cd <reliq_build>
+
+---
+
+## The `each` Macro
+
+The `each` macro is the primary mechanism for expressing computations on lattice fields. It works on `TensorFieldView` objects and generates optimized backend-specific code at compile time.
+
+```nim
+import reliq
+
+parallel:
+  let lat = newSimpleCubicLattice([8, 8, 8, 16])
+
+  block:
+    var fieldA = lat.newTensorField([3, 3]): float64
+    var fieldB = lat.newTensorField([3, 3]): float64
+    var fieldC = lat.newTensorField([3, 3]): float64
+
+    var localA = fieldA.newLocalTensorField()
+    var localB = fieldB.newLocalTensorField()
+    var localC = fieldC.newLocalTensorField()
+
+    # Create device views
+    var vA = localA.newTensorFieldView(iokRead)
+    var vB = localB.newTensorFieldView(iokRead)
+    var vC = localC.newTensorFieldView(iokWrite)
+
+    # Dispatch computation across all backend devices
+    for n in each 0..<vA.numSites():
+      vC[n] = vA[n] + vB[n]          # Element-wise addition
+      vC[n] = vA[n] * vB[n]          # Matrix multiplication
+      vC[n] = 3.0 * vA[n]            # Scalar multiplication
 ```
-Replace `<reliq_build>` with the location that you'd like `ReliQ` to be installed. 
 
-#### Step 3: Install `ReliQ` dependencies
+### Stencil Operations in `each` Loops
 
-We now need to get `Nim`, `GlobalArrays`, and `Kokkos`. Make sure that you are in you `<reliq_build>` directory. From there, execute the following.
+```nim
+let stencil = newLatticeStencil(nearestNeighborStencil[4](), lat)
+
+for n in each 0..<vDst.numSites():
+  let fwd = stencil.fwd(n, 0)     # Forward x-neighbor
+  let bwd = stencil.bwd(n, 0)     # Backward x-neighbor
+  vDst[n] = vSrc[fwd] + vSrc[bwd] - 2.0 * vSrc[n]
 ```
-<reliq_src>/bootstrap
+
+---
+
+## The `all` Loop (Host-Side)
+
+The `all` loop operates on `LocalTensorField` objects for host-side site-level operations using `LocalSiteProxy`:
+
+```nim
+var localA = fieldA.newLocalTensorField()
+var localB = fieldB.newLocalTensorField()
+var localC = fieldC.newLocalTensorField()
+
+for n in all 0..<localC.numSites():
+  localC[n] = localA.getSite(n) + localB.getSite(n)
+  localC[n] = localA.getSite(n) * localB.getSite(n)
+  localC[n] = 2.5 * localA.getSite(n)
+
+# Write changes back to the distributed Global Array
+localC.releaseLocalTensorField()
 ```
-This installs the aforementioned dependencies.
 
-#### Step 4: Configure `ReliQ`
+---
 
-Finally, we need to configure `ReliQ`. From within `<reliq_build>`, execute the following.
+## Distributed Transport
+
+### GlobalShifter — MPI-Level Transport
+
+For operations that cross MPI partition boundaries at the `TensorField` level:
+
+```nim
+parallel:
+  let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 4], [1, 1, 1, 1])
+
+  block:
+    var src  = lat.newTensorField([1, 1]): float64
+    var dest = lat.newTensorField([1, 1]): float64
+
+    # Shift forward in the t-dimension (crosses MPI boundaries)
+    let shifter = newGlobalShifter(src, dim=3, len=1)
+    shifter.apply(src, dest)   # dest[x] = src[x + e_t]
+
+    # Discrete Laplacian: sum_mu (f[x+mu] + f[x-mu]) - 2D * f[x]
+    var lap = lat.newTensorField([1, 1]): float64
+    var scratch = lat.newTensorField([1, 1]): float64
+    discreteLaplacian(src, lap, scratch)
 ```
-<reliq_src>/configure
+
+### Two Transport Layers
+
+| Layer | Type | Communication |
+|-------|------|---------------|
+| `GlobalShifter` | `TensorField` | GA ghost exchange (MPI) |
+| `Shifter` / `Transporter` | `TensorFieldView` | Device-side halo buffers |
+
+Use `GlobalShifter` when working with distributed tensor fields directly (setup, I/O, measurements). Use `Shifter` when data is already on-device inside `each` loops.
+
+---
+
+## I/O
+
+ReliQ supports standard lattice QCD file formats:
+
+```nim
+parallel:
+  let lat = newSimpleCubicLattice([8, 8, 8, 16])
+
+  block:
+    # Read an ILDG gauge configuration
+    var gaugeField: array[4, TensorField[4, 2, typeof(lat), Complex64]]
+    for mu in 0..<4:
+      gaugeField[mu] = lat.newTensorField([3, 3]): Complex64
+    readGaugeField(gaugeField, "config.ildg")
+
+    # Write a tensor field
+    var field = lat.newTensorField([3, 3]): float64
+    writeTensorField(field, "output.lime")
 ```
-And that's it! 
 
-#### More information (optional read)
+**Supported formats**: LIME containers, SciDAC/QIO with XML metadata and checksums, ILDG gauge configurations.
 
-The `<reliq_src>/bootstrap` script performs a local installation of [Spack](https://spack.io/) before using `Spack` it to install `Nim`, `UPC++`, and `Kokkos`. The following directory is created locally. 
+---
 
-* `<reliq_build>/external`: The local install of `Spack`, `Nim`, `GlobalArrays`, and `Kokkos`.
+## Test Suite
 
-The `<reliq_src>/bootstrap` script also comes with a number of options that are configurable by specifying flags. To see available options, run
+ReliQ has a comprehensive test suite organized into four categories:
+
+```bash
+make test-core     # Backend-agnostic (lattice, stencil, tensor, transport, I/O)
+make test-opencl   # OpenCL backend
+make test-openmp   # OpenMP backend with SIMD
+make test-sycl     # SYCL backend
+make test          # All of the above
 ```
-<reliq_src>/bootstrap --help
+
+Each test module runs at both 1 and 4 MPI ranks. The current suite contains **1,660 tests** across all backends with zero failures.
+
+| Suite | Tests |
+|-------|-------|
+| Core (backend-agnostic) | 875 |
+| OpenCL | 245 |
+| OpenMP | 295 |
+| SYCL | 245 |
+| **Total** | **1,660** |
+
+---
+
+## Documentation
+
+API documentation is available at [reliq-lft.github.io/ReliQ](https://reliq-lft.github.io/ReliQ/). Generate documentation locally from the build directory:
+
+```bash
+./document
 ```
-or `<reliq_src>/bootstrap -h`.
 
-Upon execution, the configuration script figures out what flags are needed to link and include `UPC++` and `Kokkos` in `ReliQ` programs. It will also create the following directories under `<reliq_build>`.
+---
 
-* `<reliq_build>/bin`: Path to compiled `ReliQ` programs. See "Compiling and running `ReliQ` programs" below for more information.
-* `<reliq_build>/cache`: Path to `Nim` cache; upon invoking the `Nim` compiler, `Nim` code is transpiled to `C++` before said `C++` code is compiled down to machine code. The `<reliq_build>/cache` directory stores the aforementioned transpiled `C++` code.
+## Module Overview
 
-The configuration script also creates following symbolic links under `<reliq_build>`.
+| Module | Description |
+|--------|-------------|
+| `lattice` | `SimpleCubicLattice[D]`, `LatticeStencil[D]`, indexing utilities |
+| `tensor` | `TensorField`, `LocalTensorField`, `TensorFieldView`, `GlobalShifter` |
+| `parallel` | Backend-agnostic parallel dispatch (`parallel:` template, `each` macro) |
+| `io` | LIME/QIO/SciDAC/ILDG file I/O with checksum validation |
+| `globalarrays` | Global Arrays FFI bindings, distributed array types, MPI wrappers |
+| `opencl` | OpenCL JIT kernel generation and dispatch |
+| `sycl` | SYCL pre-compiled kernel dispatch via `libreliq_sycl.so` |
+| `openmp` | OpenMP SIMD-vectorized CPU dispatch |
+| `simd` | `SimdVec[N,T]`, `SimdLatticeLayout`, AoSoA memory layout |
+| `utils` | Complex number predicates, command-line parsing |
 
-* `<reliq_src>/src`: Symbolic link to `ReliQ` primary source files.
-* `<reliq_src>/build`: Symbolic link to `ReliQ` source files used for building/installing `ReliQ`.
+---
 
-## Compiling and running `ReliQ` programs (__unstable__)
+## Parallel Launcher
 
-### Compiling `ReliQ` programs under `src`
+The `reliq` launcher script wraps `mpirun` and auto-configures threading:
 
-It is implied that the user has thusfar built/installed `ReliQ`. Within the path `<reliq_build>` where you built/installed `ReliQ`, you can compile any `Nim` file under `<reliq_src>/src` by running the following.
+```bash
+./reliq -e <program> -n <ntasks> [-t <nthreads>]
 ```
-make <program>
-```
-Here, `<program>` should be replaced with the name of said source file; e.g., `make simplecubiclattice`. If the compilation is successful, you should see a corresponding binary file with the same name under `<reliq_build>/bin`; e.g., `<reliq_build>/bin/simplecubiclattice`. 
 
-### Running `ReliQ` programs
+| Flag | Description |
+|------|-------------|
+| `-e` / `--executable` | Program name (from `bin/`) |
+| `-n` / `--ntasks` | Number of MPI ranks |
+| `-t` / `--nthreads` | Threads per rank (auto-detected if omitted) |
 
-To run `ReliQ` programs, we have provided an optional parallel launcher that can (but is not required to) take the place of `mpirun`, `srun`, et cetera. To execute a program with `ReliQ`'s parallel launcher __locally__, run the following.
-```
-<reliq_build>/reliq -e <program> -n 2 -t 2 --local
-```
-Here, `<program>` refers to the name of a compiled `ReliQ` program under `<reliq_build>/bin`. The above example uses the following flags. For example, `<reliq_build>/reliq -e simplecubiclattice -n 2 -t 2 --local`.
+---
 
-* __`-e` (or `--executable`):__ Specifies executable name under `<reliq_build>/bin` to run
-* __`-n` (or `--ntasks`):__ Number of tasks to run job with
-* __`-t` (or `--nthreads`):__ Number of threads per task to run job with
-* __`--local`:__ Runs with `-localhost` flag specified by `UPC++`; this is needed for running locally.
+## License
 
-For help, run
-```
-<reliq_build>/reliq --help
-```
-or `<reliq_build>/reliq -h`. 
+MIT License — Copyright (c) 2025 reliq-lft
+
+See [LICENSE](LICENSE) for details.

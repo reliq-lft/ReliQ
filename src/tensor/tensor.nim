@@ -76,7 +76,7 @@ when isMainModule:
       check pattern.nPoints == 8
 
     test "LatticeStencil from Lattice":
-      let lat = newSimpleCubicLattice([8, 8, 8, 16])
+      let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 1])
       let stencil = newLatticeStencil(nearestNeighborStencil[4](), lat)
       check stencil.nSites > 0
 

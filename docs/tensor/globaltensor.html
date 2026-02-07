@@ -244,8 +244,8 @@
 </ul>
 <ul class="simple nested-toc-section">localSiteOffset
   <li><a class="reference" href="#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint" title="localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
-                               innerPaddedBlockSize: int): int">localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
-                               innerPaddedBlockSize: int): int</a></li>
+                               innerBlockSize: int): int">localSiteOffset[D: static int](coords: array[D, int]; paddedGeom: array[D, int];
+                               innerBlockSize: int): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newGlobalBackwardShifters
@@ -336,10 +336,10 @@
 <li><strong>Stencil integration</strong>: <tt class="docutils literal"><span class="pre"><span class="Identifier">newLatticeStencil</span></span></tt> creates a unified <tt class="docutils literal"><span class="pre"><span class="Identifier">LatticeStencil</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Punctuation">]</span></span></tt> from a tensor field's geometry</li>
 </ul>
 
-<h2><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout">GA Memory Layout</a></h2><p>Global Arrays store data in <strong>C row-major</strong> order (last dimension fastest varying).  A <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Operator">=</span><span class="DecNumber">4</span><span class="Punctuation">,</span> <span class="Identifier">R</span><span class="Operator">=</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="Identifier">T</span><span class="Operator">=</span><span class="Identifier">float64</span><span class="Punctuation">]</span></span></tt> with <tt class="docutils literal"><span class="pre">shape = [3, 3]</span></tt> maps to a 7-dimensional GA <tt class="docutils literal"><span class="pre">[Lx, Ly, Lz, Lt, S0, S1, Cplx]</span></tt>.  The last <tt class="docutils literal"><span class="pre">R+1</span></tt> dimensions are <tt class="docutils literal"><span class="pre">inner</span></tt> (tensor shape + complex component), each ghost-padded to <tt class="docutils literal"><span class="pre">S + 2*ghostWidth</span></tt>.</p>
+<h2><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-ga-memory-layout">GA Memory Layout</a></h2><p>Global Arrays store data in <strong>C row-major</strong> order (last dimension fastest varying).  A <tt class="docutils literal"><span class="pre"><span class="Identifier">TensorField</span><span class="Punctuation">[</span><span class="Identifier">D</span><span class="Operator">=</span><span class="DecNumber">4</span><span class="Punctuation">,</span> <span class="Identifier">R</span><span class="Operator">=</span><span class="DecNumber">2</span><span class="Punctuation">,</span> <span class="Identifier">T</span><span class="Operator">=</span><span class="Identifier">float64</span><span class="Punctuation">]</span></span></tt> with <tt class="docutils literal"><span class="pre">shape = [3, 3]</span></tt> maps to a 7-dimensional GA <tt class="docutils literal"><span class="pre">[Lx, Ly, Lz, Lt, S0, S1, Cplx]</span></tt>.  The first <tt class="docutils literal"><span class="pre">D</span></tt> dimensions (lattice) carry ghost regions for boundary communication; the last <tt class="docutils literal"><span class="pre">R+1</span></tt> dimensions (tensor shape + complex component) also carry ghost width 1 because GA 5.8.2 requires <strong>all</strong> dimensions to have <tt class="docutils literal"><span class="pre">ghost ≥ 1</span></tt> for <tt class="docutils literal"><span class="pre">GA_Update_ghost_dir</span></tt> to function.  The padded inner block therefore has <tt class="docutils literal"><span class="pre">(S_i + 2)</span></tt> entries per tensor dimension and <tt class="docutils literal"><span class="pre">(complexFactor + 2)</span></tt> for the complex dimension; only the central <tt class="docutils literal"><span class="pre">product(shape) * complexFactor</span></tt> elements are real data. Use <tt class="docutils literal"><span class="pre">innerPaddedBlockSize</span></tt> / <tt class="docutils literal"><span class="pre">innerPaddedOffset</span></tt> to navigate.</p>
 <p>Two pointer types are available:</p>
-<ul class="simple"><li><strong>Local pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessLocal</span></span></tt>): starts at the centre of the inner padded block for the first local lattice site.  <tt class="docutils literal"><span class="pre">p[0]</span></tt> is the value at local coordinates <tt class="docutils literal"><span class="pre">(0,0,...,0)</span></tt>.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">localIdx</span></span></tt> to compute the correct flat index.</li>
-<li><strong>Ghost pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessGhosts</span></span></tt>): starts at the origin of the full padded 7-D array.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">coordsToPaddedFlat</span></span></tt> plus <tt class="docutils literal"><span class="pre"><span class="Identifier">innerPaddedOffset</span></span></tt> to index.</li>
+<ul class="simple"><li><strong>Local pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessLocal</span></span></tt>): starts at the center of the padded inner block for the first local lattice site.  <tt class="docutils literal"><span class="pre">p[0]</span></tt> is element 0 at local coordinates <tt class="docutils literal"><span class="pre">(0,0,...,0)</span></tt>.  The stride between adjacent lattice sites is <tt class="docutils literal"><span class="pre">innerPaddedBlockSize</span></tt> (the product of all padded inner dimensions), <strong>not</strong> the number of real elements.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">localIdx</span></span></tt> to compute the correct flat index.</li>
+<li><strong>Ghost pointer</strong> (<tt class="docutils literal"><span class="pre"><span class="Identifier">accessGhosts</span></span></tt>): starts at the origin of the full padded array.  Use <tt class="docutils literal"><span class="pre"><span class="Identifier">coordsToPaddedFlat</span></span></tt> to index into the ghost-padded lattice dimensions; at each site, add <tt class="docutils literal"><span class="pre">innerPaddedOffset</span></tt> to reach the first real element.</li>
 </ul>
 
 <h2><a class="toc-backref" id="globaltensor-minus-distributed-tensor-fields-via-global-arrays-example" href="#globaltensor-minus-distributed-tensor-fields-via-global-arrays-example">Example</a></h2><pre class="listing"><span class="Keyword">import</span> <span class="Identifier">reliq</span>
@@ -640,7 +640,7 @@
   <dd>
     
     <p>Compute the padded inner block size for ghost-padded arrays</p>
-<p>Each inner dimension of size S gets padded to <tt class="docutils literal"><span class="pre">S + 2*ghostWidth</span></tt>. For scalar real with S=1, ghost=1: padded = 3, so block = 3^(R+1). But we only want to access the CENTER element, so the block size for stride computation is the full product.</p>
+<p>Each inner dimension of size S gets padded to <tt class="docutils literal"><span class="pre">S + 2*ghostWidth</span></tt>. The block size is the product of all padded inner dimensions. For scalar real with S=1, ghost=1: each of R+1 dims is padded to 3, so block = 3^(R+1).</p>
 
     
   </dd>
@@ -653,7 +653,7 @@
   <dd>
     
     <p>Compute the flat offset to the center element of the padded inner block</p>
-<p>For each inner dimension of padded size P, the center is at index ghostWidth. The offset is: <tt class="docutils literal"><span class="pre">sum_{i=0..R} ghostWidth * stride_i</span></tt> where stride_i = product of P for dims i+1..R</p>
+<p>In the ghost-padded inner block, each inner dimension of padded size P has the real data at index <tt class="docutils literal"><span class="pre">ghostWidth</span></tt>.  The offset from the start of the padded block to the center (first real element) is: <tt class="docutils literal"><span class="pre">sum_{i=0..R} ghostWidth * stride_i</span></tt></p>
 
     
   </dd>
@@ -692,13 +692,13 @@
   <dd>
     
     <p>Compute the flat index into the local data pointer for a lattice site</p>
-<p>GA stores data in C row-major order with padded inner dimensions. The local pointer from <tt class="docutils literal"><span class="pre">accessLocal</span></tt> shares this padded layout, so sequential indexing <tt class="docutils literal"><span class="pre">p[site]</span></tt> does NOT work. Use this function to compute the correct flat index.</p>
-<p>For a scalar real field (shape <a class="reference internal" href="#1,1">1,1</a>, not complex), the inner padded block size is 3^(R+1) with ghost width 1 in all inner dims. The stride between consecutive lattice sites in the fastest dim equals the inner padded block size.</p>
+<p>The GA inner dimensions (tensor shape + complex) are ghost-padded to satisfy GA's requirement that all dimensions have ghost width ≥ 1. <tt class="docutils literal"><span class="pre">NGA_Access</span></tt> returns a pointer to the center of the padded block for the first local lattice site, so <tt class="docutils literal"><span class="pre">p[0]</span></tt> is the first real element.  The stride between consecutive lattice sites is the product of all padded inner dimensions (<tt class="docutils literal"><span class="pre">innerPaddedBlockSize</span></tt>).</p>
+<p>The returned index points to the center of the padded inner block for the given lattice site.  Add <tt class="docutils literal"><span class="pre">e</span></tt> to reach element <tt class="docutils literal"><span class="pre">e</span></tt> (but only <tt class="docutils literal"><span class="pre">0..&lt;innerBlockSize</span></tt> are real data; the rest is padding).</p>
 <p>Parameters:</p>
 <ul class="simple"><li><tt class="docutils literal"><span class="pre">tensor</span></tt>: The tensor field (used for shape and padding info)</li>
 <li><tt class="docutils literal"><span class="pre">coords</span></tt>: Local lattice coordinates</li>
 </ul>
-<p>Returns: Flat index into the local data pointer for the center element of the inner block at the given lattice site.</p>
+<p>Returns: Flat index into the local data pointer for the first real element at the given lattice site.</p>
 
     
   </dd>
@@ -711,8 +711,8 @@
     <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">site</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    <p>Compute the flat index into the local data pointer for a lex-ordered site</p>
-<p>Converts a lexicographic site index to proper flat index in the padded local memory, accounting for the inner block structure.</p>
+    <p>Compute the flat index for a lexicographically-ordered site</p>
+<p>Converts a lexicographic site index to the flat index in the local data pointer, accounting for lattice-dimension ghost padding while keeping inner (tensor/complex) dimensions contiguous.</p>
 
     
   </dd>
@@ -723,17 +723,17 @@
   <div id="localSiteOffset,array[D,int],array[D,int],int">
   <dt><pre><span class="Keyword">proc</span> <a href="#localSiteOffset%2Carray%5BD%2Cint%5D%2Carray%5BD%2Cint%5D%2Cint"><span class="Identifier">localSiteOffset</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">coords</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
                                     <span class="Identifier">paddedGeom</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">;</span>
-                                    <span class="Identifier">innerPaddedBlockSize</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+                                    <span class="Identifier">innerBlockSize</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
     <p>Convert local lattice coordinates to a flat offset in the local data pointer</p>
-<p>The local pointer from NGA_Access points into the padded memory at the start of the local region. The memory layout still uses padded strides (the inner block is interleaved). This computes the offset from p<a class="reference internal" href="#0">0</a> to reach the start of the inner block for a given lattice site.</p>
+<p>The local pointer from NGA_Access points into the padded memory at the start of the local region. The memory layout still uses padded strides for the lattice dimensions (which carry ghost regions). The inner block at each lattice site is contiguous with <tt class="docutils literal"><span class="pre">innerBlockSize</span></tt> elements.</p>
 <p>Parameters:</p>
 <ul class="simple"><li>coords: Local lattice coordinates</li>
 <li>paddedGeom: Padded lattice geometry (<tt class="docutils literal"><span class="pre">localGeom + 2*ghostWidth</span></tt> per dim)</li>
-<li>innerPaddedBlockSize: Product of all padded inner dimensions (<tt class="docutils literal"><span class="pre">3^(R+1)</span></tt> for ghost=1)</li>
+<li>innerBlockSize: Number of contiguous inner elements per lattice site</li>
 </ul>
-<p>Returns: Flat offset from local pointer p<a class="reference internal" href="#0">0</a>. Add innerPaddedOffset to reach the center element of the inner block.</p>
+<p>Returns: Flat offset from local pointer p<a class="reference internal" href="#0">0</a> to the start of the inner block for the given site.</p>
 
     
   </dd>
@@ -867,8 +867,8 @@
     <span class="Identifier">tensor</span><span class="Other">:</span> <a href="globaltensor.html#TensorField"><span class="Identifier">TensorField</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">updateCorners</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span></pre></dt>
   <dd>
     
-    <p>Update ghost regions in all dimensions</p>
-<p>Convenience function to update all ghost regions at once. Equivalent to calling updateGhosts for each dimension.</p>
+    <p>Update ghost regions in all lattice dimensions</p>
+<p>Skips dimensions with ghost width 0 (including inner tensor/complex dimensions).  Uses <tt class="docutils literal"><span class="pre">GA_Update_ghost_dir</span></tt> for each lattice dimension.</p>
 <p>Example:</p>
 <p><pre class="listing"><span class="Keyword">var</span> <span class="Identifier">field</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="DecNumber">3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">Complex64</span>
 <span class="Comment"># ... modify local data ...</span>
@@ -911,7 +911,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
       </div>
     </div>
   </div>

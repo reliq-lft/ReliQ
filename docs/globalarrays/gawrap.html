@@ -150,6 +150,10 @@
   <li><a class="reference" href="#GA_Update_ghost_dir%2Ccint%2Ccint%2Ccint%2Ccint" title="GA_Update_ghost_dir(g_a: cint; dir: cint; side: cint; update_corners: cint)">GA_Update_ghost_dir(g_a: cint; dir: cint; side: cint; update_corners: cint)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">GA_Update_ghosts
+  <li><a class="reference" href="#GA_Update_ghosts%2Ccint" title="GA_Update_ghosts(g_a: cint)">GA_Update_ghosts(g_a: cint)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">localIndices
   <li><a class="reference" href="#localIndices%2Ccint%2Carray%5BD%2Ccint%5D%2Carray%5BD%2Ccint%5D" title="localIndices[D: static[int]](handle: cint; lo, hi: var array[D, cint])">localIndices[D: static[int]](handle: cint; lo, hi: var array[D, cint])</a></li>
 
@@ -168,6 +172,26 @@
 </ul>
 <ul class="simple nested-toc-section">NGA_Distribution
   <li><a class="reference" href="#NGA_Distribution%2Ccint%2Ccint%2Cptr.cint%2Cptr.cint" title="NGA_Distribution(g_a: cint; pid: cint; lo: ptr cint; hi: ptr cint)">NGA_Distribution(g_a: cint; pid: cint; lo: ptr cint; hi: ptr cint)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">NGA_Get
+  <li><a class="reference" href="#NGA_Get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint" title="NGA_Get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)">NGA_Get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">NGA_Periodic_get
+  <li><a class="reference" href="#NGA_Periodic_get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint" title="NGA_Periodic_get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)">NGA_Periodic_get(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">NGA_Periodic_put
+  <li><a class="reference" href="#NGA_Periodic_put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint" title="NGA_Periodic_put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)">NGA_Periodic_put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer;
+                 ld: ptr cint)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">NGA_Put
+  <li><a class="reference" href="#NGA_Put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint" title="NGA_Put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)">NGA_Put(g_a: cint; lo: ptr cint; hi: ptr cint; buf: pointer; ld: ptr cint)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">NGA_Release
@@ -498,6 +522,18 @@
 </div>
 
 </div>
+<div id="GA_Update_ghosts-procs-all">
+  <div id="GA_Update_ghosts,cint">
+  <dt><pre><span class="Keyword">proc</span> <a href="#GA_Update_ghosts%2Ccint"><span class="Identifier">GA_Update_ghosts</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">)</span> {.<span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;GA_Update_ghosts&quot;</span><span class="Other">,</span> <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span>
+                                   <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
 <div id="localIndices-procs-all">
   <div id="localIndices,cint,array[D,cint],array[D,cint]">
   <dt><pre><span class="Keyword">proc</span> <a href="#localIndices%2Ccint%2Carray%5BD%2Ccint%5D%2Carray%5BD%2Ccint%5D"><span class="Identifier">localIndices</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">:</span> <span class="Identifier">static</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">handle</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">,</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">D</span><span class="Other">,</span> <span class="Identifier">cint</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
@@ -551,6 +587,58 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#NGA_Distribution%2Ccint%2Ccint%2Cptr.cint%2Cptr.cint"><span class="Identifier">NGA_Distribution</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">pid</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">)</span> {.
     <span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;NGA_Distribution&quot;</span><span class="Other">,</span> <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="NGA_Get-procs-all">
+  <div id="NGA_Get,cint,ptr.cint,ptr.cint,pointer,ptr.cint">
+  <dt><pre><span class="Keyword">proc</span> <a href="#NGA_Get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint"><span class="Identifier">NGA_Get</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">buf</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">ld</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">)</span> {.
+    <span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;NGA_Get&quot;</span><span class="Other">,</span> <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="NGA_Periodic_get-procs-all">
+  <div id="NGA_Periodic_get,cint,ptr.cint,ptr.cint,pointer,ptr.cint">
+  <dt><pre><span class="Keyword">proc</span> <a href="#NGA_Periodic_get%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint"><span class="Identifier">NGA_Periodic_get</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">buf</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span>
+                      <span class="Identifier">ld</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">)</span> {.<span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;NGA_Periodic_get&quot;</span><span class="Other">,</span>
+                                      <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                      <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="NGA_Periodic_put-procs-all">
+  <div id="NGA_Periodic_put,cint,ptr.cint,ptr.cint,pointer,ptr.cint">
+  <dt><pre><span class="Keyword">proc</span> <a href="#NGA_Periodic_put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint"><span class="Identifier">NGA_Periodic_put</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">buf</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span>
+                      <span class="Identifier">ld</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">)</span> {.<span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;NGA_Periodic_put&quot;</span><span class="Other">,</span>
+                                      <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                      <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="NGA_Put-procs-all">
+  <div id="NGA_Put,cint,ptr.cint,ptr.cint,pointer,ptr.cint">
+  <dt><pre><span class="Keyword">proc</span> <a href="#NGA_Put%2Ccint%2Cptr.cint%2Cptr.cint%2Cpointer%2Cptr.cint"><span class="Identifier">NGA_Put</span></a><span class="Other">(</span><span class="Identifier">g_a</span><span class="Other">:</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">lo</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">hi</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">;</span> <span class="Identifier">buf</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">ld</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">cint</span><span class="Other">)</span> {.
+    <span class="Identifier">importc</span><span class="Other">:</span> <span class="StringLit">&quot;NGA_Put&quot;</span><span class="Other">,</span> <span class="Identifier">header</span><span class="Other">:</span> <span class="StringLit">&quot;ga.h&quot;</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -660,7 +748,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 05:35:01 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:56 UTC</small>
       </div>
     </div>
   </div>

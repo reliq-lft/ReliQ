@@ -1,0 +1,99 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'document'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.4'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate documentation
+        run: |
+          set -e
+          NIM=$(which nim)
+          DOCS="$(pwd)/docs"
+          SRC="$(pwd)/src"
+          NIMFLAGS="--backend:cpp --index:on --outdir:${DOCS} --path:${SRC}"
+
+          mkdir -p ${DOCS}
+          rm -rf ${DOCS}/*
+
+          echo "=== ReliQ Documentation Generator (CI) ==="
+
+          # Step 1: Index page from Markdown
+          echo "[1/3] Generating index page..."
+          $NIM md2html ${NIMFLAGS} ${SRC}/index.md
+
+          # Step 2: API docs from reliq.nim (follows default imports)
+          # Use --docRoot to preserve directory structure
+          echo "[2/3] Generating API docs..."
+          $NIM doc ${NIMFLAGS} --project --docRoot:${SRC} ${SRC}/reliq.nim || true
+
+          # Step 3: Backend-specific modules not reached via default imports
+          echo "[3/3] Generating backend-specific module docs..."
+          EXTRA_MODULES=(
+            openmp/ompdisp
+            openmp/ompsimd
+            sycl/sycldisp
+            sycl/syclbase
+            sycl/syclwrap
+            simd/simdtypes
+            tensor/transporter
+            lattice/indexing
+          )
+
+          for mod in "${EXTRA_MODULES[@]}"; do
+            src_file="${SRC}/${mod}.nim"
+            if [[ -f "$src_file" ]]; then
+              subdir=$(dirname "$mod")
+              [[ "$subdir" != "." ]] && mkdir -p "${DOCS}/${subdir}"
+              echo "  doc: ${mod}"
+              $NIM doc ${NIMFLAGS} --docRoot:${SRC} "$src_file" || true
+            fi
+          done
+
+          NHTML=$(find ${DOCS} -name "*.html" | wc -l)
+          echo "=== Generated ${NHTML} documentation pages ==="
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

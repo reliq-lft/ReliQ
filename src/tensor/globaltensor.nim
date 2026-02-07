@@ -60,19 +60,28 @@
 ## Global Arrays store data in **C row-major** order (last dimension
 ## fastest varying).  A `TensorField[D=4, R=2, T=float64]` with
 ## ``shape = [3, 3]`` maps to a 7-dimensional GA
-## ``[Lx, Ly, Lz, Lt, S0, S1, Cplx]``.  The last ``R+1`` dimensions
-## are ``inner`` (tensor shape + complex component), each ghost-padded to
-## ``S + 2*ghostWidth``.
+## ``[Lx, Ly, Lz, Lt, S0, S1, Cplx]``.  The first ``D`` dimensions
+## (lattice) carry ghost regions for boundary communication; the last
+## ``R+1`` dimensions (tensor shape + complex component) also carry
+## ghost width 1 because GA 5.8.2 requires **all** dimensions to have
+## ``ghost ≥ 1`` for ``GA_Update_ghost_dir`` to function.  The padded
+## inner block therefore has ``(S_i + 2)`` entries per tensor dimension
+## and ``(complexFactor + 2)`` for the complex dimension; only the
+## central ``product(shape) * complexFactor`` elements are real data.
+## Use ``innerPaddedBlockSize`` / ``innerPaddedOffset`` to navigate.
 ##
 ## Two pointer types are available:
 ##
-## - **Local pointer** (`accessLocal`): starts at the centre of the
-##   inner padded block for the first local lattice site.  ``p[0]`` is
-##   the value at local coordinates ``(0,0,...,0)``.  Use `localIdx` to
-##   compute the correct flat index.
+## - **Local pointer** (`accessLocal`): starts at the center of the
+##   padded inner block for the first local lattice site.  ``p[0]``
+##   is element 0 at local coordinates ``(0,0,...,0)``.  The stride
+##   between adjacent lattice sites is ``innerPaddedBlockSize`` (the
+##   product of all padded inner dimensions), **not** the number of
+##   real elements.  Use `localIdx` to compute the correct flat index.
 ## - **Ghost pointer** (`accessGhosts`): starts at the origin of the
-##   full padded 7-D array.  Use `coordsToPaddedFlat` plus
-##   `innerPaddedOffset` to index.
+##   full padded array.  Use `coordsToPaddedFlat` to index into the
+##   ghost-padded lattice dimensions; at each site, add
+##   ``innerPaddedOffset`` to reach the first real element.
 ##
 ## Example
 ## ^^^^^^^
@@ -198,9 +207,14 @@ proc newTensorField*[D: static[int], R: static[int], L: Lattice[D]](
     ghostGrid[i] = lattice.ghostGrid[i]
 
   # tensor grid
-  # Note: GA requires ghost width >= 1 in ALL dimensions for ghost exchange
-  # to work correctly, even for dimensions that don't need neighbor data.
-  # We set ghost width = 1 for tensor/component dims to satisfy this requirement.
+  # Inner dimensions (tensor shape + complex) are NOT distributed and NOT
+  # exchanged during ghost updates.  However, GA requires ghost width ≥ 1
+  # on ALL dimensions for GA_Update_ghost_dir to function correctly (GA
+  # cannot handle zero-width ghost regions in any dimension).  Setting
+  # ghost = 1 here satisfies GA; the inner padding is accounted for in
+  # `localIdx`, `coordsToPaddedFlat`, and the GlobalShifter / Laplacian.
+  # LocalTensorField and TensorFieldView work on separate contiguous
+  # buffers that are de-padded from the GA memory.
   for i in 0..<R:
     globalGrid[D + i] = shape[i]
     mpiGrid[D + i] = 1
@@ -223,6 +237,40 @@ proc newTensorField*[D: static[int], R: static[int], L: Lattice[D]](
 #[ ============================================================================
    Halo Exchange (Ghost Region Update) for Distributed Tensor Fields
    ============================================================================ ]#
+
+proc innerBlockSize*(R: static int, shape: openArray[int], isComplex: bool): int =
+  ## Compute the number of contiguous elements per lattice site
+  ##
+  ## This is the product of all tensor shape entries times the complex factor.
+  result = 1
+  for r in 0..<R:
+    result *= shape[r]
+  if isComplex: result *= 2
+
+proc innerPaddedBlockSize*(R: static int, ghostWidth: int): int =
+  ## Compute the padded inner block size for ghost-padded arrays
+  ##
+  ## Each inner dimension of size S gets padded to ``S + 2*ghostWidth``.
+  ## The block size is the product of all padded inner dimensions.
+  ## For scalar real with S=1, ghost=1: each of R+1 dims is padded to 3,
+  ## so block = 3^(R+1).
+  result = 1
+  for _ in 0..R:  # R+1 inner dimensions (tensor dims + complex dim)
+    result *= (1 + 2 * ghostWidth)
+
+proc innerPaddedOffset*(R: static int, ghostWidth: int): int =
+  ## Compute the flat offset to the center element of the padded inner block
+  ##
+  ## In the ghost-padded inner block, each inner dimension of padded size P
+  ## has the real data at index ``ghostWidth``.  The offset from the start
+  ## of the padded block to the center (first real element) is:
+  ## ``sum_{i=0..R} ghostWidth * stride_i``
+  result = 0
+  let P = 1 + 2 * ghostWidth
+  var stride = 1
+  for _ in countdown(R, 0):
+    result += ghostWidth * stride
+    stride *= P
 
 proc updateGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T],
@@ -252,6 +300,11 @@ proc updateGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   let handle = tensor.data.getHandle()
   let updateCornersFlag: cint = if updateCorners: 1 else: 0
   
+  # Skip dimensions with ghost width 0 — GA_Update_ghost_dir fails
+  # when the target dimension has no ghost cells allocated.
+  if tensor.lattice.ghostGrid[dim] == 0:
+    return
+  
   if direction == 0:
     # Update both directions
     handle.GA_Update_ghost_dir(cint(dim), cint(1), updateCornersFlag)
@@ -263,10 +316,10 @@ proc updateAllGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T],
   updateCorners: bool = false
 ) =
-  ## Update ghost regions in all dimensions
+  ## Update ghost regions in all lattice dimensions
   ##
-  ## Convenience function to update all ghost regions at once.
-  ## Equivalent to calling updateGhosts for each dimension.
+  ## Skips dimensions with ghost width 0 (including inner tensor/complex
+  ## dimensions).  Uses ``GA_Update_ghost_dir`` for each lattice dimension.
   ##
   ## Example:
   ## ```nim
@@ -436,42 +489,6 @@ proc coordsToLex*[D: static int](coords: array[D, int], geom: array[D, int]): in
     result += coords[d] * stride
     stride *= geom[d]
 
-proc innerBlockSize*(R: static int, shape: openArray[int], isComplex: bool): int =
-  ## Compute the number of contiguous elements per lattice site
-  ##
-  ## This is the product of all tensor shape entries times the complex factor.
-  result = 1
-  for r in 0..<R:
-    result *= shape[r]
-  if isComplex: result *= 2
-
-proc innerPaddedBlockSize*(R: static int, ghostWidth: int): int =
-  ## Compute the padded inner block size for ghost-padded arrays
-  ##
-  ## Each inner dimension of size S gets padded to ``S + 2*ghostWidth``.
-  ## For scalar real with S=1, ghost=1: padded = 3, so block = 3^(R+1).
-  ## But we only want to access the CENTER element, so the block size
-  ## for stride computation is the full product.
-  result = 1
-  # R tensor dimensions + 1 complex dimension, each padded to 1+2*ghostWidth
-  # For real scalar: each dim is 1, padded to 3 with ghost=1
-  # For real [3,3]: dims are 3 and 3, padded to 5 and 5 with ghost=1, then complex dim 1→3
-  for _ in 0..R:  # R+1 inner dimensions (tensor dims + complex dim)
-    result *= (1 + 2 * ghostWidth)  # Assumes all inner dims have same ghost width
-
-proc innerPaddedOffset*(R: static int, ghostWidth: int): int =
-  ## Compute the flat offset to the center element of the padded inner block
-  ##
-  ## For each inner dimension of padded size P, the center is at index ghostWidth.
-  ## The offset is: ``sum_{i=0..R} ghostWidth * stride_i``
-  ## where stride_i = product of P for dims i+1..R
-  result = 0
-  let P = 1 + 2 * ghostWidth
-  var stride = 1
-  for _ in countdown(R, 0):  # R+1 inner dimensions, last to first
-    result += ghostWidth * stride
-    stride *= P
-
 proc coordsToPaddedFlat*[D: static int](
   coords: array[D, int],
   paddedGeom: array[D, int],
@@ -501,25 +518,25 @@ proc coordsToPaddedFlat*[D: static int](
 proc localSiteOffset*[D: static int](
   coords: array[D, int],
   paddedGeom: array[D, int],
-  innerPaddedBlockSize: int
+  innerBlockSize: int
 ): int =
   ## Convert local lattice coordinates to a flat offset in the local data pointer
   ##
   ## The local pointer from NGA_Access points into the padded memory at the start
-  ## of the local region. The memory layout still uses padded strides (the inner
-  ## block is interleaved). This computes the offset from p[0] to reach the start
-  ## of the inner block for a given lattice site.
+  ## of the local region. The memory layout still uses padded strides for the
+  ## lattice dimensions (which carry ghost regions). The inner block at each
+  ## lattice site is contiguous with ``innerBlockSize`` elements.
   ##
   ## Parameters:
   ## - coords: Local lattice coordinates
   ## - paddedGeom: Padded lattice geometry (``localGeom + 2*ghostWidth`` per dim)
-  ## - innerPaddedBlockSize: Product of all padded inner dimensions (``3^(R+1)`` for ghost=1)
+  ## - innerBlockSize: Number of contiguous inner elements per lattice site
   ##
   ## Returns:
-  ## Flat offset from local pointer p[0]. Add innerPaddedOffset to reach the
-  ## center element of the inner block.
+  ## Flat offset from local pointer p[0] to the start of the inner block
+  ## for the given site.
   result = 0
-  var stride = innerPaddedBlockSize
+  var stride = innerBlockSize
   for d in countdown(D-1, 0):
     result += coords[d] * stride
     stride *= paddedGeom[d]
@@ -530,40 +547,37 @@ proc localIdx*[D: static[int], R: static[int], L: Lattice[D], T](
 ): int =
   ## Compute the flat index into the local data pointer for a lattice site
   ##
-  ## GA stores data in C row-major order with padded inner dimensions.
-  ## The local pointer from ``accessLocal`` shares this padded layout,
-  ## so sequential indexing ``p[site]`` does NOT work. Use this function
-  ## to compute the correct flat index.
-  ##
-  ## For a scalar real field (shape [1,1], not complex), the inner padded
-  ## block size is 3^(R+1) with ghost width 1 in all inner dims.
-  ## The stride between consecutive lattice sites in the fastest dim
-  ## equals the inner padded block size.
+  ## The GA inner dimensions (tensor shape + complex) are ghost-padded to
+  ## satisfy GA's requirement that all dimensions have ghost width ≥ 1.
+  ## ``NGA_Access`` returns a pointer to the center of the padded block
+  ## for the first local lattice site, so ``p[0]`` is the first real
+  ## element.  The stride between consecutive lattice sites is the product
+  ## of all padded inner dimensions (``innerPaddedBlockSize``).
+  ## 
+  ## The returned index points to the center of the padded inner block
+  ## for the given lattice site.  Add ``e`` to reach element ``e`` (but
+  ## only ``0..<innerBlockSize`` are real data; the rest is padding).
   ##
   ## Parameters:
   ## - ``tensor``: The tensor field (used for shape and padding info)
   ## - ``coords``: Local lattice coordinates
   ##
   ## Returns:
-  ## Flat index into the local data pointer for the center element
-  ## of the inner block at the given lattice site.
+  ## Flat index into the local data pointer for the first real element
+  ## at the given lattice site.
   let paddedGeom = tensor.paddedGrid()
-  let innerGW = 1
-  let innerPad = innerPaddedBlockSize(R, innerGW)
-  # Note: we do NOT add innerPaddedOffset here because NGA_Access (local)
-  # returns a pointer that already starts at the center of the inner block
-  # for the first local site. The local pointer p[0] is at 7D position
-  # (ghost,ghost,...,ghost,innerGhost,...,innerGhost), which IS the center.
-  localSiteOffset(coords, paddedGeom, innerPad)
+  let innerPadded = innerPaddedBlockSize(R, 1)
+  localSiteOffset(coords, paddedGeom, innerPadded)
 
 proc localLexIdx*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T],
   site: int
 ): int =
-  ## Compute the flat index into the local data pointer for a lex-ordered site
+  ## Compute the flat index for a lexicographically-ordered site
   ##
-  ## Converts a lexicographic site index to proper flat index in the padded
-  ## local memory, accounting for the inner block structure.
+  ## Converts a lexicographic site index to the flat index in the local
+  ## data pointer, accounting for lattice-dimension ghost padding while
+  ## keeping inner (tensor/complex) dimensions contiguous.
   let localGeom = tensor.localGrid()
   let coords = lexToCoords(site, localGeom)
   tensor.localIdx(coords)
@@ -643,15 +657,14 @@ proc apply*[D: static[int], R: static[int], L: Lattice[D], T](
   # 3. Access destination local data (pointer shares padded memory layout)
   let destPtr = dest.accessLocal()
   
-  # 4. Compute inner block metrics for the padded array
-  let innerGhostWidth = 1
-  let innerPadded = innerPaddedBlockSize(R, innerGhostWidth)
-  let innerOff = innerPaddedOffset(R, innerGhostWidth)
-  
-  # 5. Compute the number of real data elements per lattice site
+  # 4. Compute inner block metrics — inner dims have ghost width 1
+  #    (GA requires ghost ≥ 1 on ALL dimensions)
+  let innerGW = 1  # ghost width on inner (tensor + complex) dimensions
+  let innerPadded = innerPaddedBlockSize(R, innerGW)
+  let innerOff = innerPaddedOffset(R, innerGW)
   let innerLocal = innerBlockSize(R, src.shape, isComplex(T))
   
-  # 6. For each local site, read from the shifted position in the padded array
+  # 5. For each local site, read from the shifted position in the padded array
   for site in 0..<shifter.nLocalSites:
     let coords = lexToCoords(site, shifter.localGeom)
     
@@ -670,14 +683,14 @@ proc apply*[D: static[int], R: static[int], L: Lattice[D], T](
       elif nbrCoords[shifter.dim] < 0:
         nbrCoords[shifter.dim] += shifter.localGeom[shifter.dim]
     
+    # Source index in the ghost-padded array; add innerOff to skip inner ghost
     let srcIdx = coordsToPaddedFlat(nbrCoords, shifter.paddedGeom, 
                                      shifter.ghostWidth, innerPadded) + innerOff
     
-    # Destination: local data pointer — NGA_Access starts at the center of
-    # the inner block, so we only need the lattice-site stride offset
+    # Destination index in the local pointer (padded inner stride)
     let destIdx = localSiteOffset(coords, shifter.paddedGeom, innerPadded)
     
-    # Copy all tensor elements for this site
+    # Copy only real tensor elements (skip inner ghost padding)
     for e in 0..<innerLocal:
       destPtr[destIdx + e] = srcPtr[srcIdx + e]
   
@@ -752,14 +765,13 @@ proc discreteLaplacian*[D: static[int], R: static[int], L: Lattice[D], T](
   var nLocalSites = 1
   for d in 0..<D: nLocalSites *= localGeom[d]
   
-  # Inner block metrics
-  let innerGW = 1  # Ghost width for inner dims (always 1)
+  # Inner block metrics — inner dims have ghost width 1 (GA requirement)
+  let innerGW = 1
   let innerPadded = innerPaddedBlockSize(R, innerGW)
   let innerOff = innerPaddedOffset(R, innerGW)
   let innerLocal = innerBlockSize(R, src.shape, isComplex(T))
   
-  # Zero destination using proper padded-stride indexing
-  # NGA_Access returns pointer at center of inner block, so no innerOff needed
+  # Zero destination
   for site in 0..<nLocalSites:
     let coords = lexToCoords(site, localGeom)
     let destBase = localSiteOffset(coords, paddedGeom, innerPadded)
@@ -891,7 +903,7 @@ when isMainModule:
           let ghost = field.ghostWidth()
           let q = field.accessGhosts()
           
-          # Inner block metrics for scalar [1,1] float64
+          # Inner block metrics — inner dims have ghost width 1 (GA requirement)
           let innerPadded = innerPaddedBlockSize(2, 1)
           let innerOff = innerPaddedOffset(2, 1)
           
