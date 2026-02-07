@@ -31,7 +31,7 @@
 <h2 id="data-flow">Data Flow</h2><p><pre class="listing">TensorField[D,R,L,T]           ← Distributed (GA + MPI)
     │ newLocalTensorField()
     ▼
-LocalTensorField[D,R,L,T]      ← Contiguous host buffer
+LocalTensorField[D,R,L,T]      ← Direct GA pointer + siteOffsets
     │ newTensorFieldView()
     ▼
 TensorFieldView[L,T]           ← Device-side AoSoA buffers
@@ -80,22 +80,21 @@ Padded block size (with ghosts) = (shape[0]+2) * (shape[1]+2) * ... * (complexFa
 <p><pre class="listing"><span class="Keyword">let</span> <span class="Identifier">rawPtr</span> <span class="Operator">=</span> <span class="Identifier">tensor</span><span class="Operator">.</span><span class="Identifier">accessLocal</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 <span class="Comment"># ... use rawPtr with innerPaddedBlockSize strides ...</span>
 <span class="Identifier">tensor</span><span class="Operator">.</span><span class="Identifier">releaseLocal</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre></p>
-<p>However, the recommended approach is to use <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> which handles the padded-to-contiguous copy for you.</p>
+<p>However, the recommended approach is to use <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> which provides a <tt class="docutils literal"><span class="pre">siteOffsets</span></tt> lookup table to navigate the padded memory directly.</p>
 
-<h2 id="localtensorfield-host-buffer">LocalTensorField (Host Buffer)</h2><p><tt class="docutils literal"><span class="pre">LocalTensorField[D, R, L, T]</span></tt> provides a contiguous host-memory copy of the rank-local partition.  It allocates a flat buffer and copies the real elements from the ghost-padded GA memory into contiguous AoS order:</p>
-<p><pre class="listing">data[site * elemsPerSite + element]</pre></p>
+<h2 id="localtensorfield-direct-ga-pointer">LocalTensorField (Direct GA Pointer)</h2><p><tt class="docutils literal"><span class="pre">LocalTensorField[D, R, L, T]</span></tt> holds a direct pointer into the rank-local GA memory (obtained via <tt class="docutils literal"><span class="pre">NGA_Access</span></tt>) together with a precomputed <tt class="docutils literal"><span class="pre">siteOffsets: seq[int]</span></tt> lookup table that maps each lexicographic site index to its flat offset inside the padded GA memory.  No contiguous buffer is allocated and no copy is performed — reads and writes go directly to the Global Array.</p>
+<p><pre class="listing">data[siteOffsets[site] + element]</pre></p>
 
-<h3 id="creation-and-release">Creation and Release</h3><p><pre class="listing"><span class="Comment"># Create from a distributed TensorField</span>
+<h3 id="creation">Creation</h3><p><pre class="listing"><span class="Comment"># Create from a distributed TensorField</span>
 <span class="Keyword">var</span> <span class="Identifier">local</span> <span class="Operator">=</span> <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">newLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
 
-<span class="Comment"># Access data...</span>
+<span class="Comment"># Access data — writes go directly to the GA</span>
 <span class="Keyword">for</span> <span class="Identifier">n</span> <span class="Keyword">in</span> <span class="Identifier">all</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">numSites</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
   <span class="Keyword">var</span> <span class="Identifier">site</span> <span class="Operator">=</span> <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>
   <span class="Identifier">site</span><span class="Punctuation">[</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">0</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="FloatNumber">1.0</span>
 
-<span class="Comment"># IMPORTANT: Copy changes back to the distributed Global Array</span>
-<span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">releaseLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre></p>
-<p><strong>Calling ``releaseLocalTensorField()`` is required</strong> after modifying data through a <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt>.  This copies the contiguous buffer back into the ghost-padded GA memory and deallocates the buffer.</p>
+<span class="Comment"># No manual flush needed — data is already in the GA</span></pre></p>
+<p>Since <tt class="docutils literal"><span class="pre">LocalTensorField.data</span></tt> <strong>is</strong> the GA pointer, all modifications are visible to the distributed array immediately.  There is no <tt class="docutils literal"><span class="pre">releaseLocalTensorField()</span></tt> step.</p>
 
 <h3 id="properties">Properties</h3><table border="1" class="docutils"><tr><th>Proc</th><th>Returns</th><th>Description</th></tr>
 <tr><td><tt class="docutils literal"><span class="pre">numSites()</span></tt></td><td><tt class="docutils literal"><span class="pre">int</span></tt></td><td>Number of local lattice sites</td></tr>
@@ -275,7 +274,7 @@ index = group * (elemsPerSite * VectorWidth) + element * VectorWidth + lane</pre
 
 <h2 id="module-reference">Module Reference</h2><table border="1" class="docutils"><tr><th>Module</th><th>Description</th></tr>
 <tr><td><a class="reference external" href="tensor/globaltensor.html">tensor/globaltensor</a></td><td>Distributed tensor fields and GlobalShifter</td></tr>
-<tr><td><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a></td><td>Local host buffer with contiguous AoS layout</td></tr>
+<tr><td><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a></td><td>Direct GA pointer with <tt class="docutils literal"><span class="pre">siteOffsets</span></tt> lookup</td></tr>
 <tr><td><a class="reference external" href="tensor/tensorview.html">tensor/tensorview</a></td><td>Device-side views and <tt class="docutils literal"><span class="pre">each</span></tt> macro dispatch</td></tr>
 <tr><td><a class="reference external" href="tensor/sitetensor.html">tensor/sitetensor</a></td><td><tt class="docutils literal"><span class="pre">Vec[N,T]</span></tt> and <tt class="docutils literal"><span class="pre">Mat[N,M,T]</span></tt> site types</td></tr>
 <tr><td><a class="reference external" href="tensor/transporter.html">tensor/transporter</a></td><td>Single-rank Shifter and Transporter</td></tr>
@@ -285,7 +284,7 @@ index = group * (elemsPerSite * VectorWidth) + element * VectorWidth + lane</pre
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:43 UTC</small>
       </div>
     </div>
   </div>

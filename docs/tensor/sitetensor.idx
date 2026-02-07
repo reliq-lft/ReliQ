@@ -100,19 +100,19 @@ nim	`*`	tensor/sitetensor.html#*,MatAddResult[L,T],T	proc `*`[L, T](res: MatAddR
 nim	`$`	tensor/sitetensor.html#$,TensorSiteProxy[L,T]	proc `$`[L, T](proxy: TensorSiteProxy[L, T]): string		659
 nim	`$`	tensor/sitetensor.html#$,RuntimeSiteData[T]	proc `$`[T](data: RuntimeSiteData[T]): string		665
 nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i: int): T		817
-nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int): T		823
-nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int): T		830
-nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i: int; value: T)		838
-nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int; value: T)		844
-nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int; value: T)		851
-nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		860
-nim	`-`	tensor/sitetensor.html#-,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `-`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		865
-nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalMulResult[\n    D, R, L, T]		870
-nim	`*`	tensor/sitetensor.html#*,T,LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarMulResult[D, R, L, T]		874
-nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],T	proc `*`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarMulResult[D, R, L, T]		878
-nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],T	proc `+`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarAddResult[D, R, L, T]		882
-nim	`+`	tensor/sitetensor.html#+,T,LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarAddResult[D, R, L, T]		886
-nim	`$`	tensor/sitetensor.html#$,LocalSiteProxy[D,R,L,T]	proc `$`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T]): string		890
+nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int): T		822
+nim	`[]`	tensor/sitetensor.html#[],LocalSiteProxy[D,R,L,T],int,int,int	proc `[]`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int): T		828
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i: int; value: T)		835
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j: int; value: T)		840
+nim	`[]=`	tensor/sitetensor.html#[]=,LocalSiteProxy[D,R,L,T],int,int,int,T	proc `[]=`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    i, j, k: int; value: T)		846
+nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		854
+nim	`-`	tensor/sitetensor.html#-,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `-`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[\n    D, R, L, T]		859
+nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalMulResult[\n    D, R, L, T]		864
+nim	`*`	tensor/sitetensor.html#*,T,LocalSiteProxy[D,R,L,T]	proc `*`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarMulResult[D, R, L, T]		868
+nim	`*`	tensor/sitetensor.html#*,LocalSiteProxy[D,R,L,T],T	proc `*`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarMulResult[D, R, L, T]		872
+nim	`+`	tensor/sitetensor.html#+,LocalSiteProxy[D,R,L,T],T	proc `+`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T];\n    scalar: T): LocalScalarAddResult[D, R, L, T]		876
+nim	`+`	tensor/sitetensor.html#+,T,LocalSiteProxy[D,R,L,T]	proc `+`[D: static[int]; R: static[int]; L, T](scalar: T;\n    proxy: LocalSiteProxy[D, R, L, T]): LocalScalarAddResult[D, R, L, T]		880
+nim	`$`	tensor/sitetensor.html#$,LocalSiteProxy[D,R,L,T]	proc `$`[D: static[int]; R: static[int]; L, T](proxy: LocalSiteProxy[D, R, L, T]): string		884
 nimgrp	+	tensor/sitetensor.html#+-procs-all	proc		61
 nimgrp	-	tensor/sitetensor.html#--procs-all	proc		66
 nimgrp	$	tensor/sitetensor.html#$-procs-all	proc		659

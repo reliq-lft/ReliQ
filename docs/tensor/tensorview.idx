@@ -9,54 +9,54 @@ nim	iokWrite	tensor/tensorview.html#iokWrite	IOKind.iokWrite		131
 nim	iokReadWrite	tensor/tensorview.html#iokReadWrite	IOKind.iokReadWrite		131
 nim	IOKind	tensor/tensorview.html#IOKind	enum IOKind		131
 nim	DeviceStorage	tensor/tensorview.html#DeviceStorage	object DeviceStorage		133
-nim	TensorFieldView	tensor/tensorview.html#TensorFieldView	object TensorFieldView		149
-nim	computeElementsPerSite	tensor/tensorview.html#computeElementsPerSite,openArray[int],bool	proc computeElementsPerSite(shape: openArray[int]; isComplex: bool = false): int		165
-nim	computeTotalLatticeSites	tensor/tensorview.html#computeTotalLatticeSites,openArray[int]	proc computeTotalLatticeSites(localGrid: openArray[int]): int		171
-nim	splitLatticeSites	tensor/tensorview.html#splitLatticeSites,int,int	proc splitLatticeSites(totalSites: int; numDevices: int): seq[int]		176
-nim	numVectorGroups	tensor/tensorview.html#numVectorGroups,int	proc numVectorGroups(numSites: int): int		187
-nim	transformAoStoAoSoA	tensor/tensorview.html#transformAoStoAoSoA,pointer,int,int	proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int): seq[T]		191
-nim	transformAoSoAtoAoS	tensor/tensorview.html#transformAoSoAtoAoS,pointer,int,int	proc transformAoSoAtoAoS[T](src: pointer; numSites, elemsPerSite: int): seq[T]		217
-nim	transformAoStoAoSoASimd	tensor/tensorview.html#transformAoStoAoSoASimd,pointer,SimdLatticeLayout,int	proc transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;\n                           elemsPerSite: int): seq[T]		237
-nim	transformAoSoAtoAoSSimd	tensor/tensorview.html#transformAoSoAtoAoSSimd,pointer,SimdLatticeLayout,int	proc transformAoSoAtoAoSSimd[T](src: pointer; layout: SimdLatticeLayout;\n                           elemsPerSite: int): seq[T]		263
-nim	defaultSimdGrid	tensor/tensorview.html#defaultSimdGrid,array[D,int]	proc defaultSimdGrid[D: static[int]](localGrid: array[D, int]): seq[int]		280
-nim	defaultSimdGrid	tensor/tensorview.html#defaultSimdGrid,seq[int]	proc defaultSimdGrid(localGrid: seq[int]): seq[int]		299
-nim	newTensorFieldView	tensor/tensorview.html#newTensorFieldView.t,LocalTensorField[D,R,L,T],IOKind	template newTensorFieldView[D: static[int]; R: static[int]; L, T](\n    tensor: LocalTensorField[D, R, L, T]; io: IOKind): TensorFieldView[L, T]		450
-nim	newTensorFieldView	tensor/tensorview.html#newTensorFieldView.t,TensorField[D,R,L,T],IOKind	template newTensorFieldView[D: static[int]; R: static[int]; L, T](\n    tensor: TensorField[D, R, L, T]; io: IOKind): TensorFieldView[L, T]		522
-nim	`=copy`	tensor/tensorview.html#=copy,DeviceStorage,DeviceStorage	proc `=copy`(dest: var DeviceStorage; src: DeviceStorage)		547
-nim	numSites	tensor/tensorview.html#numSites,TensorFieldView[L,T]	proc numSites[L, T](view: TensorFieldView[L, T]): int		552
-nim	elementsPerSite	tensor/tensorview.html#elementsPerSite,TensorFieldView[L,T]	proc elementsPerSite[L, T](view: TensorFieldView[L, T]): int		556
-nim	totalElements	tensor/tensorview.html#totalElements,TensorFieldView[L,T]	proc totalElements[L, T](view: TensorFieldView[L, T]): int		560
-nim	buffers	tensor/tensorview.html#buffers,TensorFieldView[L,T]	proc buffers[L, T](view: TensorFieldView[L, T]): seq[BackendBuffer]		564
-nim	sitesPerDevice	tensor/tensorview.html#sitesPerDevice,TensorFieldView[L,T]	proc sitesPerDevice[L, T](view: TensorFieldView[L, T]): seq[int]		568
-nim	simdLayout	tensor/tensorview.html#simdLayout,TensorFieldView[L,T]	proc simdLayout[L, T](view: TensorFieldView[L, T]): SimdLatticeLayout		574
-nim	nSitesInner	tensor/tensorview.html#nSitesInner,TensorFieldView[L,T]	proc nSitesInner[L, T](view: TensorFieldView[L, T]): int		578
-nim	nSitesOuter	tensor/tensorview.html#nSitesOuter,TensorFieldView[L,T]	proc nSitesOuter[L, T](view: TensorFieldView[L, T]): int		582
-nim	hasSimdLayout	tensor/tensorview.html#hasSimdLayout,TensorFieldView[L,T]	proc hasSimdLayout[L, T](view: TensorFieldView[L, T]): bool		586
-nim	aosoaDataPtr	tensor/tensorview.html#aosoaDataPtr,TensorFieldView[L,T]	proc aosoaDataPtr[L, T](view: TensorFieldView[L, T]): ptr UncheckedArray[T]		590
-nim	readSiteData	tensor/tensorview.html#readSiteData,TensorFieldView[L,T],int	proc readSiteData[L, T](view: TensorFieldView[L, T]; site: int): RuntimeSiteData[T]		640
-nim	formatSiteData	tensor/tensorview.html#formatSiteData,TensorFieldView[L,T],int	proc formatSiteData[L, T](view: TensorFieldView[L, T]; site: int): string		675
-nim	writeSiteElement	tensor/tensorview.html#writeSiteElement,TensorFieldView[L,T],int,int,T	proc writeSiteElement[L, T](view: TensorFieldView[L, T]; site: int; elementIdx: int;\n                       value: T)		681
-nim	`[]`	tensor/tensorview.html#[],TensorFieldView[L,T],int	proc `[]`[L, T](view: TensorFieldView[L, T]; site: int): TensorSiteProxy[L, T]		970
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,TensorSiteProxy[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: TensorSiteProxy[L, T])		976
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,T	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: T)		979
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatMulResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatMulResult[L, T])		982
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatAddResult[L, T])		985
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,VecAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: VecAddResult[L, T])		988
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatVecResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatVecResult[L, T])		991
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,ScalarMulResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: ScalarMulResult[L, T])		994
-nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,ScalarAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: ScalarAddResult[L, T])		997
-nim	`[]`	tensor/tensorview.html#[],TensorFieldView[L,T],StencilShift[D]	proc `[]`[L, T, D: static int](view: TensorFieldView[L, T]; shift: StencilShift[D]): TensorSiteProxy[\n    L, T]		1004
-nim	matmul	tensor/tensorview.html#matmul,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matmul[L, T](a, b: TensorFieldView[L, T]; site: int): MatMulResult[L, T]		1015
-nim	matadd	tensor/tensorview.html#matadd,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matadd[L, T](a, b: TensorFieldView[L, T]; site: int): MatAddResult[L, T]		1021
-nim	vecadd	tensor/tensorview.html#vecadd,TensorFieldView[L,T],TensorFieldView[L,T],int	proc vecadd[L, T](a, b: TensorFieldView[L, T]; site: int): VecAddResult[L, T]		1025
-nim	matvec	tensor/tensorview.html#matvec,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matvec[L, T](mat, vec: TensorFieldView[L, T]; site: int): MatVecResult[L, T]		1029
-nim	`=copy`	tensor/tensorview.html#=copy,TensorFieldView[L,T],TensorFieldView[L,T]	proc `=copy`[L, T](dest: var TensorFieldView[L, T]; src: TensorFieldView[L, T])		1034
-nim	`=destroy`	tensor/tensorview.html#=destroy,TensorFieldView[L,T]	proc `=destroy`[L, T](view: var TensorFieldView[L, T])		1070
-nim	numGlobalSites	tensor/tensorview.html#numGlobalSites,TensorFieldView[L,T]	proc numGlobalSites[L, T](view: TensorFieldView[L, T]): int		1120
-nimgrp	[]=	tensor/tensorview.html#[]=-procs-all	proc		976
-nimgrp	=copy	tensor/tensorview.html#=copy-procs-all	proc		547
-nimgrp	[]	tensor/tensorview.html#[]-procs-all	proc		970
-nimgrp	defaultsimdgrid	tensor/tensorview.html#defaultSimdGrid-procs-all	proc		280
-nimgrp	newtensorfieldview	tensor/tensorview.html#newTensorFieldView-templates-all	template		450
+nim	TensorFieldView	tensor/tensorview.html#TensorFieldView	object TensorFieldView		150
+nim	computeElementsPerSite	tensor/tensorview.html#computeElementsPerSite,openArray[int],bool	proc computeElementsPerSite(shape: openArray[int]; isComplex: bool = false): int		166
+nim	computeTotalLatticeSites	tensor/tensorview.html#computeTotalLatticeSites,openArray[int]	proc computeTotalLatticeSites(localGrid: openArray[int]): int		172
+nim	splitLatticeSites	tensor/tensorview.html#splitLatticeSites,int,int	proc splitLatticeSites(totalSites: int; numDevices: int): seq[int]		177
+nim	numVectorGroups	tensor/tensorview.html#numVectorGroups,int	proc numVectorGroups(numSites: int): int		188
+nim	transformAoStoAoSoA	tensor/tensorview.html#transformAoStoAoSoA,pointer,int,int,seq[int]	proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int;\n                       siteOffsets: seq[int]): seq[T]		192
+nim	transformAoSoAtoAoS	tensor/tensorview.html#transformAoSoAtoAoS,pointer,int,int	proc transformAoSoAtoAoS[T](src: pointer; numSites, elemsPerSite: int): seq[T]		218
+nim	transformAoStoAoSoASimd	tensor/tensorview.html#transformAoStoAoSoASimd,pointer,SimdLatticeLayout,int,seq[int]	proc transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;\n                           elemsPerSite: int; siteOffsets: seq[int]): seq[T]		238
+nim	transformAoSoAtoAoSSimd	tensor/tensorview.html#transformAoSoAtoAoSSimd,pointer,SimdLatticeLayout,int	proc transformAoSoAtoAoSSimd[T](src: pointer; layout: SimdLatticeLayout;\n                           elemsPerSite: int): seq[T]		266
+nim	defaultSimdGrid	tensor/tensorview.html#defaultSimdGrid,array[D,int]	proc defaultSimdGrid[D: static[int]](localGrid: array[D, int]): seq[int]		284
+nim	defaultSimdGrid	tensor/tensorview.html#defaultSimdGrid,seq[int]	proc defaultSimdGrid(localGrid: seq[int]): seq[int]		303
+nim	newTensorFieldView	tensor/tensorview.html#newTensorFieldView.t,LocalTensorField[D,R,L,T],IOKind	template newTensorFieldView[D: static[int]; R: static[int]; L, T](\n    tensor: LocalTensorField[D, R, L, T]; io: IOKind): TensorFieldView[L, T]		456
+nim	newTensorFieldView	tensor/tensorview.html#newTensorFieldView.t,TensorField[D,R,L,T],IOKind	template newTensorFieldView[D: static[int]; R: static[int]; L, T](\n    tensor: TensorField[D, R, L, T]; io: IOKind): TensorFieldView[L, T]		530
+nim	`=copy`	tensor/tensorview.html#=copy,DeviceStorage,DeviceStorage	proc `=copy`(dest: var DeviceStorage; src: DeviceStorage)		555
+nim	numSites	tensor/tensorview.html#numSites,TensorFieldView[L,T]	proc numSites[L, T](view: TensorFieldView[L, T]): int		560
+nim	elementsPerSite	tensor/tensorview.html#elementsPerSite,TensorFieldView[L,T]	proc elementsPerSite[L, T](view: TensorFieldView[L, T]): int		564
+nim	totalElements	tensor/tensorview.html#totalElements,TensorFieldView[L,T]	proc totalElements[L, T](view: TensorFieldView[L, T]): int		568
+nim	buffers	tensor/tensorview.html#buffers,TensorFieldView[L,T]	proc buffers[L, T](view: TensorFieldView[L, T]): seq[BackendBuffer]		572
+nim	sitesPerDevice	tensor/tensorview.html#sitesPerDevice,TensorFieldView[L,T]	proc sitesPerDevice[L, T](view: TensorFieldView[L, T]): seq[int]		576
+nim	simdLayout	tensor/tensorview.html#simdLayout,TensorFieldView[L,T]	proc simdLayout[L, T](view: TensorFieldView[L, T]): SimdLatticeLayout		582
+nim	nSitesInner	tensor/tensorview.html#nSitesInner,TensorFieldView[L,T]	proc nSitesInner[L, T](view: TensorFieldView[L, T]): int		586
+nim	nSitesOuter	tensor/tensorview.html#nSitesOuter,TensorFieldView[L,T]	proc nSitesOuter[L, T](view: TensorFieldView[L, T]): int		590
+nim	hasSimdLayout	tensor/tensorview.html#hasSimdLayout,TensorFieldView[L,T]	proc hasSimdLayout[L, T](view: TensorFieldView[L, T]): bool		594
+nim	aosoaDataPtr	tensor/tensorview.html#aosoaDataPtr,TensorFieldView[L,T]	proc aosoaDataPtr[L, T](view: TensorFieldView[L, T]): ptr UncheckedArray[T]		598
+nim	readSiteData	tensor/tensorview.html#readSiteData,TensorFieldView[L,T],int	proc readSiteData[L, T](view: TensorFieldView[L, T]; site: int): RuntimeSiteData[T]		648
+nim	formatSiteData	tensor/tensorview.html#formatSiteData,TensorFieldView[L,T],int	proc formatSiteData[L, T](view: TensorFieldView[L, T]; site: int): string		683
+nim	writeSiteElement	tensor/tensorview.html#writeSiteElement,TensorFieldView[L,T],int,int,T	proc writeSiteElement[L, T](view: TensorFieldView[L, T]; site: int; elementIdx: int;\n                       value: T)		689
+nim	`[]`	tensor/tensorview.html#[],TensorFieldView[L,T],int	proc `[]`[L, T](view: TensorFieldView[L, T]; site: int): TensorSiteProxy[L, T]		978
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,TensorSiteProxy[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: TensorSiteProxy[L, T])		984
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,T	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: T)		987
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatMulResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatMulResult[L, T])		990
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatAddResult[L, T])		993
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,VecAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: VecAddResult[L, T])		996
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,MatVecResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: MatVecResult[L, T])		999
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,ScalarMulResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: ScalarMulResult[L, T])		1002
+nim	`[]=`	tensor/tensorview.html#[]=,TensorFieldView[L,T],int,ScalarAddResult[L,T]	proc `[]=`[L, T](view: TensorFieldView[L, T]; site: int; value: ScalarAddResult[L, T])		1005
+nim	`[]`	tensor/tensorview.html#[],TensorFieldView[L,T],StencilShift[D]	proc `[]`[L, T, D: static int](view: TensorFieldView[L, T]; shift: StencilShift[D]): TensorSiteProxy[\n    L, T]		1012
+nim	matmul	tensor/tensorview.html#matmul,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matmul[L, T](a, b: TensorFieldView[L, T]; site: int): MatMulResult[L, T]		1023
+nim	matadd	tensor/tensorview.html#matadd,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matadd[L, T](a, b: TensorFieldView[L, T]; site: int): MatAddResult[L, T]		1029
+nim	vecadd	tensor/tensorview.html#vecadd,TensorFieldView[L,T],TensorFieldView[L,T],int	proc vecadd[L, T](a, b: TensorFieldView[L, T]; site: int): VecAddResult[L, T]		1033
+nim	matvec	tensor/tensorview.html#matvec,TensorFieldView[L,T],TensorFieldView[L,T],int	proc matvec[L, T](mat, vec: TensorFieldView[L, T]; site: int): MatVecResult[L, T]		1037
+nim	`=copy`	tensor/tensorview.html#=copy,TensorFieldView[L,T],TensorFieldView[L,T]	proc `=copy`[L, T](dest: var TensorFieldView[L, T]; src: TensorFieldView[L, T])		1042
+nim	`=destroy`	tensor/tensorview.html#=destroy,TensorFieldView[L,T]	proc `=destroy`[L, T](view: var TensorFieldView[L, T])		1081
+nim	numGlobalSites	tensor/tensorview.html#numGlobalSites,TensorFieldView[L,T]	proc numGlobalSites[L, T](view: TensorFieldView[L, T]): int		1138
+nimgrp	[]=	tensor/tensorview.html#[]=-procs-all	proc		984
+nimgrp	=copy	tensor/tensorview.html#=copy-procs-all	proc		555
+nimgrp	[]	tensor/tensorview.html#[]-procs-all	proc		978
+nimgrp	defaultsimdgrid	tensor/tensorview.html#defaultSimdGrid-procs-all	proc		284
+nimgrp	newtensorfieldview	tensor/tensorview.html#newTensorFieldView-templates-all	template		456
 heading	TensorFieldView - Device-Side Views for Backend Dispatch	tensor/tensorview.html#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch	 TensorFieldView - Device-Side Views for Backend Dispatch		0
 heading	Example	tensor/tensorview.html#tensorfieldview-minus-deviceminusside-views-for-backend-dispatch-example	  Example		0

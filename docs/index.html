@@ -33,7 +33,7 @@
 <h3 id="key-features">Key Features</h3><ul class="simple"><li><strong>Multi-backend dispatch</strong>: OpenCL (GPU JIT), SYCL (pre-compiled GPU/CPU), OpenMP (SIMD-vectorized CPU) — all sharing the same user-facing API</li>
 <li><strong>AoSoA memory layout</strong>: Array of Structures of Arrays for optimal SIMD and GPU memory coalescing</li>
 <li><strong>Distributed memory</strong>: MPI-based parallelism via <a class="reference external" href="https://globalarrays.github.io/">Global Arrays</a> with automatic ghost region management and distributed transport (<tt class="docutils literal"><span class="pre">GlobalShifter</span></tt>, <tt class="docutils literal"><span class="pre">discreteLaplacian</span></tt>)</li>
-<li><strong>Layered tensor fields</strong>: <tt class="docutils literal"><span class="pre">TensorField</span></tt> (distributed GA) → <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> (contiguous host buffer) → <tt class="docutils literal"><span class="pre">TensorFieldView</span></tt> (device-side AoSoA views)</li>
+<li><strong>Layered tensor fields</strong>: <tt class="docutils literal"><span class="pre">TensorField</span></tt> (distributed GA) → <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> (direct pointer into rank-local GA memory with siteOffsets lookup) → <tt class="docutils literal"><span class="pre">TensorFieldView</span></tt> (device-side AoSoA views)</li>
 <li><strong>Unified stencil operations</strong>: A single <tt class="docutils literal"><span class="pre">LatticeStencil[D]</span></tt> type that works identically across all backends, handling periodic boundary conditions and ghost regions automatically</li>
 <li><strong>Macro-based dispatch</strong>: The <tt class="docutils literal"><span class="pre">each</span></tt> macro analyzes loop bodies at compile time and generates optimized backend-specific code</li>
 </ul>
@@ -85,7 +85,7 @@
 ├──────────────────────────────────────────────────────────┤
 │                    Tensor Layer                          │
 │   TensorField ─► LocalTensorField ─► TensorFieldView    │
-│   (GA/MPI)        (host buffer)       (device buffers)   │
+│   (GA/MPI)        (direct GA ptr)      (device buffers)   │
 ├──────────────────────────────────────────────────────────┤
 │        GlobalShifter · LatticeStencil · Transporter      │
 │        discreteLaplacian · applyStencilShift             │
@@ -99,7 +99,7 @@
 └──────────────────────────────────────────────────────────┘</pre></p>
 
 <h3 id="data-flow">Data Flow</h3><ol class="simple"><li><strong>``TensorField[D,R,L,T]``</strong> — Distributed tensor field stored as a Global Array with ghost regions.  Created with <tt class="docutils literal"><span class="pre">lat.newTensorField(shape): T</span></tt>.</li>
-<li><strong>``LocalTensorField[D,R,L,T]``</strong> — Contiguous host-memory copy of the rank-local partition.  Elements are stored in flat AoS order: <tt class="docutils literal"><span class="pre">data[site * elemsPerSite + e]</span></tt>.  Created with <tt class="docutils literal"><span class="pre">field.newLocalTensorField()</span></tt>.  Call <tt class="docutils literal"><span class="pre">releaseLocalTensorField()</span></tt> to copy changes back to the GA.</li>
+<li><strong>``LocalTensorField[D,R,L,T]``</strong> — A direct pointer into the rank-local GA memory (obtained via <tt class="docutils literal"><span class="pre">NGA_Access</span></tt>) with a precomputed <tt class="docutils literal"><span class="pre">siteOffsets: seq[int]</span></tt> lookup table that maps lexicographic site → flat offset in padded GA memory.  Elements are accessed as <tt class="docutils literal"><span class="pre">data[siteOffsets[site] + e]</span></tt>.  Created with <tt class="docutils literal"><span class="pre">field.newLocalTensorField()</span></tt>.  Writes go directly to the GA — no manual flush is needed.</li>
 <li><strong>``TensorFieldView[L,T]``</strong> — Device-side view with AoSoA layout for SIMD or GPU buffers.  Created with <tt class="docutils literal"><span class="pre">local.newTensorFieldView(iokRead)</span></tt> (or <tt class="docutils literal"><span class="pre">iokWrite</span></tt>/<tt class="docutils literal"><span class="pre">iokReadWrite</span></tt>). This is the type the <tt class="docutils literal"><span class="pre">each</span></tt> macro operates on.</li>
 </ol>
 
@@ -117,7 +117,7 @@
 
 <h3 id="tensor-fields">Tensor Fields</h3><ul class="simple"><li><a class="reference external" href="tensor/tensor.html">tensor/tensor</a> — Tensor module aggregation; re-exports all tensor submodules</li>
 <li><a class="reference external" href="tensor/globaltensor.html">tensor/globaltensor</a> — <tt class="docutils literal"><span class="pre">TensorField[D,R,L,T]</span></tt>: distributed tensor field with ghost-padded GA memory layout, <tt class="docutils literal"><span class="pre">GlobalShifter</span></tt> for distributed transport, <tt class="docutils literal"><span class="pre">discreteLaplacian</span></tt>, coordinate utilities, and <tt class="docutils literal"><span class="pre">LatticeStencil</span></tt> integration</li>
-<li><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a> — <tt class="docutils literal"><span class="pre">LocalTensorField[D,R,L,T]</span></tt>: contiguous host buffer with flat AoS element access, site proxies for <tt class="docutils literal"><span class="pre">all</span></tt> loops, arithmetic operators</li>
+<li><a class="reference external" href="tensor/localtensor.html">tensor/localtensor</a> — <tt class="docutils literal"><span class="pre">LocalTensorField[D,R,L,T]</span></tt>: direct GA pointer with <tt class="docutils literal"><span class="pre">siteOffsets</span></tt> lookup for padded-stride navigation, site proxies for <tt class="docutils literal"><span class="pre">all</span></tt> loops, arithmetic operators</li>
 <li><a class="reference external" href="tensor/tensorview.html">tensor/tensorview</a> — <tt class="docutils literal"><span class="pre">TensorFieldView[L,T]</span></tt>: device-side views for the <tt class="docutils literal"><span class="pre">each</span></tt> macro; handles AoSoA layout transformation across OpenCL, SYCL, and OpenMP backends</li>
 <li><a class="reference external" href="tensor/sitetensor.html">tensor/sitetensor</a> — <tt class="docutils literal"><span class="pre">Vec[N,T]</span></tt> and <tt class="docutils literal"><span class="pre">Mat[N,M,T]</span></tt>: compile-time dimensioned site-level tensor types</li>
 <li><a class="reference external" href="tensor/transporter.html">tensor/transporter</a> — <tt class="docutils literal"><span class="pre">Shifter[D,T]</span></tt> and <tt class="docutils literal"><span class="pre">Transporter[D,U,F]</span></tt>: single-rank parallel transport with halo exchange</li>
@@ -250,9 +250,7 @@ make test-sycl       # SYCL backend tests</pre></p>
       <span class="Identifier">localC</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">localA</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span> <span class="Operator">+</span> <span class="Identifier">localB</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>   <span class="Comment"># add</span>
       <span class="Identifier">localC</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="Identifier">localA</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span> <span class="Operator">*</span> <span class="Identifier">localB</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>   <span class="Comment"># multiply</span>
       <span class="Identifier">localC</span><span class="Punctuation">[</span><span class="Identifier">n</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="FloatNumber">2.5</span> <span class="Operator">*</span> <span class="Identifier">localA</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>                 <span class="Comment"># scale</span>
-    
-    <span class="Comment"># Copy changes back to the distributed Global Array</span>
-    <span class="Identifier">localC</span><span class="Operator">.</span><span class="Identifier">releaseLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre></p>
+</pre></p>
 
 <h2 id="aosoa-memory-layout">AoSoA Memory Layout</h2><p>ReliQ uses an Array of Structures of Arrays (AoSoA) memory layout for optimal SIMD and GPU performance:</p>
 <p><pre class="listing">Traditional AoS:  [s0e0, s0e1, s1e0, s1e1, s2e0, s2e1, ...]
@@ -323,7 +321,7 @@ index = group * (elemsPerSite * VW) + i * VW + lane</pre></p>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:55 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:43 UTC</small>
       </div>
     </div>
   </div>

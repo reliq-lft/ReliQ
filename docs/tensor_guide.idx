@@ -6,8 +6,8 @@ heading	Creation	tensor_guide.html#creation	   Creation		0
 heading	GA Memory Layout	tensor_guide.html#ga-memory-layout	   GA Memory Layout		0
 heading	Ghost Exchange	tensor_guide.html#ghost-exchange	   Ghost Exchange		0
 heading	Direct Local Access	tensor_guide.html#direct-local-access	   Direct Local Access		0
-heading	LocalTensorField (Host Buffer)	tensor_guide.html#localtensorfield-host-buffer	  LocalTensorField (Host Buffer)		0
-heading	Creation and Release	tensor_guide.html#creation-and-release	   Creation and Release		0
+heading	LocalTensorField (Direct GA Pointer)	tensor_guide.html#localtensorfield-direct-ga-pointer	  LocalTensorField (Direct GA Pointer)		0
+heading	Creation	tensor_guide.html#creation	   Creation		0
 heading	Properties	tensor_guide.html#properties	   Properties		0
 heading	Element Access	tensor_guide.html#element-access	   Element Access		0
 heading	The all Loop	tensor_guide.html#the-all-loop	   The <tt class="docutils literal"><span class="pre">all</span></tt> Loop		0

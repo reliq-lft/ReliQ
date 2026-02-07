@@ -328,7 +328,7 @@ proc readTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
     let fileOffset = globalLex * bytesPerSite
     
     # Copy data to local tensor
-    let localOffset = localSite * realsPerSite
+    let localOffset = localTensor.siteOffsets[localSite]
     
     when isComplex64(T):
       for e in 0..<elemsPerSite:
@@ -355,8 +355,7 @@ proc readTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
         copyMem(addr val, unsafeAddr data[fileOffset + e * 4], 4)
         localTensor.data[localOffset + e] = val
   
-  # Flush contiguous buffer back to GA
-  localTensor.releaseLocalTensorField()
+  # Data was written directly to GA via pointer — no flush needed
   
   # Synchronize global array after writing local portion
   GA_Sync()
@@ -482,7 +481,7 @@ proc writeTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
     let fileOffset = globalLex * bytesPerSite
     
     # Copy data from local tensor to global buffer
-    let localOffset = localSite * realsPerSite
+    let localOffset = localTensor.siteOffsets[localSite]
     
     when isComplex64(T):
       for e in 0..<elemsPerSite:
@@ -671,7 +670,7 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
       let fileOffset = siteOffset + dirOffset
       
       # Copy 9 complex elements (18 floats) to local tensor
-      let localOffset = localSite * realsPerDir
+      let localOffset = localTensor.siteOffsets[localSite]
       
       for e in 0..<elemsPerDir:
         var re, im: float64
@@ -680,8 +679,7 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
         localTensor.data[localOffset + e * 2] = re
         localTensor.data[localOffset + e * 2 + 1] = im
     
-    # Flush contiguous buffer back to GA
-    localTensor.releaseLocalTensorField()
+    # Data was written directly to GA via pointer — no flush needed
   
   GA_Sync()
 
@@ -744,7 +742,7 @@ proc writeGaugeField*[D: static[int], L: Lattice[D]](
       let dirOffset = mu * bytesPerDir
       let fileOffset = siteOffset + dirOffset
       
-      let localOffset = localSite * realsPerDir
+      let localOffset = localTensor.siteOffsets[localSite]
       
       for e in 0..<elemsPerDir:
         let re = localTensor.data[localOffset + e * 2]

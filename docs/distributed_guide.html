@@ -132,23 +132,22 @@
 # Run on 1 rank (default)
 ./reliq -e tensor</pre></p>
 
-<h2 id="data-transfer-between-ga-and-host">Data Transfer Between GA and Host</h2><p>The <tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> contiguous buffer approach handles the padded GA memory layout automatically:</p>
+<h2 id="data-transfer-between-ga-and-host">Data Transfer Between GA and Host</h2><p><tt class="docutils literal"><span class="pre">LocalTensorField</span></tt> provides a direct pointer into the rank-local GA memory (via <tt class="docutils literal"><span class="pre">NGA_Access</span></tt>) together with a precomputed <tt class="docutils literal"><span class="pre">siteOffsets</span></tt> lookup table for navigating the padded strides.  No contiguous buffer is allocated — reads and writes go directly to the Global Array:</p>
 <p><pre class="listing"><span class="Identifier">parallel</span><span class="Punctuation">:</span>
   <span class="Keyword">let</span> <span class="Identifier">lat</span> <span class="Operator">=</span> <span class="Identifier">newSimpleCubicLattice</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">8</span><span class="Punctuation">,</span> <span class="DecNumber">16</span><span class="Punctuation">]</span><span class="Punctuation">)</span>
   
   <span class="Keyword">block</span><span class="Punctuation">:</span>
     <span class="Keyword">var</span> <span class="Identifier">field</span> <span class="Operator">=</span> <span class="Identifier">lat</span><span class="Operator">.</span><span class="Identifier">newTensorField</span><span class="Punctuation">(</span><span class="Punctuation">[</span><span class="DecNumber">3</span><span class="Punctuation">,</span> <span class="DecNumber">3</span><span class="Punctuation">]</span><span class="Punctuation">)</span><span class="Punctuation">:</span> <span class="Identifier">float64</span>
     
-    <span class="Comment"># Copies real data from padded GA → contiguous host buffer</span>
+    <span class="Comment"># Obtain a direct pointer into the rank-local GA memory</span>
     <span class="Keyword">var</span> <span class="Identifier">local</span> <span class="Operator">=</span> <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">newLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
     
-    <span class="Comment"># Work with local data...</span>
+    <span class="Comment"># Work with local data — writes go directly to the GA</span>
     <span class="Keyword">for</span> <span class="Identifier">n</span> <span class="Keyword">in</span> <span class="Identifier">all</span> <span class="FloatNumber">0.</span><span class="Operator">.&lt;</span><span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">numSites</span><span class="Punctuation">(</span><span class="Punctuation">)</span><span class="Punctuation">:</span>
       <span class="Keyword">var</span> <span class="Identifier">site</span> <span class="Operator">=</span> <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">getSite</span><span class="Punctuation">(</span><span class="Identifier">n</span><span class="Punctuation">)</span>
       <span class="Identifier">site</span><span class="Punctuation">[</span><span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="DecNumber">0</span><span class="Punctuation">]</span> <span class="Operator">=</span> <span class="FloatNumber">1.0</span>
     
-    <span class="Comment"># Copy contiguous buffer back → padded GA</span>
-    <span class="Identifier">local</span><span class="Operator">.</span><span class="Identifier">releaseLocalTensorField</span><span class="Punctuation">(</span><span class="Punctuation">)</span>
+    <span class="Comment"># No manual flush needed — data is already in the GA</span>
     
     <span class="Comment"># Ghost exchange after modification</span>
     <span class="Identifier">field</span><span class="Operator">.</span><span class="Identifier">updateAllGhosts</span><span class="Punctuation">(</span><span class="Punctuation">)</span></pre></p>
@@ -164,7 +163,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:43 UTC</small>
       </div>
     </div>
   </div>

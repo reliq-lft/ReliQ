@@ -35,15 +35,18 @@
 ## on the current MPI rank.  It is created by down-casting a global
 ## tensor via `newLocalTensorField`.
 ##
-## Local tensor fields are the bridge between the distributed GA layer
-## and the device-side `TensorFieldView`: data flows
-## ``TensorField → LocalTensorField → TensorFieldView``
-## on the way to a compute kernel and back again on return.
+## The ``data`` pointer points **directly** into Global Arrays memory
+## obtained via ``NGA_Access``.  Any writes through ``data`` immediately
+## modify the underlying GA — no explicit copy-back is needed.  Because
+## the GA has ghost-padded strides, a precomputed ``siteOffsets`` lookup
+## table maps each lexicographic site index to its flat offset in the
+## padded memory so that ``data[siteOffsets[site] + e]`` reaches element
+## ``e`` of the given site.
 ##
 ## Key operations:
 ##
-## - **Construction**: `newLocalTensorField` copies rank-local data from
-##   the parent `TensorField` into a contiguous host buffer
+## - **Construction**: `newLocalTensorField` obtains a direct pointer to
+##   rank-local GA memory and precomputes ``siteOffsets``
 ## - **Element access**: `[]` / `[]=` for per-element and per-site reads
 ##   and writes
 ## - **Arithmetic**: site-level ``+``, ``-``, ``*``, compound ``+=``, ``-=`` on
@@ -60,7 +63,7 @@
 ##   for n in all 0..<local.numSites():
 ##     var site = local.getSite(n)
 ##     site[0, 0] = 1.0
-##   local.releaseLocalTensorField()  # flush back to GA
+##   # writes go directly to GA — no flush required
 
 import lattice
 import globaltensor
@@ -82,11 +85,11 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   ## Represents a local tensor field on host memory defined on a lattice with 
   ## specified dimensions and data type.
   ##
-  ## The ``data`` pointer points to a **contiguous** buffer where elements
-  ## are stored in flat AoS order: ``data[site * elemsPerSite + e]``.
-  ## This is independent of the ghost-padded stride in the underlying GA.
-  ## On construction, real elements are copied out of the padded GA memory;
-  ## on ``releaseLocalTensorField``, they are copied back.
+  ## The ``data`` pointer points directly into GA memory via ``NGA_Access``.
+  ## Writes through ``data`` immediately modify the underlying Global Array.
+  ## Because GA inner dimensions have ghost padding, a ``siteOffsets`` lookup
+  ## table maps lexicographic site index → flat offset in padded memory:
+  ## ``data[siteOffsets[site] + e]`` reaches element ``e`` of that site.
   lattice*: L
   localGrid*: array[D, int]
   shape*: array[R, int]
@@ -94,13 +97,10 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   elif isComplex64(T): data*: HostStorage[float64]
   else: data*: HostStorage[T]
   hasPadding*: bool
-  # --- internal bookkeeping for padded GA copy ---
-  gaPtr: pointer             ## raw pointer from NGA_Access (padded GA memory)
-  paddedGeom: array[D, int]  ## padded lattice geometry
-  innerPadStride: int        ## innerPaddedBlockSize (stride between sites in GA memory)
+  # --- internal bookkeeping for padded GA strides ---
+  siteOffsets*: seq[int]    ## precomputed flat offset for each lex site
   elemsPerSite: int          ## real elements per site (product(shape) * complexFactor)
   nLocalSites: int           ## product of localGrid
-  ownsBuffer: bool           ## true when we allocated a contiguous buffer
 
 proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T];
@@ -108,13 +108,11 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
 ): LocalTensorField[D, R, L, T] =
   ## Create a new local tensor field from a global tensor field
   ##
-  ## Copies rank-local data from the padded GA memory into a contiguous
-  ## host buffer where elements are stored in flat AoS order:
-  ## ``buffer[site * elemsPerSite + e]``.  This decouples the user-facing
-  ## flat indexing from the ghost-padded stride in the underlying GA.
-  ##
-  ## Call ``releaseLocalTensorField`` when done to copy modified data back
-  ## to the GA and free the contiguous buffer.
+  ## Obtains a direct pointer into rank-local GA memory via ``NGA_Access``
+  ## and precomputes a ``siteOffsets`` lookup table that maps each
+  ## lexicographic site index to its flat offset in the padded GA memory.
+  ## Writes through ``data`` immediately modify the GA — no explicit
+  ## copy-back is needed.
   const rank = D + R + 1
   let handle = tensor.data.getHandle()
   var paddedGrid: array[rank, cint]
@@ -147,69 +145,25 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   for d in 0..<D:
     paddedGeomD[d] = localGrid[d] + 2 * ghostWidth[d]
 
-  # Allocate contiguous buffer and copy real elements from padded GA
-  let bufferSize = nLocal * elemsPerSite
-  when isComplex32(T):
-    type Scalar = float32
-  elif isComplex64(T):
-    type Scalar = float64
-  else:
-    type Scalar = T
-  let buf = cast[ptr UncheckedArray[Scalar]](alloc0(bufferSize * sizeof(Scalar)))
-  let gaData = cast[ptr UncheckedArray[Scalar]](p)
-  
+  # Precompute site offsets into padded GA memory
+  var offsets = newSeq[int](nLocal)
   for site in 0..<nLocal:
     let coords = lexToCoords(site, localGrid)
-    let gaOff = localSiteOffset(coords, paddedGeomD, innerPadded)
-    let bufOff = site * elemsPerSite
-    for e in 0..<elemsPerSite:
-      buf[bufOff + e] = gaData[gaOff + e]
+    offsets[site] = localSiteOffset(coords, paddedGeomD, innerPadded)
 
   result = LocalTensorField[D, R, L, T](
     lattice: tensor.lattice,
     localGrid: localGrid,
     shape: tensor.shape,
     hasPadding: padded,
-    gaPtr: p,
-    paddedGeom: paddedGeomD,
-    innerPadStride: innerPadded,
+    siteOffsets: offsets,
     elemsPerSite: elemsPerSite,
     nLocalSites: nLocal,
-    ownsBuffer: true
   )
 
-  when isComplex32(T): result.data = cast[HostStorage[float32]](buf)
-  elif isComplex64(T): result.data = cast[HostStorage[float64]](buf)
-  else: result.data = cast[HostStorage[T]](buf)
-
-proc releaseLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
-  tensor: var LocalTensorField[D, R, L, T]
-) =
-  ## Copy modified contiguous data back to the padded GA memory and free the buffer
-  ##
-  ## This must be called after modifying a LocalTensorField to ensure changes
-  ## are reflected in the underlying Global Array.
-  if not tensor.ownsBuffer: return
-  
-  when isComplex32(T):
-    type Scalar = float32
-  elif isComplex64(T):
-    type Scalar = float64
-  else:
-    type Scalar = T
-  
-  let gaData = cast[ptr UncheckedArray[Scalar]](tensor.gaPtr)
-  let buf = cast[ptr UncheckedArray[Scalar]](tensor.data)
-  
-  for site in 0..<tensor.nLocalSites:
-    let coords = lexToCoords(site, tensor.localGrid)
-    let gaOff = localSiteOffset(coords, tensor.paddedGeom, tensor.innerPadStride)
-    let bufOff = site * tensor.elemsPerSite
-    for e in 0..<tensor.elemsPerSite:
-      gaData[gaOff + e] = buf[bufOff + e]
-  
-  dealloc(cast[pointer](tensor.data))
-  tensor.ownsBuffer = false
+  when isComplex32(T): result.data = cast[HostStorage[float32]](p)
+  elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
+  else: result.data = cast[HostStorage[T]](p)
 
 proc numGlobalSites*[D: static[int], R: static[int], L: Lattice[D], T](
   view: LocalTensorField[D, R, L, T]
@@ -274,7 +228,7 @@ proc getSite*[D: static[int], R: static[int], L: Lattice[D], T](
 ): LocalSiteProxy[D, R, L, T] {.inline.} =
   ## Get a site proxy for the given site index (for "for all" loops)
   result.hostPtr = cast[pointer](tensor.data)
-  result.site = site
+  result.siteOffset = tensor.siteOffsets[site]
   result.shape = tensor.shape
   result.elemsPerSite = tensor.tensorElementsPerSite()
 
@@ -285,8 +239,8 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let dstData = cast[ptr UncheckedArray[T]](tensor.data)
   let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = site * elemsPerSite
-  let srcBase = value.site * value.elemsPerSite
+  let dstBase = tensor.siteOffsets[site]
+  let srcBase = value.siteOffset
   for e in 0..<elemsPerSite:
     dstData[dstBase + e] = srcData[srcBase + e]
 
@@ -298,9 +252,9 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
   let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = site * elemsPerSite
-  let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
-  let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+  let dstBase = tensor.siteOffsets[site]
+  let srcABase = value.proxyA.siteOffset
+  let srcBBase = value.proxyB.siteOffset
   if value.isSubtraction:
     for e in 0..<elemsPerSite:
       dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
@@ -316,9 +270,9 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
   let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = site * elemsPerSite
-  let srcABase = value.proxyA.site * value.proxyA.elemsPerSite
-  let srcBBase = value.proxyB.site * value.proxyB.elemsPerSite
+  let dstBase = tensor.siteOffsets[site]
+  let srcABase = value.proxyA.siteOffset
+  let srcBBase = value.proxyB.siteOffset
   
   # Get matrix dimensions from shape
   let rows = tensor.shape[0]
@@ -341,8 +295,8 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let dstData = cast[ptr UncheckedArray[T]](tensor.data)
   let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = site * elemsPerSite
-  let srcBase = value.proxy.site * value.proxy.elemsPerSite
+  let dstBase = tensor.siteOffsets[site]
+  let srcBase = value.proxy.siteOffset
   for e in 0..<elemsPerSite:
     dstData[dstBase + e] = value.scalar * srcData[srcBase + e]
 
@@ -353,8 +307,8 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let dstData = cast[ptr UncheckedArray[T]](tensor.data)
   let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = site * elemsPerSite
-  let srcBase = value.proxy.site * value.proxy.elemsPerSite
+  let dstBase = tensor.siteOffsets[site]
+  let srcBase = value.proxy.siteOffset
   for e in 0..<elemsPerSite:
     dstData[dstBase + e] = srcData[srcBase + e] + value.scalar
 
@@ -387,7 +341,7 @@ when isMainModule:
       
       # Initialize: A = [1, 2, 3], B = [4, 5, 6]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0
         localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0
@@ -401,7 +355,7 @@ when isMainModule:
       
       # Verify: C = [5, 7, 9]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 5.0
         check localC.data[base + 1] == 7.0
         check localC.data[base + 2] == 9.0
@@ -419,7 +373,7 @@ when isMainModule:
       
       # Initialize: A = [10, 20, 30, 40], B = [1, 2, 3, 4]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 10.0
         localA.data[base + 1] = 20.0
         localA.data[base + 2] = 30.0
@@ -435,7 +389,7 @@ when isMainModule:
       
       # Verify: C = [9, 18, 27, 36]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 9.0
         check localC.data[base + 1] == 18.0
         check localC.data[base + 2] == 27.0
@@ -452,7 +406,7 @@ when isMainModule:
       
       # Initialize: A = [1, 2, 3]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0
         localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0
@@ -463,7 +417,7 @@ when isMainModule:
       
       # Verify: C = [2.5, 5.0, 7.5]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 2.5
         check localC.data[base + 1] == 5.0
         check localC.data[base + 2] == 7.5
@@ -481,7 +435,7 @@ when isMainModule:
       
       # A = [[1,2],[3,4]], B = [[1,0],[0,1]] (identity)
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
         localB.data[base + 0] = 1.0; localB.data[base + 1] = 0.0
@@ -493,7 +447,7 @@ when isMainModule:
       
       # Verify: C = A (multiplied by identity)
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 1.0
         check localC.data[base + 1] == 2.0
         check localC.data[base + 2] == 3.0
@@ -515,7 +469,7 @@ when isMainModule:
       
       # Verify
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         check localA.data[base + 0] == 1.0
         check localA.data[base + 1] == 2.0
         check localA.data[base + 2] == 3.0
@@ -538,7 +492,7 @@ when isMainModule:
       
       # A = [[1,2],[3,4]], B = [[5,6],[7,8]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
         localB.data[base + 0] = 5.0; localB.data[base + 1] = 6.0
@@ -550,7 +504,7 @@ when isMainModule:
       
       # Verify: C = [[6,8],[10,12]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 6.0
         check localC.data[base + 1] == 8.0
         check localC.data[base + 2] == 10.0
@@ -569,7 +523,7 @@ when isMainModule:
       
       # A = [[10,20],[30,40]], B = [[1,2],[3,4]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 10.0; localA.data[base + 1] = 20.0
         localA.data[base + 2] = 30.0; localA.data[base + 3] = 40.0
         localB.data[base + 0] = 1.0; localB.data[base + 1] = 2.0
@@ -581,7 +535,7 @@ when isMainModule:
       
       # Verify: C = [[9,18],[27,36]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 9.0
         check localC.data[base + 1] == 18.0
         check localC.data[base + 2] == 27.0
@@ -600,7 +554,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 9
+        let base = localA.siteOffsets[site]
         # A = [[1,2,3],[4,5,6],[7,8,9]]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0; localA.data[base + 2] = 3.0
         localA.data[base + 3] = 4.0; localA.data[base + 4] = 5.0; localA.data[base + 5] = 6.0
@@ -616,7 +570,7 @@ when isMainModule:
       
       # Verify: C = A
       for site in 0..<numSites:
-        let base = site * 9
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 1.0
         check localC.data[base + 1] == 2.0
         check localC.data[base + 2] == 3.0
@@ -640,7 +594,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
         localB.data[base + 0] = 2.0; localB.data[base + 1] = 0.0
@@ -652,7 +606,7 @@ when isMainModule:
       
       # Verify: C = [[1*2+2*1, 1*0+2*3], [3*2+4*1, 3*0+4*3]] = [[4,6],[10,12]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 4.0
         check localC.data[base + 1] == 6.0
         check localC.data[base + 2] == 10.0
@@ -673,7 +627,7 @@ when isMainModule:
       
       # A = [[1,2],[3,4]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
       
@@ -683,7 +637,7 @@ when isMainModule:
       
       # Verify: C = [[3,6],[9,12]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 3.0
         check localC.data[base + 1] == 6.0
         check localC.data[base + 2] == 9.0
@@ -700,7 +654,7 @@ when isMainModule:
       
       # A = [1, 2, 3]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0
         localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0
@@ -711,7 +665,7 @@ when isMainModule:
       
       # Verify: C = [11, 12, 13]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 11.0
         check localC.data[base + 1] == 12.0
         check localC.data[base + 2] == 13.0
@@ -727,7 +681,7 @@ when isMainModule:
       
       # A = [[1,2],[3,4]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
         localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
       
@@ -737,7 +691,7 @@ when isMainModule:
       
       # Verify: C = [[6,7],[8,9]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 6.0
         check localC.data[base + 1] == 7.0
         check localC.data[base + 2] == 8.0
@@ -763,7 +717,7 @@ when isMainModule:
       
       # Verify via direct data access
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         check localA.data[base + 0] == 10.0
         check localA.data[base + 1] == 20.0
         check localA.data[base + 2] == 30.0
@@ -795,7 +749,7 @@ when isMainModule:
       
       # Verify via direct data access
       for site in 0..<numSites:
-        let base = site * 9
+        let base = localA.siteOffsets[site]
         check localA.data[base + 0] == 1.0  # [0,0]
         check localA.data[base + 1] == 0.0  # [0,1]
         check localA.data[base + 2] == 0.0  # [0,2]
@@ -818,7 +772,7 @@ when isMainModule:
       
       # Initialize to identity matrix
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localM.siteOffsets[site]
         localM.data[base + 0] = 1.0
         localM.data[base + 1] = 0.0
         localM.data[base + 2] = 0.0
@@ -831,7 +785,7 @@ when isMainModule:
       
       # Verify data is still correct
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localM.siteOffsets[site]
         check localM.data[base + 0] == 1.0
         check localM.data[base + 1] == 0.0
         check localM.data[base + 2] == 0.0
@@ -845,7 +799,7 @@ when isMainModule:
       
       # Initialize vector at each site to [1, 2, 3]
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localV.siteOffsets[site]
         localV.data[base + 0] = 1.0
         localV.data[base + 1] = 2.0
         localV.data[base + 2] = 3.0
@@ -857,7 +811,7 @@ when isMainModule:
       
       # Verify data
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localV.siteOffsets[site]
         check localV.data[base + 0] == 1.0
         check localV.data[base + 1] == 2.0
         check localV.data[base + 2] == 3.0
@@ -878,7 +832,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0'f32
         localA.data[base + 1] = 2.0'f32
         localA.data[base + 2] = 3.0'f32
@@ -890,7 +844,7 @@ when isMainModule:
         localC[n] = localA.getSite(n) + localB.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 1.5'f32
         check localC.data[base + 1] == 3.0'f32
         check localC.data[base + 2] == 4.5'f32
@@ -905,7 +859,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 2.0'f32
         localA.data[base + 1] = 4.0'f32
       
@@ -913,7 +867,7 @@ when isMainModule:
         localB[n] = 2.5'f32 * localA.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localB.siteOffsets[site]
         check localB.data[base + 0] == 5.0'f32
         check localB.data[base + 1] == 10.0'f32
 
@@ -930,7 +884,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1.0'f32; localA.data[base + 1] = 2.0'f32
         localA.data[base + 2] = 3.0'f32; localA.data[base + 3] = 4.0'f32
         localB.data[base + 0] = 2.0'f32; localB.data[base + 1] = 0.0'f32
@@ -940,7 +894,7 @@ when isMainModule:
         localC[n] = localA.getSite(n) * localB.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 2.0'f32
         check localC.data[base + 1] == 4.0'f32
         check localC.data[base + 2] == 6.0'f32
@@ -958,7 +912,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 10'i32
         localA.data[base + 1] = 20'i32
         localA.data[base + 2] = 30'i32
@@ -970,7 +924,7 @@ when isMainModule:
         localC[n] = localA.getSite(n) + localB.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 3
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 15'i32
         check localC.data[base + 1] == 35'i32
         check localC.data[base + 2] == 55'i32
@@ -987,7 +941,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 100'i32
         localA.data[base + 1] = 50'i32
         localB.data[base + 0] = 30'i32
@@ -997,7 +951,7 @@ when isMainModule:
         localC[n] = localA.getSite(n) - localB.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == 70'i32
         check localC.data[base + 1] == 30'i32
 
@@ -1017,7 +971,7 @@ when isMainModule:
       let bigVal2: int64 = 4_000_000_000'i64
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = bigVal1
         localA.data[base + 1] = 100'i64
         localB.data[base + 0] = bigVal2
@@ -1027,7 +981,7 @@ when isMainModule:
         localC[n] = localA.getSite(n) + localB.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localC.siteOffsets[site]
         check localC.data[base + 0] == bigVal1 + bigVal2
         check localC.data[base + 1] == 300'i64
 
@@ -1041,7 +995,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 1_000_000'i64
         localA.data[base + 1] = 2_000_000'i64
       
@@ -1049,7 +1003,7 @@ when isMainModule:
         localB[n] = 3'i64 * localA.getSite(n)
       
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localB.siteOffsets[site]
         check localB.data[base + 0] == 3_000_000'i64
         check localB.data[base + 1] == 6_000_000'i64
 
@@ -1073,7 +1027,7 @@ when isMainModule:
       let numSites = localA.numSites()
       
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localA.siteOffsets[site]
         # A = identity
         localA.data[base + 0] = 1.0; localA.data[base + 1] = 0.0
         localA.data[base + 2] = 0.0; localA.data[base + 3] = 1.0
@@ -1097,7 +1051,7 @@ when isMainModule:
       
       # Verify: R = [[3,4],[5,6]]
       for site in 0..<numSites:
-        let base = site * 4
+        let base = localR.siteOffsets[site]
         check localR.data[base + 0] == 3.0
         check localR.data[base + 1] == 4.0
         check localR.data[base + 2] == 5.0
@@ -1117,7 +1071,7 @@ when isMainModule:
       
       # A = [10, 20], C = [1, 2]
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localA.siteOffsets[site]
         localA.data[base + 0] = 10.0
         localA.data[base + 1] = 20.0
         localC.data[base + 0] = 1.0
@@ -1129,7 +1083,7 @@ when isMainModule:
       
       # Verify: Out = [11, 22]
       for site in 0..<numSites:
-        let base = site * 2
+        let base = localOut.siteOffsets[site]
         check localOut.data[base + 0] == 11.0
         check localOut.data[base + 1] == 22.0
   

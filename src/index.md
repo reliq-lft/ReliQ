@@ -20,7 +20,7 @@ architectures.
   region management and distributed transport (``GlobalShifter``,
   ``discreteLaplacian``)
 - **Layered tensor fields**: ``TensorField`` (distributed GA) →
-  ``LocalTensorField`` (contiguous host buffer) → ``TensorFieldView``
+  ``LocalTensorField`` (direct pointer into rank-local GA memory with siteOffsets lookup) → ``TensorFieldView``
   (device-side AoSoA views)
 - **Unified stencil operations**: A single ``LatticeStencil[D]`` type that
   works identically across all backends, handling periodic boundary
@@ -84,7 +84,7 @@ guide page:
 ├──────────────────────────────────────────────────────────┤
 │                    Tensor Layer                          │
 │   TensorField ─► LocalTensorField ─► TensorFieldView    │
-│   (GA/MPI)        (host buffer)       (device buffers)   │
+│   (GA/MPI)        (direct GA ptr)      (device buffers)   │
 ├──────────────────────────────────────────────────────────┤
 │        GlobalShifter · LatticeStencil · Transporter      │
 │        discreteLaplacian · applyStencilShift             │
@@ -104,11 +104,13 @@ guide page:
    Global Array with ghost regions.  Created with
    ``lat.newTensorField(shape): T``.
 
-2. **``LocalTensorField[D,R,L,T]``** — Contiguous host-memory copy of
-   the rank-local partition.  Elements are stored in flat AoS order:
-   ``data[site * elemsPerSite + e]``.  Created with
-   ``field.newLocalTensorField()``.  Call ``releaseLocalTensorField()``
-   to copy changes back to the GA.
+2. **``LocalTensorField[D,R,L,T]``** — A direct pointer into the
+   rank-local GA memory (obtained via ``NGA_Access``) with a precomputed
+   ``siteOffsets: seq[int]`` lookup table that maps lexicographic site →
+   flat offset in padded GA memory.  Elements are accessed as
+   ``data[siteOffsets[site] + e]``.  Created with
+   ``field.newLocalTensorField()``.  Writes go directly to the GA —
+   no manual flush is needed.
 
 3. **``TensorFieldView[L,T]``** — Device-side view with AoSoA layout
    for SIMD or GPU buffers.  Created with
@@ -143,8 +145,8 @@ guide page:
   ``GlobalShifter`` for distributed transport, ``discreteLaplacian``,
   coordinate utilities, and ``LatticeStencil`` integration
 - [tensor/localtensor](tensor/localtensor.html) —
-  ``LocalTensorField[D,R,L,T]``: contiguous host buffer with flat AoS
-  element access, site proxies for ``all`` loops, arithmetic operators
+  ``LocalTensorField[D,R,L,T]``: direct GA pointer with ``siteOffsets``
+  lookup for padded-stride navigation, site proxies for ``all`` loops, arithmetic operators
 - [tensor/tensorview](tensor/tensorview.html) — ``TensorFieldView[L,T]``:
   device-side views for the ``each`` macro; handles AoSoA layout
   transformation across OpenCL, SYCL, and OpenMP backends
@@ -338,8 +340,6 @@ site-level operations using ``LocalSiteProxy``:
       localC[n] = localA.getSite(n) * localB.getSite(n)   # multiply
       localC[n] = 2.5 * localA.getSite(n)                 # scale
 
-    # Copy changes back to the distributed Global Array
-    localC.releaseLocalTensorField()
 ```
 
 ## AoSoA Memory Layout

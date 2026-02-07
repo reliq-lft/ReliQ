@@ -72,6 +72,7 @@
   elementSize*: int          ## sizeof(T)
   hostPtr*: pointer
   hostOffsets*: seq[int]
+  siteOffsets*: seq[int]     ## Precomputed flat offsets for each lex site in padded GA memory
   destroyed*: bool           ## Flag to prevent double destruction
   simdLayout*: SimdLatticeLayout ## SIMD layout for vectorized AoSoA access
   aosoaData*: pointer        ## Pointer to AoSoA transformed data (OpenMP)
@@ -229,13 +230,15 @@
 
 </ul>
 <ul class="simple nested-toc-section">transformAoStoAoSoA
-  <li><a class="reference" href="#transformAoStoAoSoA%2Cpointer%2Cint%2Cint" title="transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int): seq[T]">transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int): seq[T]</a></li>
+  <li><a class="reference" href="#transformAoStoAoSoA%2Cpointer%2Cint%2Cint%2Cseq%5Bint%5D" title="transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int;
+                       siteOffsets: seq[int]): seq[T]">transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int;
+                       siteOffsets: seq[int]): seq[T]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">transformAoStoAoSoASimd
-  <li><a class="reference" href="#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint" title="transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
-                           elemsPerSite: int): seq[T]">transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
-                           elemsPerSite: int): seq[T]</a></li>
+  <li><a class="reference" href="#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint%2Cseq%5Bint%5D" title="transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
+                           elemsPerSite: int; siteOffsets: seq[int]): seq[T]">transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
+                           elemsPerSite: int; siteOffsets: seq[int]): seq[T]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">vecadd
@@ -336,6 +339,7 @@
   <span class="Identifier">elementSize</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>          <span class="Comment">## sizeof(T)</span>
   <span class="Identifier">hostPtr</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">pointer</span>
   <span class="Identifier">hostOffsets</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span>
+  <span class="Identifier">siteOffsets</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span>     <span class="Comment">## Precomputed flat offsets for each lex site in padded GA memory</span>
   <span class="Identifier">destroyed</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>           <span class="Comment">## Flag to prevent double destruction</span>
   <span class="Identifier">simdLayout</span><span class="Operator">*</span><span class="Other">:</span> <a href="../simd/simdlayout.html#SimdLatticeLayout"><span class="Identifier">SimdLatticeLayout</span></a> <span class="Comment">## SIMD layout for vectorized AoSoA access</span>
   <span class="Identifier">aosoaData</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">pointer</span>        <span class="Comment">## Pointer to AoSoA transformed data (OpenMP)</span>
@@ -435,7 +439,7 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#%3Ddestroy%2CTensorFieldView%5BL%2CT%5D"><span class="Identifier">`=destroy`</span></a><span class="Other">[</span><span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">view</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="tensorview.html#TensorFieldView"><span class="Identifier">TensorFieldView</span></a><span class="Other">[</span><span class="Identifier">L</span><span class="Other">,</span> <span class="Identifier">T</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Destructor for TensorFieldView (OpenCL/SYCL backend) Writes device data back to host if ioKind is iokWrite or iokReadWrite, transforms from AoSoA back to AoS layout, then releases all device buffers.
+    Destructor for TensorFieldView (OpenCL/SYCL backend) Reads device data back, transforms from AoSoA to AoS, and scatters into the padded GA memory via siteOffsets.  Because the host pointer points directly into GA memory, this write-back immediately updates the Global Array — no separate flush is needed. Releases all device buffers after write-back.
     
   </dd>
 </div>
@@ -792,8 +796,8 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#transformAoSoAtoAoS%2Cpointer%2Cint%2Cint"><span class="Identifier">transformAoSoAtoAoS</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">src</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">numSites</span><span class="Other">,</span> <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Transform data from AoSoA back to AoS layout.</p>
-<p>This is used when reading device data back to host.</p>
+    <p>Transform data from AoSoA back to flat contiguous AoS layout.</p>
+<p>This is used by <tt class="docutils literal"><span class="pre">updateGlobalTensorField</span></tt> for manual write-back.</p>
 
     
   </dd>
@@ -806,8 +810,8 @@
                                 <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
-    <p>Transform data from AoSoA back to AoS layout using SIMD layout.</p>
-<p>Inverse of transformAoStoAoSoASimd.</p>
+    <p>Transform data from AoSoA back to flat contiguous AoS layout using SIMD layout.</p>
+<p>This is used by <tt class="docutils literal"><span class="pre">updateGlobalTensorField</span></tt> for manual write-back. Inverse of transformAoStoAoSoASimd.</p>
 
     
   </dd>
@@ -815,13 +819,14 @@
 
 </div>
 <div id="transformAoStoAoSoA-procs-all">
-  <div id="transformAoStoAoSoA,pointer,int,int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#transformAoStoAoSoA%2Cpointer%2Cint%2Cint"><span class="Identifier">transformAoStoAoSoA</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">src</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">numSites</span><span class="Other">,</span> <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <div id="transformAoStoAoSoA,pointer,int,int,seq[int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#transformAoStoAoSoA%2Cpointer%2Cint%2Cint%2Cseq%5Bint%5D"><span class="Identifier">transformAoStoAoSoA</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">src</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">numSites</span><span class="Other">,</span> <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
+                            <span class="Identifier">siteOffsets</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
     <p>Transform data from AoS (Array of Structures) to AoSoA layout.</p>
 <p>AoS layout: site0<a class="reference internal" href="#e0,e1,...">e0,e1,...</a>, site1<a class="reference internal" href="#e0,e1,...">e0,e1,...</a>, ... AoSoA layout: group0<a class="reference internal" href="#">e0: s0,s1,...,sV-1, e1: s0,s1,...,sV-1, ...</a>, group1<a class="reference internal" href="#...">...</a></p>
-<p>Each vector group contains VectorWidth sites with elements interleaved. This enables SIMD-friendly memory access patterns.</p>
+<p>Each vector group contains VectorWidth sites with elements interleaved. This enables SIMD-friendly memory access patterns. Uses siteOffsets to handle padded GA memory strides.</p>
 
     
   </dd>
@@ -829,15 +834,15 @@
 
 </div>
 <div id="transformAoStoAoSoASimd-procs-all">
-  <div id="transformAoStoAoSoASimd,pointer,SimdLatticeLayout,int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint"><span class="Identifier">transformAoStoAoSoASimd</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">src</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">layout</span><span class="Other">:</span> <a href="../simd/simdlayout.html#SimdLatticeLayout"><span class="Identifier">SimdLatticeLayout</span></a><span class="Other">;</span>
-                                <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
+  <div id="transformAoStoAoSoASimd,pointer,SimdLatticeLayout,int,seq[int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint%2Cseq%5Bint%5D"><span class="Identifier">transformAoStoAoSoASimd</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">src</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span> <span class="Identifier">layout</span><span class="Other">:</span> <a href="../simd/simdlayout.html#SimdLatticeLayout"><span class="Identifier">SimdLatticeLayout</span></a><span class="Other">;</span>
+                                <span class="Identifier">elemsPerSite</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">siteOffsets</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span></pre></dt>
   <dd>
     
     <p>Transform data from AoS to AoSoA layout using SIMD layout with configurable lane grid.</p>
-<p>Unlike the simple VectorWidth-based AoSoA, this uses the SimdLatticeLayout to properly map lattice coordinates to SIMD lanes based on the user-specified simdGrid.</p>
+<p>Unlike the simple VectorWidth-based AoSoA, this uses the SimdLatticeLayout to properly map lattice coordinates to SIMD lanes based on the user-specified simdGrid. Uses siteOffsets to handle padded GA memory strides.</p>
 <p>AoS layout: site0<a class="reference internal" href="#e0,e1,...">e0,e1,...</a>, site1<a class="reference internal" href="#e0,e1,...">e0,e1,...</a>, ... AoSoA layout: outer0<a class="reference internal" href="#">e0: lane0..laneN, e1: lane0..laneN, ...</a>, outer1<a class="reference internal" href="#...">...</a></p>
-<p>Parameters: src: Pointer to AoS source data layout: SimdLatticeLayout with innerGeom (SIMD lanes) and outerGeom (vector groups) elemsPerSite: Number of tensor elements per site</p>
+<p>Parameters: src: Pointer to GA memory (padded strides) layout: SimdLatticeLayout with innerGeom (SIMD lanes) and outerGeom (vector groups) elemsPerSite: Number of tensor elements per site siteOffsets: Precomputed flat offsets for each lexicographic site in padded GA memory</p>
 
     
   </dd>
@@ -911,7 +916,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:44 UTC</small>
       </div>
     </div>
   </div>

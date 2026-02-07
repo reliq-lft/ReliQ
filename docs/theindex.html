@@ -4120,12 +4120,6 @@
     tensor: TensorField[D, R, L, T])" href="tensor/globaltensor.html#releaseLocal%2CTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocal.D%5D%2CT%5D">globaltensor: proc releaseLocal[D: static[int]; R: static[int]; L: Lattice[D]; T](
     tensor: TensorField[D, R, L, T])</a></li>
           </ul></dd>
-<dt><a name="releaseLocalTensorField" href="#releaseLocalTensorField"><span>releaseLocalTensorField:</span></a></dt><dd><ul class="simple">
-<li><a class="reference external"
-          data-doc-search-tag="localtensor: proc releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
-    tensor: var LocalTensorField[D, R, L, T])" href="tensor/localtensor.html#releaseLocalTensorField%2CLocalTensorField%5BD%2CR%2CL%3A%20Lattice%5BreleaseLocalTensorField.D%5D%2CT%5D">localtensor: proc releaseLocalTensorField[D: static[int]; R: static[int]; L: Lattice[D]; T](
-    tensor: var LocalTensorField[D, R, L, T])</a></li>
-          </ul></dd>
 <dt><a name="releaseMemObject" href="#releaseMemObject"><span>releaseMemObject:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="clwrap: proc releaseMemObject(memobj: Pmem): TClResult" href="opencl/clwrap.html#releaseMemObject%2CPmem">clwrap: proc releaseMemObject(memobj: Pmem): TClResult</a></li>
@@ -4780,13 +4774,15 @@
           </ul></dd>
 <dt><a name="transformAoStoAoSoA" href="#transformAoStoAoSoA"><span>transformAoStoAoSoA:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="tensorview: proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int): seq[T]" href="tensor/tensorview.html#transformAoStoAoSoA%2Cpointer%2Cint%2Cint">tensorview: proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int): seq[T]</a></li>
+          data-doc-search-tag="tensorview: proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int;
+                       siteOffsets: seq[int]): seq[T]" href="tensor/tensorview.html#transformAoStoAoSoA%2Cpointer%2Cint%2Cint%2Cseq%5Bint%5D">tensorview: proc transformAoStoAoSoA[T](src: pointer; numSites, elemsPerSite: int;
+                       siteOffsets: seq[int]): seq[T]</a></li>
           </ul></dd>
 <dt><a name="transformAoStoAoSoASimd" href="#transformAoStoAoSoASimd"><span>transformAoStoAoSoASimd:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="tensorview: proc transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
-                           elemsPerSite: int): seq[T]" href="tensor/tensorview.html#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint">tensorview: proc transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
-                           elemsPerSite: int): seq[T]</a></li>
+                           elemsPerSite: int; siteOffsets: seq[int]): seq[T]" href="tensor/tensorview.html#transformAoStoAoSoASimd%2Cpointer%2CSimdLatticeLayout%2Cint%2Cseq%5Bint%5D">tensorview: proc transformAoStoAoSoASimd[T](src: pointer; layout: SimdLatticeLayout;
+                           elemsPerSite: int; siteOffsets: seq[int]): seq[T]</a></li>
           </ul></dd>
 <dt><a name="transpose" href="#transpose"><span>transpose:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -5098,7 +5094,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:45 UTC</small>
       </div>
     </div>
   </div>

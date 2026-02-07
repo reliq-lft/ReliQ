@@ -45,12 +45,11 @@ parallel:
   block:
     var field = lat.newTensorField([3, 3]): float64
 
-    # Initialize field...
+    # Initialize field — writes go directly to the GA
     var local = field.newLocalTensorField()
     for n in all 0..<local.numSites():
       var site = local.getSite(n)
       site[0, 0] = 1.0
-    local.releaseLocalTensorField()
 
     # Write to LIME/SciDAC format
     writeTensorField(field, "output.lime")
@@ -162,12 +161,12 @@ let coords = globalLexCoords(idx, lattDims)
 1. Rank 0 reads the binary data from the LIME container
 2. Data is byte-swapped if needed (endianness detection)
 3. Rank 0 creates a ``LocalTensorField`` and fills it with file data
-4. ``releaseLocalTensorField()`` copies data back to the distributed GA
+4. Data is written directly into GA memory through the ``LocalTensorField`` pointer
 5. ``GA_Sync()`` ensures all ranks see the updated data
 
 ## Data Flow: Write
 
-1. ``newLocalTensorField()`` copies rank-local GA data to contiguous buffer
+1. ``newLocalTensorField()`` provides a direct pointer to rank-local GA data
 2. Each rank's local data is gathered to rank 0
 3. Rank 0 writes the LIME container with SciDAC/ILDG headers
 4. Checksums are computed and stored

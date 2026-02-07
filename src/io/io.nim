@@ -493,11 +493,11 @@ when isMainModule:
         
         let numSites = localA.numSites()
         for site in 0..<numSites:
-          let base = site * 9
+          let base = localA.siteOffsets[site]
           for i in 0..<9:
             localA.data[base + i] = float64(site * 10 + i) * 0.001
         
-        localA.releaseLocalTensorField()
+        # Data written directly to GA via pointer — no flush needed
         
         let status = writeTensorField(tensorA, TestTensorFile, "<info>Test real tensor</info>")
         check status == lsSuccess
@@ -511,7 +511,7 @@ when isMainModule:
         
         var localB = tensorB.newLocalTensorField()
         for site in 0..<min(10, numSites):
-          let base = site * 9
+          let base = localB.siteOffsets[site]
           for i in 0..<9:
             let expected = float64(site * 10 + i) * 0.001
             let diff = abs(localB.data[base + i] - expected)
@@ -526,12 +526,12 @@ when isMainModule:
         
         let numSites = localA.numSites()
         for site in 0..<numSites:
-          let base = site * 9 * 2
+          let base = localA.siteOffsets[site]
           for i in 0..<9:
             localA.data[base + i * 2] = float64(site * 10 + i) * 0.001
             localA.data[base + i * 2 + 1] = float64(site * 10 + i) * 0.0001
         
-        localA.releaseLocalTensorField()
+        # Data written directly to GA via pointer — no flush needed
         
         let status = writeTensorField(tensorA, TestTensorFile, "<info>Test complex tensor</info>")
         check status == lsSuccess
@@ -545,7 +545,7 @@ when isMainModule:
         
         var localB = tensorB.newLocalTensorField()
         for site in 0..<min(10, numSites):
-          let base = site * 9 * 2
+          let base = localB.siteOffsets[site]
           for i in 0..<9:
             let expectedRe = float64(site * 10 + i) * 0.001
             let expectedIm = float64(site * 10 + i) * 0.0001

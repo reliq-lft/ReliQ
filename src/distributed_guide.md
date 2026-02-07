@@ -158,8 +158,10 @@ ReliQ provides a launcher script (``reliq``) that dispatches to ``mpirun``:
 
 ## Data Transfer Between GA and Host
 
-The ``LocalTensorField`` contiguous buffer approach handles the padded GA
-memory layout automatically:
+``LocalTensorField`` provides a direct pointer into the rank-local GA memory
+(via ``NGA_Access``) together with a precomputed ``siteOffsets`` lookup table
+for navigating the padded strides.  No contiguous buffer is allocated — reads
+and writes go directly to the Global Array:
 
 ```nim
 parallel:
@@ -168,16 +170,15 @@ parallel:
   block:
     var field = lat.newTensorField([3, 3]): float64
 
-    # Copies real data from padded GA → contiguous host buffer
+    # Obtain a direct pointer into the rank-local GA memory
     var local = field.newLocalTensorField()
 
-    # Work with local data...
+    # Work with local data — writes go directly to the GA
     for n in all 0..<local.numSites():
       var site = local.getSite(n)
       site[0, 0] = 1.0
 
-    # Copy contiguous buffer back → padded GA
-    local.releaseLocalTensorField()
+    # No manual flush needed — data is already in the GA
 
     # Ghost exchange after modification
     field.updateAllGhosts()

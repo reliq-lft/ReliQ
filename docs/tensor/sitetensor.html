@@ -68,7 +68,7 @@
   scalar*: T">LocalScalarMulResult</a></li>
 <li><a class="reference" href="#LocalSiteProxy" title="LocalSiteProxy[D; R; L; T] = object
   hostPtr*: pointer
-  site*: int
+  siteOffset*: int
   shape*: array[R, int]
   elemsPerSite*: int">LocalSiteProxy</a></li>
 <li><a class="reference" href="#Mat" title="Mat[N; M; T] = object
@@ -391,7 +391,7 @@
 <div id="LocalSiteProxy">
   <dt><pre><a href="sitetensor.html#LocalSiteProxy"><span class="Identifier">LocalSiteProxy</span></a><span class="Other">[</span><span class="Identifier">D</span><span class="Other">;</span> <span class="Identifier">R</span><span class="Other">;</span> <span class="Identifier">L</span><span class="Other">;</span> <span class="Identifier">T</span><span class="Other">]</span> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">hostPtr</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">pointer</span>
-  <span class="Identifier">site</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
+  <span class="Identifier">siteOffset</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">shape</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="Identifier">R</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span>
   <span class="Identifier">elemsPerSite</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
@@ -1437,7 +1437,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 06:49:57 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-02-07 07:38:44 UTC</small>
       </div>
     </div>
   </div>

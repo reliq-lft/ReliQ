@@ -10,7 +10,7 @@ connected by a well-defined data flow.
 TensorField[D,R,L,T]           ← Distributed (GA + MPI)
     │ newLocalTensorField()
     ▼
-LocalTensorField[D,R,L,T]      ← Contiguous host buffer
+LocalTensorField[D,R,L,T]      ← Direct GA pointer + siteOffsets
     │ newTensorFieldView()
     ▼
 TensorFieldView[L,T]           ← Device-side AoSoA buffers
@@ -93,37 +93,39 @@ let rawPtr = tensor.accessLocal()
 tensor.releaseLocal()
 ```
 
-However, the recommended approach is to use ``LocalTensorField`` which handles
-the padded-to-contiguous copy for you.
+However, the recommended approach is to use ``LocalTensorField`` which
+provides a ``siteOffsets`` lookup table to navigate the padded memory directly.
 
-## LocalTensorField (Host Buffer)
+## LocalTensorField (Direct GA Pointer)
 
-``LocalTensorField[D, R, L, T]`` provides a contiguous host-memory copy of the
-rank-local partition.  It allocates a flat buffer and copies the real elements
-from the ghost-padded GA memory into contiguous AoS order:
+``LocalTensorField[D, R, L, T]`` holds a direct pointer into the rank-local
+GA memory (obtained via ``NGA_Access``) together with a precomputed
+``siteOffsets: seq[int]`` lookup table that maps each lexicographic site
+index to its flat offset inside the padded GA memory.  No contiguous buffer
+is allocated and no copy is performed — reads and writes go directly to
+the Global Array.
 
 ```
-data[site * elemsPerSite + element]
+data[siteOffsets[site] + element]
 ```
 
-### Creation and Release
+### Creation
 
 ```nim
 # Create from a distributed TensorField
 var local = field.newLocalTensorField()
 
-# Access data...
+# Access data — writes go directly to the GA
 for n in all 0..<local.numSites():
   var site = local.getSite(n)
   site[0, 0] = 1.0
 
-# IMPORTANT: Copy changes back to the distributed Global Array
-local.releaseLocalTensorField()
+# No manual flush needed — data is already in the GA
 ```
 
-**Calling ``releaseLocalTensorField()`` is required** after modifying data
-through a ``LocalTensorField``.  This copies the contiguous buffer back into
-the ghost-padded GA memory and deallocates the buffer.
+Since ``LocalTensorField.data`` **is** the GA pointer, all modifications
+are visible to the distributed array immediately.  There is no
+``releaseLocalTensorField()`` step.
 
 ### Properties
 
@@ -386,7 +388,7 @@ Use ``GlobalShifter`` for setup, I/O, and measurement code.  Use
 | Module | Description |
 |--------|-------------|
 | [tensor/globaltensor](tensor/globaltensor.html) | Distributed tensor fields and GlobalShifter |
-| [tensor/localtensor](tensor/localtensor.html) | Local host buffer with contiguous AoS layout |
+| [tensor/localtensor](tensor/localtensor.html) | Direct GA pointer with ``siteOffsets`` lookup |
 | [tensor/tensorview](tensor/tensorview.html) | Device-side views and ``each`` macro dispatch |
 | [tensor/sitetensor](tensor/sitetensor.html) | ``Vec[N,T]`` and ``Mat[N,M,T]`` site types |
 | [tensor/transporter](tensor/transporter.html) | Single-rank Shifter and Transporter |

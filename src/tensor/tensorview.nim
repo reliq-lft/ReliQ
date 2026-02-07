@@ -141,6 +141,7 @@ type DeviceStorage* = object
   elementSize*: int         ## sizeof(T)
   hostPtr*: pointer         
   hostOffsets*: seq[int]
+  siteOffsets*: seq[int]    ## Precomputed flat offsets for each lex site in padded GA memory
   destroyed*: bool          ## Flag to prevent double destruction
   simdLayout*: SimdLatticeLayout  ## SIMD layout for vectorized AoSoA access
   aosoaData*: pointer       ## Pointer to AoSoA transformed data (OpenMP)
@@ -188,7 +189,7 @@ proc numVectorGroups*(numSites: int): int {.inline.} =
   ## Compute number of vector groups (ceiling division)
   (numSites + VectorWidth - 1) div VectorWidth
 
-proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int): seq[T] =
+proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int, siteOffsets: seq[int]): seq[T] =
   ## Transform data from AoS (Array of Structures) to AoSoA layout.
   ## 
   ## AoS layout: site0[e0,e1,...], site1[e0,e1,...], ...
@@ -196,6 +197,7 @@ proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
   ## 
   ## Each vector group contains VectorWidth sites with elements interleaved.
   ## This enables SIMD-friendly memory access patterns.
+  ## Uses siteOffsets to handle padded GA memory strides.
   let numGroups = numVectorGroups(numSites)
   let paddedSites = numGroups * VectorWidth
   result = newSeq[T](paddedSites * elemsPerSite)
@@ -205,19 +207,18 @@ proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
   for site in 0..<numSites:
     let g = site div VectorWidth      # vector group index
     let lane = site mod VectorWidth   # lane within group
+    let srcBase = siteOffsets[site]
     for e in 0..<elemsPerSite:
-      # AoS index: site * elemsPerSite + e
       # AoSoA index: g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
-      let aosIdx = site * elemsPerSite + e
       let aosoaIdx = g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
-      result[aosoaIdx] = srcData[aosIdx]
+      result[aosoaIdx] = srcData[srcBase + e]
   
   # Padding lanes (for partial last group) are left as zero-initialized
 
 proc transformAoSoAtoAoS*[T](src: pointer, numSites, elemsPerSite: int): seq[T] =
-  ## Transform data from AoSoA back to AoS layout.
+  ## Transform data from AoSoA back to flat contiguous AoS layout.
   ## 
-  ## This is used when reading device data back to host.
+  ## This is used by ``updateGlobalTensorField`` for manual write-back.
   result = newSeq[T](numSites * elemsPerSite)
   
   let srcData = cast[ptr UncheckedArray[T]](src)
@@ -234,19 +235,21 @@ proc transformAoSoAtoAoS*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
 
 #[ SIMD-aware AoSoA layout transformation functions ]#
 
-proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int): seq[T] =
+proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int, siteOffsets: seq[int]): seq[T] =
   ## Transform data from AoS to AoSoA layout using SIMD layout with configurable lane grid.
   ## 
   ## Unlike the simple VectorWidth-based AoSoA, this uses the SimdLatticeLayout to
   ## properly map lattice coordinates to SIMD lanes based on the user-specified simdGrid.
+  ## Uses siteOffsets to handle padded GA memory strides.
   ##
   ## AoS layout: site0[e0,e1,...], site1[e0,e1,...], ...
   ## AoSoA layout: outer0[e0: lane0..laneN, e1: lane0..laneN, ...], outer1[...]
   ##
   ## Parameters:
-  ##   src: Pointer to AoS source data
+  ##   src: Pointer to GA memory (padded strides)
   ##   layout: SimdLatticeLayout with innerGeom (SIMD lanes) and outerGeom (vector groups)
   ##   elemsPerSite: Number of tensor elements per site
+  ##   siteOffsets: Precomputed flat offsets for each lexicographic site in padded GA memory
   let totalElements = layout.nSites * elemsPerSite
   result = newSeq[T](totalElements)
   
@@ -255,14 +258,15 @@ proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsP
   for outerIdx in 0..<layout.nSitesOuter:
     for lane in 0..<layout.nSitesInner:
       let localSite = outerInnerToLocal(outerIdx, lane, layout)
+      let srcBase = siteOffsets[localSite]
       for e in 0..<elemsPerSite:
-        let aosIdx = localSite * elemsPerSite + e
         let aosoaIdx = aosoaIndex(outerIdx, lane, e, elemsPerSite, layout.nSitesInner)
-        result[aosoaIdx] = srcData[aosIdx]
+        result[aosoaIdx] = srcData[srcBase + e]
 
 proc transformAoSoAtoAoSSimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int): seq[T] =
-  ## Transform data from AoSoA back to AoS layout using SIMD layout.
+  ## Transform data from AoSoA back to flat contiguous AoS layout using SIMD layout.
   ##
+  ## This is used by ``updateGlobalTensorField`` for manual write-back.
   ## Inverse of transformAoStoAoSoASimd.
   let totalElements = layout.nSites * elemsPerSite
   result = newSeq[T](totalElements)
@@ -366,7 +370,7 @@ when UseOpenMP:
       var holder = SeqHolder()
       case io
       of iokRead, iokReadWrite:
-        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite)
+        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite, @(tensor.siteOffsets))
       of iokWrite:
         holder.data = newSeq[T](totalSites * tensorElementsPerSite)
       
@@ -380,6 +384,7 @@ when UseOpenMP:
         elementSize: elemSize,
         hostPtr: cast[pointer](tensor.data),
         hostOffsets: @[0],
+        siteOffsets: @(tensor.siteOffsets),
         simdLayout: layout,
         aosoaData: cast[pointer](addr holder.data[0]),
         aosoaSeqRef: holder  # Keep the ref alive
@@ -424,7 +429,7 @@ when UseOpenMP:
       var holder = SeqHolder()
       case io
       of iokRead, iokReadWrite:
-        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite)
+        holder.data = transformAoStoAoSoASimd[T](cast[pointer](tensor.data), layout, tensorElementsPerSite, @(tensor.siteOffsets))
       of iokWrite:
         holder.data = newSeq[T](totalSites * tensorElementsPerSite)
       
@@ -438,6 +443,7 @@ when UseOpenMP:
         elementSize: elemSize,
         hostPtr: cast[pointer](tensor.data),
         hostOffsets: @[0],
+        siteOffsets: @(tensor.siteOffsets),
         simdLayout: layout,
         aosoaData: cast[pointer](addr holder.data[0]),
         aosoaSeqRef: holder  # Keep the ref alive
@@ -490,10 +496,11 @@ else:
         tensorElementsPerSite: tensorElementsPerSite,  # T elements for memory
         elementSize: elemSize,
         hostPtr: cast[pointer](tensor.data),
-        hostOffsets: hostOffsets
+        hostOffsets: hostOffsets,
+        siteOffsets: @(tensor.siteOffsets)
       )
       
-      var hostOffset = 0
+      var siteStart = 0
       for deviceIdx in 0..<numDevices:
         let numSites = sitesPerDevice[deviceIdx]
         let numTensorElements = numSites * tensorElementsPerSite
@@ -508,14 +515,15 @@ else:
         
         case io
         of iokRead, iokReadWrite:
-          # Transform from AoS to AoSoA before uploading
-          let srcPtr = cast[pointer](addr tensor.data[hostOffset])
-          var aosoaData = transformAoStoAoSoA[T](srcPtr, numSites, tensorElementsPerSite)
+          # Transform from padded GA to AoSoA before uploading
+          # Build device-local siteOffsets slice
+          let deviceOffsets = tensor.siteOffsets[siteStart ..< siteStart + numSites]
+          var aosoaData = transformAoStoAoSoA[T](cast[pointer](tensor.data), numSites, tensorElementsPerSite, deviceOffsets)
           clQueues[deviceIdx].write(addr aosoaData[0], view.data.buffers[deviceIdx], paddedBufferSize)
           check finish(clQueues[deviceIdx])
         of iokWrite: discard
 
-        hostOffset += numTensorElements
+        siteStart += numSites
       
       move(view)
 
@@ -1037,8 +1045,10 @@ proc `=copy`*[L, T](dest: var TensorFieldView[L, T], src: TensorFieldView[L, T])
 when UseOpenMP:
   proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
     ## Destructor for TensorFieldView (OpenMP backend)
-    ## For SIMD views, transforms AoSoA data back to AoS in host memory.
-    ## For non-SIMD views, data is already on host - no transforms needed.
+    ## For SIMD views, transforms AoSoA data back to AoS and scatters
+    ## into the padded GA memory via siteOffsets.  Because the host pointer
+    ## points directly into GA memory, this write-back immediately updates
+    ## the Global Array — no separate flush is needed.
     if view.data.destroyed:
       return  # Already destroyed, skip
     
@@ -1046,22 +1056,23 @@ when UseOpenMP:
     if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
       case view.ioKind:
         of iokWrite, iokReadWrite:
-          # Transform AoSoA back to AoS in host memory
+          # Transform AoSoA back to flat contiguous AoS
           let layout = view.data.simdLayout
           let elemsPerSite = view.data.tensorElementsPerSite
           let aosData = transformAoSoAtoAoSSimd[T](
             view.data.aosoaData, layout, elemsPerSite
           )
           
-          # Copy to host buffer
+          # Scatter flat AoS into padded GA memory using siteOffsets
           let destPtr = cast[ptr UncheckedArray[T]](view.data.hostPtr)
-          for i in 0..<aosData.len:
-            destPtr[i] = aosData[i]
+          let nSites = view.data.totalSites
+          for site in 0..<nSites:
+            let dstBase = view.data.siteOffsets[site]
+            let srcBase = site * elemsPerSite
+            for e in 0..<elemsPerSite:
+              destPtr[dstBase + e] = aosData[srcBase + e]
         of iokRead:
           discard
-      
-      # Free the AoSoA buffer
-      # Note: The GC_ref in constructor keeps the seq alive until here
     
     # Mark as destroyed
     view.data.destroyed = true
@@ -1069,14 +1080,18 @@ when UseOpenMP:
 else:
   proc `=destroy`*[L, T](view: var TensorFieldView[L, T]) =
     ## Destructor for TensorFieldView (OpenCL/SYCL backend)
-    ## Writes device data back to host if ioKind is iokWrite or iokReadWrite,
-    ## transforms from AoSoA back to AoS layout, then releases all device buffers.
+    ## Reads device data back, transforms from AoSoA to AoS, and scatters
+    ## into the padded GA memory via siteOffsets.  Because the host pointer
+    ## points directly into GA memory, this write-back immediately updates
+    ## the Global Array — no separate flush is needed.
+    ## Releases all device buffers after write-back.
     if view.data.destroyed:
       return  # Already destroyed, skip
     if view.data.buffers.len > 0:
       case view.ioKind:
         of iokWrite, iokReadWrite:
           if not view.data.hostPtr.isNil:
+            var siteStart = 0
             for deviceIdx in 0..<view.data.buffers.len:
               let buf = view.data.buffers[deviceIdx]
               if not buf.isNil:
@@ -1096,15 +1111,18 @@ else:
                 except CatchableError:
                   discard  # Best-effort read-back during destruction
                 
-                # Transform AoSoA back to AoS
+                # Transform AoSoA back to flat contiguous AoS
                 let aosData = transformAoSoAtoAoS[T](addr aosoaData[0], numSites, tensorElementsPerSite)
                 
-                # Copy to host buffer
-                let destPtr = cast[ptr UncheckedArray[T]](
-                  cast[pointer](cast[int](view.data.hostPtr) + view.data.hostOffsets[deviceIdx])
-                )
-                for i in 0..<(numSites * tensorElementsPerSite):
-                  destPtr[i] = aosData[i]
+                # Scatter flat AoS into padded GA memory using siteOffsets
+                let destPtr = cast[ptr UncheckedArray[T]](view.data.hostPtr)
+                for site in 0..<numSites:
+                  let dstBase = view.data.siteOffsets[siteStart + site]
+                  let srcBase = site * tensorElementsPerSite
+                  for e in 0..<tensorElementsPerSite:
+                    destPtr[dstBase + e] = aosData[srcBase + e]
+                
+                siteStart += numSites
         of iokRead: discard
       
       # Release all buffers and set to nil to prevent double-free
@@ -1253,9 +1271,9 @@ when isMainModule:
           
           # Initialize host data
           for i in 0..<numSites:
-            localA.data[i] = float64(i)
-            localB.data[i] = float64(i * 2)
-            localC.data[i] = 0.0
+            localA.data[localA.siteOffsets[i]] = float64(i)
+            localB.data[localB.siteOffsets[i]] = float64(i * 2)
+            localC.data[localC.siteOffsets[i]] = 0.0
           
           block:
             # Create device views
@@ -1270,7 +1288,7 @@ when isMainModule:
           
           # Verify results
           for i in 0..<numSites:
-            check localC.data[i] == float64(i) + float64(i * 2)
+            check localC.data[localC.siteOffsets[i]] == float64(i) + float64(i * 2)
         
         test "Scalar multiplication with TensorFieldView":
           var tensorA = testLattice.newTensorField([1]): float64
@@ -1283,8 +1301,8 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for i in 0..<numSites:
-            localA.data[i] = float64(i)
-            localB.data[i] = 0.0
+            localA.data[localA.siteOffsets[i]] = float64(i)
+            localB.data[localB.siteOffsets[i]] = 0.0
           
           block:
             var tViewA = localA.newTensorFieldView(iokRead)
@@ -1295,7 +1313,7 @@ when isMainModule:
               tViewB[i] = tViewA[i] * 3.0
           
           for i in 0..<numSites:
-            check localB.data[i] == float64(i) * 3.0
+            check localB.data[localB.siteOffsets[i]] == float64(i) * 3.0
         
         test "In-place update with TensorFieldView":
           var tensorA = testLattice.newTensorField([1]): float64
@@ -1306,7 +1324,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for i in 0..<numSites:
-            localA.data[i] = float64(i)
+            localA.data[localA.siteOffsets[i]] = float64(i)
           
           block:
             var tViewA = localA.newTensorFieldView(iokReadWrite)
@@ -1316,7 +1334,7 @@ when isMainModule:
               tViewA[i] = tViewA[i] + 1.0
           
           for i in 0..<numSites:
-            check localA.data[i] == float64(i) + 1.0
+            check localA.data[localA.siteOffsets[i]] == float64(i) + 1.0
         
         test "numSites returns correct count":
           var tensorA = testLattice.newTensorField([1]): float64
@@ -1345,7 +1363,7 @@ when isMainModule:
           # Initialize: A = [[1, 2], [3, 4]], B = [[5, 6], [7, 8]] at each site
           # C = A * B = [[1*5+2*7, 1*6+2*8], [3*5+4*7, 3*6+4*8]] = [[19, 22], [43, 50]]
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0  # [0,0]
             localA.data[base + 1] = 2.0  # [0,1]
             localA.data[base + 2] = 3.0  # [1,0]
@@ -1372,7 +1390,7 @@ when isMainModule:
           
           # Verify results: C = A * B = [[19, 22], [43, 50]]
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 19.0  # [0,0]
             check localC.data[base + 1] == 22.0  # [0,1]
             check localC.data[base + 2] == 43.0  # [1,0]
@@ -1394,7 +1412,7 @@ when isMainModule:
           # A = [[1, 2], [3, 4]], B = [[5, 6], [7, 8]]
           # C = A + B = [[6, 8], [10, 12]]
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1417,7 +1435,7 @@ when isMainModule:
               mViewC[n] = mViewA[n] + mViewB[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 6.0
             check localC.data[base + 1] == 8.0
             check localC.data[base + 2] == 10.0
@@ -1439,7 +1457,7 @@ when isMainModule:
           # A = [[10, 20], [30, 40]], B = [[1, 2], [3, 4]]
           # C = A - B = [[9, 18], [27, 36]]
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 10.0
             localA.data[base + 1] = 20.0
             localA.data[base + 2] = 30.0
@@ -1462,7 +1480,7 @@ when isMainModule:
               mViewC[n] = mViewA[n] - mViewB[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 9.0
             check localC.data[base + 1] == 18.0
             check localC.data[base + 2] == 27.0
@@ -1484,7 +1502,7 @@ when isMainModule:
           # A = [1, 2, 3, 4], B = [10, 20, 30, 40]
           # C = A + B = [11, 22, 33, 44]
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1507,7 +1525,7 @@ when isMainModule:
               vViewC[n] = vViewA[n] + vViewB[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 11.0
             check localC.data[base + 1] == 22.0
             check localC.data[base + 2] == 33.0
@@ -1529,8 +1547,8 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let baseA = site * 4
-            let baseV = site * 2
+            let baseA = localA.siteOffsets[site]
+            let baseV = localV.siteOffsets[site]
             localA.data[baseA + 0] = 1.0  # [0,0]
             localA.data[baseA + 1] = 2.0  # [0,1]
             localA.data[baseA + 2] = 3.0  # [1,0]
@@ -1550,7 +1568,7 @@ when isMainModule:
               vViewC[n] = mViewA[n] * vViewV[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 17.0  # 1*5 + 2*6
             check localC.data[base + 1] == 39.0  # 3*5 + 4*6
         
@@ -1566,7 +1584,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1584,7 +1602,7 @@ when isMainModule:
               mViewC[n] = 2.0 * mViewA[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 2.0
             check localC.data[base + 1] == 4.0
             check localC.data[base + 2] == 6.0
@@ -1602,7 +1620,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1620,7 +1638,7 @@ when isMainModule:
               mViewC[n] = mViewA[n] * 3.0
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 3.0
             check localC.data[base + 1] == 6.0
             check localC.data[base + 2] == 9.0
@@ -1638,7 +1656,7 @@ when isMainModule:
                          localV.localGrid[2] * localV.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localV.siteOffsets[site]
             localV.data[base + 0] = 2.0
             localV.data[base + 1] = 4.0
             localV.data[base + 2] = 6.0
@@ -1656,7 +1674,7 @@ when isMainModule:
               vViewC[n] = 2.5 * vViewV[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 5.0
             check localC.data[base + 1] == 10.0
             check localC.data[base + 2] == 15.0
@@ -1683,7 +1701,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1714,7 +1732,7 @@ when isMainModule:
               mViewE[n] = mViewD[n] + mViewC[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localE.siteOffsets[site]
             check localE.data[base + 0] == 20.0
             check localE.data[base + 1] == 23.0
             check localE.data[base + 2] == 44.0
@@ -1737,7 +1755,7 @@ when isMainModule:
           # B = [[1,2,3], [4,5,6], [7,8,9]]
           # C = A * B = B
           for site in 0..<numSites:
-            let base = site * 9
+            let base = localA.siteOffsets[site]
             # Identity matrix A
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 0.0
@@ -1769,7 +1787,7 @@ when isMainModule:
           
           # C should equal B (since A is identity)
           for site in 0..<numSites:
-            let base = site * 9
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 1.0
             check localC.data[base + 1] == 2.0
             check localC.data[base + 2] == 3.0
@@ -1795,8 +1813,8 @@ when isMainModule:
           # A = [[1,2,3], [4,5,6], [7,8,9]], v = [1, 1, 1]
           # C = A*v = [1+2+3, 4+5+6, 7+8+9] = [6, 15, 24]
           for site in 0..<numSites:
-            let baseA = site * 9
-            let baseV = site * 3
+            let baseA = localA.siteOffsets[site]
+            let baseV = localV.siteOffsets[site]
             localA.data[baseA + 0] = 1.0
             localA.data[baseA + 1] = 2.0
             localA.data[baseA + 2] = 3.0
@@ -1819,7 +1837,7 @@ when isMainModule:
               vViewC[n] = mViewA[n] * vViewV[n]
           
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 6.0
             check localC.data[base + 1] == 15.0
             check localC.data[base + 2] == 24.0
@@ -1836,7 +1854,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0
             localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0
@@ -1854,7 +1872,7 @@ when isMainModule:
               mViewC[n] = mViewA[n] + 10.0
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 11.0
             check localC.data[base + 1] == 12.0
             check localC.data[base + 2] == 13.0
@@ -1872,7 +1890,7 @@ when isMainModule:
                          localV.localGrid[2] * localV.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localV.siteOffsets[site]
             localV.data[base + 0] = 1.0
             localV.data[base + 1] = 2.0
             localV.data[base + 2] = 3.0
@@ -1890,7 +1908,7 @@ when isMainModule:
               vViewC[n] = 100.0 + vViewV[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 101.0
             check localC.data[base + 1] == 102.0
             check localC.data[base + 2] == 103.0
@@ -1907,7 +1925,7 @@ when isMainModule:
           
           # Initialize to zeros
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localM.siteOffsets[site]
             for i in 0..<4:
               localM.data[base + i] = 0.0
           
@@ -1923,7 +1941,7 @@ when isMainModule:
           
           # Verify identity matrices
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localM.siteOffsets[site]
             check localM.data[base + 0] == 1.0  # [0,0]
             check localM.data[base + 1] == 0.0  # [0,1]
             check localM.data[base + 2] == 0.0  # [1,0]
@@ -1940,7 +1958,7 @@ when isMainModule:
           
           # Initialize to zeros
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localV.siteOffsets[site]
             for i in 0..<3:
               localV.data[base + i] = 0.0
           
@@ -1955,7 +1973,7 @@ when isMainModule:
           
           # Verify vectors
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localV.siteOffsets[site]
             check localV.data[base + 0] == 1.0
             check localV.data[base + 1] == 2.0
             check localV.data[base + 2] == 3.0
@@ -1983,7 +2001,7 @@ when isMainModule:
           # Initialize A with site-specific values
           # Site n gets [n, n+100]
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = float64(site)
             localA.data[base + 1] = float64(site + 100)
             localB.data[base + 0] = 0.0
@@ -2002,7 +2020,7 @@ when isMainModule:
           # Verify: if AoSoA and lanes work correctly, B[site] = [2*site, 2*(site+100)]
           # If lanes were broken, we'd see scrambled results
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localB.siteOffsets[site]
             check localB.data[base + 0] == float64(2 * site)
             check localB.data[base + 1] == float64(2 * (site + 100))
           
@@ -2022,7 +2040,7 @@ when isMainModule:
           
           # Initialize to identity matrix at each site
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localM.siteOffsets[site]
             localM.data[base + 0] = 1.0  # [0,0]
             localM.data[base + 1] = 0.0  # [0,1]
             localM.data[base + 2] = 0.0  # [1,0]
@@ -2039,7 +2057,7 @@ when isMainModule:
           
           # Verify data is still correct after CPU fallback loop
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localM.siteOffsets[site]
             check localM.data[base + 0] == 1.0
             check localM.data[base + 1] == 0.0
             check localM.data[base + 2] == 0.0
@@ -2056,7 +2074,7 @@ when isMainModule:
           
           # Initialize vector at each site to [1, 2, 3]
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localV.siteOffsets[site]
             localV.data[base + 0] = 1.0
             localV.data[base + 1] = 2.0
             localV.data[base + 2] = 3.0
@@ -2070,7 +2088,7 @@ when isMainModule:
           
           # Verify data
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localV.siteOffsets[site]
             check localV.data[base + 0] == 1.0
             check localV.data[base + 1] == 2.0
             check localV.data[base + 2] == 3.0
@@ -2100,7 +2118,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0; localA.data[base + 1] = 2.0
             localA.data[base + 2] = 3.0; localA.data[base + 3] = 4.0
             localB.data[base + 0] = 1.0; localB.data[base + 1] = 0.0
@@ -2124,7 +2142,7 @@ when isMainModule:
               mViewR[n] = mViewA[n] * mViewB[n] + mViewC[n] * mViewD[n] - mViewE[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localR.siteOffsets[site]
             check localR.data[base + 0] == 2.0
             check localR.data[base + 1] == 3.0
             check localR.data[base + 2] == 4.0
@@ -2148,7 +2166,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0'f32
             localA.data[base + 1] = 2.0'f32
             localA.data[base + 2] = 3.0'f32
@@ -2165,7 +2183,7 @@ when isMainModule:
               viewC[n] = viewA[n] + viewB[n]
           
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 1.5'f32
             check localC.data[base + 1] == 3.0'f32
             check localC.data[base + 2] == 4.5'f32
@@ -2182,7 +2200,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 2.0'f32
             localA.data[base + 1] = 4.0'f32
           
@@ -2194,7 +2212,7 @@ when isMainModule:
               viewB[n] = 2.5'f32 * viewA[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localB.siteOffsets[site]
             check localB.data[base + 0] == 5.0'f32
             check localB.data[base + 1] == 10.0'f32
 
@@ -2213,7 +2231,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1.0'f32; localA.data[base + 1] = 2.0'f32
             localA.data[base + 2] = 3.0'f32; localA.data[base + 3] = 4.0'f32
             localB.data[base + 0] = 2.0'f32; localB.data[base + 1] = 0.0'f32
@@ -2228,7 +2246,7 @@ when isMainModule:
               viewC[n] = viewA[n] * viewB[n]
           
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 2.0'f32
             check localC.data[base + 1] == 4.0'f32
             check localC.data[base + 2] == 6.0'f32
@@ -2248,7 +2266,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 10'i32
             localA.data[base + 1] = 20'i32
             localA.data[base + 2] = 30'i32
@@ -2265,7 +2283,7 @@ when isMainModule:
               viewC[n] = viewA[n] + viewB[n]
           
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 15'i32
             check localC.data[base + 1] == 35'i32
             check localC.data[base + 2] == 55'i32
@@ -2284,7 +2302,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 100'i32
             localA.data[base + 1] = 50'i32
             localB.data[base + 0] = 30'i32
@@ -2299,7 +2317,7 @@ when isMainModule:
               viewC[n] = viewA[n] - viewB[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == 70'i32
             check localC.data[base + 1] == 30'i32
 
@@ -2321,7 +2339,7 @@ when isMainModule:
           let bigVal2: int64 = 4_000_000_000'i64
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = bigVal1
             localA.data[base + 1] = 100'i64
             localB.data[base + 0] = bigVal2
@@ -2336,7 +2354,7 @@ when isMainModule:
               viewC[n] = viewA[n] + viewB[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localC.siteOffsets[site]
             check localC.data[base + 0] == bigVal1 + bigVal2  # 7_000_000_000
             check localC.data[base + 1] == 300'i64
 
@@ -2352,7 +2370,7 @@ when isMainModule:
                          localA.localGrid[2] * localA.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localA.siteOffsets[site]
             localA.data[base + 0] = 1_000_000'i64
             localA.data[base + 1] = 2_000_000'i64
           
@@ -2364,7 +2382,7 @@ when isMainModule:
               viewB[n] = 3'i64 * viewA[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localB.siteOffsets[site]
             check localB.data[base + 0] == 3_000_000'i64
             check localB.data[base + 1] == 6_000_000'i64
 
@@ -2381,19 +2399,21 @@ when isMainModule:
                          localF64.localGrid[2] * localF64.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localF64.siteOffsets[site]
             localF64.data[base + 0] = 1.5
             localF64.data[base + 1] = 2.5
-            localF32.data[base + 0] = 1.5'f32
-            localF32.data[base + 1] = 2.5'f32
+            let baseF32 = localF32.siteOffsets[site]
+            localF32.data[baseF32 + 0] = 1.5'f32
+            localF32.data[baseF32 + 1] = 2.5'f32
           
           # Test float64 independently
           block:
             var viewA = localF64.newTensorFieldView(iokRead)
             var viewB = localF64.newTensorFieldView(iokReadWrite)
             for site in 0..<numSites:
-              localF64.data[site * 2 + 0] = 0.0
-              localF64.data[site * 2 + 1] = 0.0
+              let base = localF64.siteOffsets[site]
+              localF64.data[base + 0] = 0.0
+              localF64.data[base + 1] = 0.0
             block:
               var viewBWrite = localF64.newTensorFieldView(iokWrite)
               for n in each 0..<viewBWrite.numSites():
@@ -2407,7 +2427,7 @@ when isMainModule:
               viewBWrite[n] = 2.0'f32 * viewA[n]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localF32.siteOffsets[site]
             check localF32.data[base + 0] == 3.0'f32
             check localF32.data[base + 1] == 5.0'f32
 
@@ -2587,8 +2607,8 @@ when isMainModule:
           
           # Initialize source to 7.0, destination to 0.0
           for i in 0..<numSites:
-            localSrc.data[i] = 7.0
-            localDst.data[i] = 0.0
+            localSrc.data[localSrc.siteOffsets[i]] = 7.0
+            localDst.data[localDst.siteOffsets[i]] = 0.0
           
           let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
           
@@ -2603,7 +2623,7 @@ when isMainModule:
           
           # All destinations should be 7.0 (copied from neighbor in constant field)
           for i in 0..<numSites:
-            check localDst.data[i] == 7.0
+            check localDst.data[localDst.siteOffsets[i]] == 7.0
         
         test "Stencil neighbor copy with matrix fields via each loop":
           ## Copy neighbor's 2x2 matrix via stencil in each loop
@@ -2618,7 +2638,7 @@ when isMainModule:
           
           # Initialize source matrices to identity
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localSrc.siteOffsets[site]
             localSrc.data[base + 0] = 1.0
             localSrc.data[base + 1] = 0.0
             localSrc.data[base + 2] = 0.0
@@ -2637,7 +2657,7 @@ when isMainModule:
           
           # Verify all destination matrices are identity
           for site in 0..<numSites:
-            let base = site * 4
+            let base = localDst.siteOffsets[site]
             check localDst.data[base + 0] == 1.0
             check localDst.data[base + 1] == 0.0
             check localDst.data[base + 2] == 0.0
@@ -2656,7 +2676,7 @@ when isMainModule:
           
           # Initialize source vectors to (3, 6, 9)
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localSrc.siteOffsets[site]
             localSrc.data[base + 0] = 3.0
             localSrc.data[base + 1] = 6.0
             localSrc.data[base + 2] = 9.0
@@ -2674,7 +2694,7 @@ when isMainModule:
           
           # Verify vectors copied correctly
           for site in 0..<numSites:
-            let base = site * 3
+            let base = localDst.siteOffsets[site]
             check localDst.data[base + 0] == 3.0
             check localDst.data[base + 1] == 6.0
             check localDst.data[base + 2] == 9.0
@@ -2691,7 +2711,7 @@ when isMainModule:
                          localSrc.localGrid[2] * localSrc.localGrid[3]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localSrc.siteOffsets[site]
             localSrc.data[base + 0] = 1.5'f32
             localSrc.data[base + 1] = 2.5'f32
           
@@ -2706,7 +2726,7 @@ when isMainModule:
               vDst[n] = vSrc[nbrIdx]
           
           for site in 0..<numSites:
-            let base = site * 2
+            let base = localDst.siteOffsets[site]
             check localDst.data[base + 0] == 1.5'f32
             check localDst.data[base + 1] == 2.5'f32
         
@@ -2722,8 +2742,8 @@ when isMainModule:
                          localSrc.localGrid[2] * localSrc.localGrid[3]
           
           for i in 0..<numSites:
-            localSrc.data[i] = 5.0
-            localDst.data[i] = 0.0
+            localSrc.data[localSrc.siteOffsets[i]] = 5.0
+            localDst.data[localDst.siteOffsets[i]] = 0.0
           
           let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
           
@@ -2738,7 +2758,7 @@ when isMainModule:
           
           # 3.0 * 5.0 = 15.0
           for i in 0..<numSites:
-            check localDst.data[i] == 15.0
+            check localDst.data[localDst.siteOffsets[i]] == 15.0
         
         test "Stencil add neighbor and self in each loop":
           ## C[n] = A[n] + A[neighbor(n)]
@@ -2753,8 +2773,8 @@ when isMainModule:
                          localSrc.localGrid[2] * localSrc.localGrid[3]
           
           for i in 0..<numSites:
-            localSrc.data[i] = 4.0
-            localDst.data[i] = 0.0
+            localSrc.data[localSrc.siteOffsets[i]] = 4.0
+            localDst.data[localDst.siteOffsets[i]] = 0.0
           
           let stencil = newLatticeStencil(nearestNeighborStencil[4](), testLattice)
           
@@ -2768,7 +2788,7 @@ when isMainModule:
           
           # 4.0 + 4.0 = 8.0
           for i in 0..<numSites:
-            check localDst.data[i] == 8.0
+            check localDst.data[localDst.siteOffsets[i]] == 8.0
 
       #[ ============================================================================
          SIMD Vectorized TensorFieldView Tests (OpenMP backend)
@@ -2786,7 +2806,7 @@ when isMainModule:
             
             # Initialize data
             for i in 0..<numSites:
-              localA.data[i] = float64(i)
+              localA.data[localA.siteOffsets[i]] = float64(i)
             
             # Create SIMD view with [1, 2, 2, 2] = 8 lanes
             block:
@@ -2807,14 +2827,17 @@ when isMainModule:
                            localA.localGrid[2] * localA.localGrid[3]
             let numElements = numSites * 2
             
-            # Initialize with pattern
-            for i in 0..<numElements:
-              localA.data[i] = float64(i * 7 + 3)
+            # Initialize with pattern (using siteOffsets for padded memory)
+            for site in 0..<numSites:
+              let base = localA.siteOffsets[site]
+              localA.data[base + 0] = float64(site * 2 * 7 + 3)
+              localA.data[base + 1] = float64((site * 2 + 1) * 7 + 3)
             
-            # Save original values
-            var originalData = newSeq[float64](numElements)
-            for i in 0..<numElements:
-              originalData[i] = localA.data[i]
+            # Save original values (using siteOffsets for padded memory)
+            var originalData = newSeq[(float64, float64)](numSites)
+            for site in 0..<numSites:
+              let base = localA.siteOffsets[site]
+              originalData[site] = (localA.data[base + 0], localA.data[base + 1])
             
             # Create SIMD view (transforms to AoSoA), then destroy (transforms back)
             block:
@@ -2824,8 +2847,10 @@ when isMainModule:
               # View will transform back to AoS on destruction
             
             # Verify data matches after roundtrip
-            for i in 0..<numElements:
-              check localA.data[i] == originalData[i]
+            for site in 0..<numSites:
+              let base = localA.siteOffsets[site]
+              check localA.data[base + 0] == originalData[site][0]
+              check localA.data[base + 1] == originalData[site][1]
           
           test "SIMD view AoSoA data transformation":
             ## Verify AoSoA layout actually rearranges data
@@ -2837,7 +2862,7 @@ when isMainModule:
             
             # Initialize with site index
             for i in 0..<numSites:
-              localA.data[i] = float64(i)
+              localA.data[localA.siteOffsets[i]] = float64(i)
             
             block:
               let simdGrid = @[1, 2, 2, 2]  # 8 lanes
@@ -2865,7 +2890,7 @@ when isMainModule:
             
             # Initialize all to 1.0
             for i in 0..<numSites:
-              localA.data[i] = 1.0
+              localA.data[localA.siteOffsets[i]] = 1.0
             
             # Use SIMD view to double all values
             block:
@@ -2884,7 +2909,7 @@ when isMainModule:
             
             # Verify all values are now 2.0
             for i in 0..<numSites:
-              check localA.data[i] == 2.0
+              check localA.data[localA.siteOffsets[i]] == 2.0
           
           test "SIMD nSitesInner matches product of simdGrid":
             ## Verify nSitesInner calculation

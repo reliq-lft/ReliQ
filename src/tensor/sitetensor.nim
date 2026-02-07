@@ -321,8 +321,8 @@ type
   LocalSiteProxy*[D: static[int], R: static[int], L, T] = object
     ## Proxy type returned by LocalTensorField[] for "for all" loops
     ## Provides CPU-only access to tensor sites without GPU acceleration
-    hostPtr*: pointer        # Direct host memory pointer
-    site*: int               # Site index
+    hostPtr*: pointer        # Direct host memory pointer (into GA)
+    siteOffset*: int         # Precomputed flat offset for this site in padded GA memory
     shape*: array[R, int]    # Tensor shape
     elemsPerSite*: int       # Elements per site
 
@@ -817,44 +817,38 @@ when isMainModule:
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int): T {.inline.} =
   ## Vector element read: local[n][i]
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
-  data[base + i]
+  data[proxy.siteOffset + i]
 
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int): T {.inline.} =
   ## Matrix element read: local[n][i, j]
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
   let cols = proxy.shape[1]
-  data[base + i * cols + j]
+  data[proxy.siteOffset + i * cols + j]
 
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int): T {.inline.} =
   ## 3D tensor element read: local[n][i, j, k]
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
   let dim1 = proxy.shape[1]
   let dim2 = proxy.shape[2]
-  data[base + i * dim1 * dim2 + j * dim2 + k]
+  data[proxy.siteOffset + i * dim1 * dim2 + j * dim2 + k]
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int, value: T) {.inline.} =
   ## Vector element write: local[n][i] = value
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
-  data[base + i] = value
+  data[proxy.siteOffset + i] = value
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int, value: T) {.inline.} =
   ## Matrix element write: local[n][i, j] = value
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
   let cols = proxy.shape[1]
-  data[base + i * cols + j] = value
+  data[proxy.siteOffset + i * cols + j] = value
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int, value: T) {.inline.} =
   ## 3D tensor element write: local[n][i, j, k] = value
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
   let dim1 = proxy.shape[1]
   let dim2 = proxy.shape[2]
-  data[base + i * dim1 * dim2 + j * dim2 + k] = value
+  data[proxy.siteOffset + i * dim1 * dim2 + j * dim2 + k] = value
 
 # LocalSiteProxy arithmetic operators
 proc `+`*[D: static[int], R: static[int], L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[D, R, L, T] {.inline.} =
@@ -894,7 +888,7 @@ proc `$`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T
   ## Matrix: grid format with Unicode box drawing
   
   let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  let base = proxy.site * proxy.elemsPerSite
+  let base = proxy.siteOffset
   
   when R == 0:
     # Scalar (0-rank tensor)
