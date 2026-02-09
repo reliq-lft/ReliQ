@@ -182,6 +182,10 @@ proc backwardStencil*[D: static int](): StencilPattern[D] =
   for d in 0..<D:
     result.addPoint(-1, d)
 
+proc stapleStencil*[D: static[int]](): StencilPattern[D] =
+  result = nearestNeighborStencil[D]()
+  result.name = "staple"
+
 #[ ============================================================================
    Path-based Stencil Construction (for Wilson loops, etc.)
    ============================================================================ ]#
@@ -305,6 +309,12 @@ type
 
 # Alias for number of local sites (main iteration count)
 proc nSites*[D: static int](s: LatticeStencil[D]): int {.inline.} = s.nLocalSites
+proc numSites*[D: static int](s: LatticeStencil[D]): int {.inline.} = s.nLocalSites
+
+template all*[D: static int](s: LatticeStencil[D]): untyped =
+  ## Returns a range over all local sites: ``0 ..< nSites``.
+  ## Use with ``each`` loops: ``for n in each stencil.all:``
+  0 ..< s.nSites
 
 #[ ============================================================================
    LatticeStencil Construction
@@ -599,6 +609,17 @@ proc newLatticeStencil*[D: static int, L: Lattice[D]](
   ## ```
   newLatticeStencil(nearestNeighborStencil[D](), lat)
 
+proc newNearestNeighborLatticeStencil*[D: static int, L: Lattice[D]](
+  lat: L
+): LatticeStencil[D] =
+  ## Convenience alias for ``newLatticeStencil(lat)``
+  ##
+  ## Example:
+  ## ```nim
+  ## let stencil = lattice.newNearestNeighborLatticeStencil()
+  ## ```
+  newLatticeStencil(lat)
+
 #[ ============================================================================
    Neighbor Access - The Core API
    ============================================================================ ]#
@@ -677,6 +698,9 @@ proc bwd*[D: static int](s: LatticeStencil[D], site: int, dir: int): StencilShif
 
 # Get the neighbor index from a shift (for direct use)
 proc idx*(sh: StencilShift): int {.inline.} = sh.neighborIdx
+
+# Implicit conversion so view[stencil.fwd(n,d)] resolves to view[int]
+converter toNeighborIdx*[D: static int](sh: StencilShift[D]): int = sh.neighborIdx
 
 #[ ============================================================================
    Iteration Helpers

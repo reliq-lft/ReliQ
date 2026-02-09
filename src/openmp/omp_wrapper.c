@@ -55,6 +55,55 @@ void omp_parallel_for_chunked(
 }
 
 /* ============================================================================
+   Reduction: parallel for with OpenMP reduction(+:)
+   ============================================================================ */
+
+double omp_parallel_reduce_sum(
+    int64_t start,
+    int64_t end,
+    omp_reduce_callback callback,
+    void* context
+) {
+    double total = 0.0;
+    #pragma omp parallel for schedule(static) reduction(+:total)
+    for (int64_t i = start; i < end; i++) {
+        total += callback(i, context);
+    }
+    return total;
+}
+
+/* ============================================================================
+   Chunked Reduction: each thread reduces a [start, end) chunk,
+   OpenMP reduction(+:) sums partial sums across threads.
+   This is the reduction analog of omp_parallel_for_chunked.
+   ============================================================================ */
+
+double omp_parallel_reduce_sum_chunked(
+    int64_t start,
+    int64_t end,
+    omp_chunk_reduce_callback callback,
+    void* context
+) {
+    double total = 0.0;
+    int64_t range = end - start;
+    if (range <= 0) return 0.0;
+
+    #pragma omp parallel reduction(+:total)
+    {
+        int tid = omp_get_thread_num();
+        int nthreads = omp_get_num_threads();
+        int64_t chunk_size = (range + nthreads - 1) / nthreads;
+        int64_t chunk_start = start + tid * chunk_size;
+        int64_t chunk_end = chunk_start + chunk_size;
+        if (chunk_end > end) chunk_end = end;
+        if (chunk_start < end) {
+            total += callback(chunk_start, chunk_end, context);
+        }
+    }
+    return total;
+}
+
+/* ============================================================================
    Utility Functions
    ============================================================================ */
 

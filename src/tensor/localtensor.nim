@@ -165,6 +165,13 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
   else: result.data = cast[HostStorage[T]](p)
 
+proc newLocalScalarField*[D: static[int], L, T](
+  tensor: TensorField[D, 1, L, T];
+  padded: bool = false
+): LocalTensorField[D, 0, L, T] =
+  ## Create a new local scalar field from a global scalar field
+  return tensor.newLocalTensorField(padded)
+
 proc numGlobalSites*[D: static[int], R: static[int], L: Lattice[D], T](
   view: LocalTensorField[D, R, L, T]
 ): int {.inline.} =
@@ -223,10 +230,18 @@ proc tensorElementsPerSite*[D: static[int], R: static[int], L: Lattice[D], T](
   for d in 0..<R:
     result *= tensor.shape[d]
 
+template all*[D: static[int], R: static[int], L: Lattice[D], T](
+  tensor: LocalTensorField[D, R, L, T]
+): untyped =
+  ## Returns a range over all sites: ``0 ..< numSites``.
+  ## Use with ``reduce`` loops: ``for n in reduce lfield.all:``
+  0 ..< tensor.numSites()
+
 proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: LocalTensorField[D, R, L, T], site: int
 ): LocalSiteProxy[D, R, L, T] {.inline.} =
   ## Get a site proxy for the given site index (for "for all" loops)
+  ## siteOffset is stored in storage-type units (e.g. float64 for Complex64)
   result.hostPtr = cast[pointer](tensor.data)
   result.siteOffset = tensor.siteOffsets[site]
   result.shape = tensor.shape
@@ -236,43 +251,56 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalSiteProxy[D, R, L, T]
 ) {.inline.} =
   ## Copy a site from one proxy to another
-  let dstData = cast[ptr UncheckedArray[T]](tensor.data)
-  let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
+  ## siteOffset and element indexing in storage-type units
+  const cf = when isComplex32(T) or isComplex64(T): 2 else: 1
+  when isComplex64(T):
+    let dstData = cast[ptr UncheckedArray[float64]](tensor.data)
+    let srcData = cast[ptr UncheckedArray[float64]](value.hostPtr)
+  elif isComplex32(T):
+    let dstData = cast[ptr UncheckedArray[float32]](tensor.data)
+    let srcData = cast[ptr UncheckedArray[float32]](value.hostPtr)
+  else:
+    let dstData = cast[ptr UncheckedArray[T]](tensor.data)
+    let srcData = cast[ptr UncheckedArray[T]](value.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
   let dstBase = tensor.siteOffsets[site]
   let srcBase = value.siteOffset
-  for e in 0..<elemsPerSite:
+  for e in 0..<elemsPerSite * cf:
     dstData[dstBase + e] = srcData[srcBase + e]
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalAddResult[D, R, L, T]
 ) {.inline.} =
   ## Site-level addition/subtraction: local[n] = localA[n] + localB[n]
-  let dstData = cast[ptr UncheckedArray[T]](tensor.data)
-  let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-  let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
+  const cf = when isComplex32(T) or isComplex64(T): 2 else: 1
+  when isComplex64(T):
+    let dstData = cast[ptr UncheckedArray[float64]](tensor.data)
+    let srcAData = cast[ptr UncheckedArray[float64]](value.proxyA.hostPtr)
+    let srcBData = cast[ptr UncheckedArray[float64]](value.proxyB.hostPtr)
+  elif isComplex32(T):
+    let dstData = cast[ptr UncheckedArray[float32]](tensor.data)
+    let srcAData = cast[ptr UncheckedArray[float32]](value.proxyA.hostPtr)
+    let srcBData = cast[ptr UncheckedArray[float32]](value.proxyB.hostPtr)
+  else:
+    let dstData = cast[ptr UncheckedArray[T]](tensor.data)
+    let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
+    let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
   let elemsPerSite = tensor.tensorElementsPerSite()
   let dstBase = tensor.siteOffsets[site]
   let srcABase = value.proxyA.siteOffset
   let srcBBase = value.proxyB.siteOffset
   if value.isSubtraction:
-    for e in 0..<elemsPerSite:
+    for e in 0..<elemsPerSite * cf:
       dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
   else:
-    for e in 0..<elemsPerSite:
+    for e in 0..<elemsPerSite * cf:
       dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalMulResult[D, R, L, T]
 ) {.inline.} =
   ## Site-level matrix multiplication: local[n] = localA[n] * localB[n]
-  let dstData = cast[ptr UncheckedArray[T]](tensor.data)
-  let srcAData = cast[ptr UncheckedArray[T]](value.proxyA.hostPtr)
-  let srcBData = cast[ptr UncheckedArray[T]](value.proxyB.hostPtr)
-  let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = tensor.siteOffsets[site]
-  let srcABase = value.proxyA.siteOffset
-  let srcBBase = value.proxyB.siteOffset
+  let dstProxy = tensor[site]
   
   # Get matrix dimensions from shape
   let rows = tensor.shape[0]
@@ -281,36 +309,28 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   
   for i in 0..<rows:
     for j in 0..<cols:
-      var sum: T = T(0)
+      var sum: T = default(T)
       for k in 0..<innerDim:
-        let aIdx = srcABase + i * innerDim + k
-        let bIdx = srcBBase + k * cols + j
-        sum = sum + srcAData[aIdx] * srcBData[bIdx]
-      dstData[dstBase + i * cols + j] = sum
+        sum = sum + localProxyGet(value.proxyA, i * innerDim + k) * localProxyGet(value.proxyB, k * cols + j)
+      localProxySet(dstProxy, i * cols + j, sum)
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalScalarMulResult[D, R, L, T]
 ) {.inline.} =
   ## Site-level scalar multiply: local[n] = scalar * localA[n]
-  let dstData = cast[ptr UncheckedArray[T]](tensor.data)
-  let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
+  let dstProxy = tensor[site]
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = tensor.siteOffsets[site]
-  let srcBase = value.proxy.siteOffset
   for e in 0..<elemsPerSite:
-    dstData[dstBase + e] = value.scalar * srcData[srcBase + e]
+    localProxySet(dstProxy, e, value.scalar * localProxyGet(value.proxy, e))
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalScalarAddResult[D, R, L, T]
 ) {.inline.} =
   ## Site-level scalar add: local[n] = localA[n] + scalar
-  let dstData = cast[ptr UncheckedArray[T]](tensor.data)
-  let srcData = cast[ptr UncheckedArray[T]](value.proxy.hostPtr)
+  let dstProxy = tensor[site]
   let elemsPerSite = tensor.tensorElementsPerSite()
-  let dstBase = tensor.siteOffsets[site]
-  let srcBase = value.proxy.siteOffset
   for e in 0..<elemsPerSite:
-    dstData[dstBase + e] = srcData[srcBase + e] + value.scalar
+    localProxySet(dstProxy, e, localProxyGet(value.proxy, e) + value.scalar)
 
 when isMainModule:
   import ../openmp/omplocal

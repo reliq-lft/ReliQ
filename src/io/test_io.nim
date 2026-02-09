@@ -333,13 +333,13 @@ suite "QIO Format":
     for i in 0..<data.len:
       data[i] = float64(i) * 0.0001
     
-    let field = GaugeField[float64](dims: dims, data: data)
+    let field = QIOGaugeField[float64](dims: dims, data: data)
     
-    check writeGaugeField(TestQIOFile, field, "<info>Test config</info>") == lsSuccess
+    check writeQIOGaugeField(TestQIOFile, field, "<info>Test config</info>") == lsSuccess
     check fileExists(TestQIOFile)
     
     # Read back and verify
-    let readField = readGaugeField(TestQIOFile)
+    let readField = readQIOGaugeField(TestQIOFile)
     check readField.dims == dims
     check readField.data.len == data.len
     
@@ -372,17 +372,17 @@ suite "Integration":
     for i in 0..<originalData.len:
       originalData[i] = sin(float64(i) * 0.01) * cos(float64(i) * 0.007)
     
-    let field = GaugeField[float64](dims: dims, data: originalData)
+    let field = QIOGaugeField[float64](dims: dims, data: originalData)
     let userXml = """<info>
   <beta>6.0</beta>
   <trajectory>1000</trajectory>
   <algorithm>HMC</algorithm>
 </info>"""
     
-    check writeGaugeField(TestQIOFile, field, userXml) == lsSuccess
+    check writeQIOGaugeField(TestQIOFile, field, userXml) == lsSuccess
     
     # Read back
-    let readField = readGaugeField(TestQIOFile)
+    let readField = readQIOGaugeField(TestQIOFile)
     
     # Verify dimensions
     check readField.dims == dims

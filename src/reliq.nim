@@ -30,11 +30,13 @@
 import lattice
 import parallel
 import tensor/[tensor]
+import gauge/[gauge]
 import io/[io]
 import utils/[complex]
 
 export lattice
 export parallel
 export tensor
+export gauge
 export io
 export complex

@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/globalarrays/globalarrays.nim
+  Source file: src/gauge/gaugefield.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,18 +27,10 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import gampi
-import gabase
-import utils/[commandline]
+import gaugefield
+import gaugeaction
+import gaugeforce
 
-template gaParallel*(body: untyped): untyped =
-  var argc = cargc()
-  var argv = cargv(argc)
-  initMPI(addr argc, addr argv)
-  initGA()
-  gaIsLive = true
-  body
-  gaIsLive = false
-  finalizeGA()
-  finalizeMPI()
-  
+export gaugefield
+export gaugeaction
+export gaugeforce

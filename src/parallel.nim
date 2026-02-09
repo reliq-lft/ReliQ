@@ -56,3 +56,22 @@ template parallel*(body: untyped): untyped =
       syclParallel: body
     else:
       clParallel: body
+
+template accelerator*(body: untyped): untyped =
+  ## Scoping block for GPU/accelerator operations.
+  ## TensorFieldViews are created and ``each`` loops run within this block.
+  ## On exit, views are synced/destroyed in order.
+  bind UseOpenMP, UseSycl
+  block:
+    when UseOpenMP:
+      ompParallel: body
+    elif UseSycl:
+      syclParallel: body
+    else:
+      clParallel: body
+
+template local*(body: untyped): untyped =
+  ## Scoping block for CPU-local operations.
+  ## LocalTensorFields are created and accessed within this block.
+  block:
+    body

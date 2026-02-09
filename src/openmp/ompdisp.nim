@@ -27,27 +27,32 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-## SIMD-Vectorized Each Macro for TensorFieldView (OpenMP backend)
+## OpenMP Dispatch Module for TensorFieldView — C Codegen Approach
 ##
-## This module provides the `each` iterator for SIMD-vectorized parallel loops
-## on TensorFieldView objects. Uses OpenMP for thread parallelism and the
-## SIMD infrastructure (SimdVecDyn, AoSoA layout) from simd/ for vectorization.
+## This module provides the ``each`` macro for parallel loops on
+## ``TensorFieldView`` objects.  Unlike the OpenCL backend which JIT-
+## compiles kernel strings at runtime, this module emits complete C
+## functions at file scope via ``{.emit.}`` and calls them from Nim.
 ##
-## The macro analyzes the loop body at compile time to detect operation patterns
-## (copy, add, subtract, scalar multiply, matrix multiply, etc.) and generates
-## SIMD-vectorized code that:
-## - Iterates over vector groups (outer loop, OpenMP parallelized)
-## - Loads contiguous AoSoA lanes as SimdVecDyn vectors
-## - Performs arithmetic on full SIMD vectors
-## - Stores results back to AoSoA layout
+## The strategy mirrors ``cldisp.nim``: the typed macro AST is walked by
+## a recursive transpiler that generates C code strings.  The resulting
+## C function is self-contained (no Nim gotos, no closure captures) and
+## contains the ``#pragma omp parallel for`` directive.
 ##
-## Usage:
-##   for n in each 0..<view.numSites():
-##     viewC[n] = viewA[n] + viewB[n]   # Vectorized via SIMD load/add/store
-##
-## For LocalTensorField operations, see `all` in omplocal.nim.
+## Supported patterns (identical to OpenCL):
+## - Tensor assign / copy:  ``viewC[n] = viewA[n]``
+## - Element-wise +/-:     ``viewC[n] = viewA[n] + viewB[n]``
+## - Scalar × tensor:      ``viewC[n] = 2.0 * viewA[n]``
+## - Matrix multiply:      ``viewC[n] = viewA[n] * viewB[n]``
+## - Mat-vec multiply:     ``viewC[n] = viewA[n] * viewV[n]``
+## - Adjoint:              ``viewC[n] += ta * tb.adjoint()``
+## - Stencil neighbors:    ``let fwd = stencil.fwd(n, mu)``
+## - Gauge field access:   ``vu[mu][n]``
+## - In-place accumulate:  ``vplaq[n] += expr``
+## - Element-level write:  ``view[n][i,j] = val``
+## - Echo (serial fallback)
 
-import std/[macros, tables, strutils]
+import std/[macros, tables, strutils, sets, sequtils, compilesettings, os]
 
 import ompbase
 export ompbase
@@ -57,674 +62,1211 @@ export ompbase
 
 {.emit: """
 #include <omp.h>
+#include <string.h>
 """.}
 
-import ./ompwrap
-import ../simd/simdtypes
+const VectorWidth* {.intdefine.} = 8
+
+# Path to the portable SIMD header, resolved at compile time relative to this source file
+const simdHeaderPath* = currentSourcePath().parentDir() / "simd_intrinsics.h"
+
+#[ ============================================================================
+   Type Detection Utilities  (shared with cldisp.nim)
+   ============================================================================ ]#
+
+proc typeContains(n: NimNode, name: string): bool =
+  case n.kind
+  of nnkSym:
+    if n.strVal == name: return true
+  of nnkBracketExpr:
+    for child in n:
+      if typeContains(child, name): return true
+  else:
+    for child in n:
+      if typeContains(child, name): return true
+  return false
+
+proc isGaugeFieldViewSym(n: NimNode): bool =
+  try:
+    return typeContains(n.getTypeInst(), "GaugeFieldView")
+  except: return false
+
+proc isTensorFieldViewSym(n: NimNode): bool =
+  try:
+    return typeContains(n.getTypeInst(), "TensorFieldView")
+  except: return false
+
+proc isComplexSym(n: NimNode): bool =
+  try:
+    let ti = n.getTypeInst()
+    return typeContains(ti, "Complex64") or typeContains(ti, "Complex32")
+  except: return false
+
+proc isComplex32Sym(n: NimNode): bool =
+  try:
+    return typeContains(n.getTypeInst(), "Complex32")
+  except: return false
+
+proc isMatMulSym(n: NimNode): bool =
+  try:
+    return typeContains(n.getTypeInst(), "MatMulResult")
+  except: return false
+
+proc isIntSym(n: NimNode): bool =
+  try:
+    return n.getTypeInst().repr == "int"
+  except: return false
+
+proc extractGaugeFieldDim(n: NimNode): int =
+  try:
+    let ti = n.getTypeInst()
+    if ti.kind == nnkBracketExpr and ti.len >= 2:
+      if ti[1].kind in {nnkIntLit..nnkInt64Lit}:
+        return ti[1].intVal.int
+  except: discard
+  return 4
+
+type ElementType* = enum
+  etFloat64, etFloat32, etInt32, etInt64
+
+proc detectElementType(n: NimNode): ElementType =
+  try:
+    let ti = n.getTypeInst()
+    let r = ti.repr
+    if r.contains("float32") or r.contains("cfloat"): return etFloat32
+    if r.contains("int32") or r.contains("cint"): return etInt32
+    if r.contains("int64") or r.contains("clonglong"): return etInt64
+  except: discard
+  return etFloat64
+
+proc elementTypeToC*(et: ElementType): string =
+  case et
+  of etFloat32: "float"
+  of etFloat64: "double"
+  of etInt32: "int"
+  of etInt64: "long long"
+
+#[ ============================================================================
+   Kernel Information Gathering  (mirrors cldisp.nim)
+   ============================================================================ ]#
+
+type
+  ViewEntry* = object
+    name*: string
+    nimSym*: NimNode
+    isRead*: bool
+    isWrite*: bool
+    isComplex*: bool
+    scalarType*: ElementType
+
+  GaugeViewEntry* = object
+    name*: string
+    nimSym*: NimNode
+    dim*: int
+    isComplex*: bool
+    scalarType*: ElementType
+
+  StencilEntry* = object
+    name*: string
+    nimSym*: NimNode
+
+  LetBindingKind* = enum
+    lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkMatMul, lbkOther
+
+  LetBinding* = object
+    varName*: string
+    kind*: LetBindingKind
+    stencilName*: string
+    dirExpr*: string
+    pointExpr*: string
+
+  KernelInfo* = object
+    views*: seq[ViewEntry]
+    gaugeViews*: seq[GaugeViewEntry]
+    stencils*: seq[StencilEntry]
+    letBindings*: seq[LetBinding]
+    loopVar*: NimNode
+    loopVarStr*: string
+    isComplex*: bool
+    hasStencil*: bool
+    scalarType*: ElementType
+
+proc getLetBinding*(info: KernelInfo, name: string): LetBinding =
+  for lb in info.letBindings:
+    if lb.varName == name: return lb
+  return LetBinding(varName: name, kind: lbkOther)
+
+proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
+  result.loopVar = loopVar
+  result.loopVarStr = loopVar.strVal
+
+  var viewTab = initTable[string, ViewEntry]()
+  var gaugeTab = initTable[string, GaugeViewEntry]()
+  var stencilTab = initTable[string, StencilEntry]()
+  var letBindNames: HashSet[string]
+  var hasStencilFlag = false
+  var letBindingsLocal: seq[LetBinding]
+
+  proc addView(sym: NimNode, name: string, rd, wr: bool) =
+    if name notin viewTab:
+      viewTab[name] = ViewEntry(name: name, nimSym: sym, isRead: rd, isWrite: wr,
+                                 isComplex: isComplexSym(sym),
+                                 scalarType: detectElementType(sym))
+    else:
+      if rd: viewTab[name].isRead = true
+      if wr: viewTab[name].isWrite = true
+
+  proc addStencil(sym: NimNode, name: string) =
+    if name notin stencilTab:
+      stencilTab[name] = StencilEntry(name: name, nimSym: sym)
+    hasStencilFlag = true
+
+  proc extractGaugeSym(n: NimNode): NimNode =
+    if n.kind == nnkHiddenDeref and n[0].kind == nnkCall:
+      let ic = n[0]
+      if ic[0].kind == nnkSym and ic[0].strVal == "[]" and ic.len >= 3:
+        let arg = ic[1]
+        if arg.kind == nnkHiddenAddr and arg[0].kind == nnkSym:
+          return arg[0]
+        elif arg.kind == nnkSym:
+          return arg
+    return nil
+
+  proc walk(n: NimNode) =
+    case n.kind
+    of nnkCall:
+      if n.len >= 2 and n[0].kind == nnkSym:
+        let fn = n[0].strVal
+        case fn
+        of "[]=":
+          let target = n[1]
+          if target.kind == nnkSym and isTensorFieldViewSym(target):
+            addView(target, target.strVal, false, true)
+          elif target.kind == nnkCall and target[0].kind == nnkSym and target[0].strVal == "[]":
+            # Element-level write: view[n][i,j] = val
+            if target.len >= 3:
+              let inner = target[1]
+              if inner.kind == nnkSym and isTensorFieldViewSym(inner):
+                addView(inner, inner.strVal, false, true)
+          for i in 1..<n.len: walk(n[i])
+        of "[]":
+          if n.len >= 3:
+            let gs = extractGaugeSym(n[1])
+            if gs != nil and isGaugeFieldViewSym(gs):
+              let gn = gs.strVal
+              if gn notin gaugeTab:
+                gaugeTab[gn] = GaugeViewEntry(name: gn, nimSym: gs,
+                  dim: extractGaugeFieldDim(gs), isComplex: isComplexSym(gs),
+                  scalarType: detectElementType(gs))
+              walk(n[2])
+              return
+            let sym = if n[1].kind == nnkSym: n[1]
+                      elif n[1].kind == nnkHiddenDeref and n[1][0].kind == nnkSym: n[1][0]
+                      elif n[1].kind == nnkHiddenAddr and n[1][0].kind == nnkSym: n[1][0]
+                      else: nil
+            if sym != nil and isTensorFieldViewSym(sym):
+              addView(sym, sym.strVal, true, false)
+            for i in 1..<n.len: walk(n[i])
+        of "fwd", "bwd":
+          if n.len >= 4 and n[1].kind == nnkSym:
+            addStencil(n[1], n[1].strVal)
+          for i in 1..<n.len: walk(n[i])
+        of "neighbor":
+          if n.len >= 4 and n[1].kind == nnkSym:
+            addStencil(n[1], n[1].strVal)
+          for i in 1..<n.len: walk(n[i])
+        else:
+          for i in 1..<n.len: walk(n[i])
+
+    of nnkInfix:
+      if n.len >= 3 and n[0].kind == nnkSym and n[0].strVal == "+=":
+        let lhs = n[1]
+        if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
+          if lhs.len >= 3:
+            let viewSym = lhs[1]
+            if viewSym.kind == nnkSym and isTensorFieldViewSym(viewSym):
+              addView(viewSym, viewSym.strVal, true, true)
+      for child in n: walk(child)
+
+    of nnkLetSection:
+      for idefs in n:
+        if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+          let vsym = idefs[0]
+          let val = idefs[2]
+          letBindNames.incl vsym.strVal
+          if val.kind == nnkCall and val.len >= 4 and val[0].kind == nnkSym:
+            let fn = val[0].strVal
+            if fn == "fwd" or fn == "bwd":
+              addStencil(val[1], val[1].strVal)
+              var dirStr = ""
+              if val[3].kind == nnkSym: dirStr = val[3].strVal
+              elif val[3].kind in {nnkIntLit..nnkInt64Lit}: dirStr = $val[3].intVal
+              letBindingsLocal.add LetBinding(
+                varName: vsym.strVal,
+                kind: if fn == "fwd": lbkStencilFwd else: lbkStencilBwd,
+                stencilName: val[1].strVal,
+                dirExpr: dirStr)
+            elif fn == "neighbor":
+              addStencil(val[1], val[1].strVal)
+              var ptStr = "0"
+              if val.len >= 4:
+                if val[3].kind in {nnkIntLit..nnkInt64Lit}: ptStr = $val[3].intVal
+                elif val[3].kind == nnkSym: ptStr = val[3].strVal
+              letBindingsLocal.add LetBinding(
+                varName: vsym.strVal,
+                kind: lbkStencilNeighbor,
+                stencilName: val[1].strVal,
+                pointExpr: ptStr)
+            else:
+              var isMatmul = false
+              try: isMatmul = isMatMulSym(vsym)
+              except: discard
+              letBindingsLocal.add LetBinding(
+                varName: vsym.strVal,
+                kind: if isMatmul: lbkMatMul else: lbkOther)
+              walk(val)
+          else:
+            var isMatmul = false
+            try: isMatmul = isMatMulSym(vsym)
+            except: discard
+            letBindingsLocal.add LetBinding(
+              varName: vsym.strVal,
+              kind: if isMatmul: lbkMatMul else: lbkOther)
+            walk(val)
+
+    of nnkHiddenCallConv:
+      if n.len >= 2: walk(n[1])
+    else:
+      for child in n: walk(child)
+
+  walk(body)
+
+  result.hasStencil = hasStencilFlag
+  result.letBindings = letBindingsLocal
+  for _, v in viewTab: result.views.add v
+  for _, gv in gaugeTab: result.gaugeViews.add gv
+  for _, s in stencilTab: result.stencils.add s
+  for v in result.views:
+    if v.isComplex: result.isComplex = true
+  for gv in result.gaugeViews:
+    if gv.isComplex: result.isComplex = true
+  result.scalarType = etFloat64
+  for v in result.views:
+    result.scalarType = v.scalarType
+    break
+  for gv in result.gaugeViews:
+    result.scalarType = gv.scalarType
+    break
+
+#[ ============================================================================
+   Runtime Variable Detection
+   ============================================================================ ]#
+
+proc findRuntimeIntVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, sym: NimNode]] =
+  var seen: HashSet[string]
+  var viewNames, gaugeNames, stencilNames, letNames: HashSet[string]
+  var found: seq[tuple[name: string, sym: NimNode]]
+
+  for v in info.views: viewNames.incl v.name
+  for gv in info.gaugeViews: gaugeNames.incl gv.name
+  for s in info.stencils: stencilNames.incl s.name
+  for lb in info.letBindings: letNames.incl lb.varName
+
+  proc scan(n: NimNode) =
+    case n.kind
+    of nnkSym:
+      let name = n.strVal
+      if name != info.loopVarStr and name notin seen and
+         name notin viewNames and name notin gaugeNames and
+         name notin stencilNames and name notin letNames:
+        if isIntSym(n):
+          seen.incl name
+          found.add (name, n)
+    else:
+      for child in n: scan(child)
+
+  scan(body)
+  return found
 
 #[ ============================================================================
    Echo Statement Detection
    ============================================================================ ]#
 
-proc hasEchoStatement(n: NimNode): bool =
-  ## Check if body contains echo/debugEcho (requires serial execution)
+proc hasEchoStatement*(n: NimNode): bool =
   case n.kind
   of nnkCall:
-    if n[0].kind == nnkSym:
-      let name = n[0].strVal
-      if name in ["echo", "debugEcho"]:
-        return true
+    if n[0].kind == nnkSym and n[0].strVal in ["echo", "debugEcho"]: return true
     for child in n:
-      if hasEchoStatement(child):
-        return true
+      if hasEchoStatement(child): return true
   of nnkCommand:
-    if n[0].kind == nnkIdent and n[0].strVal == "echo":
-      return true
-    if n[0].kind == nnkSym and n[0].strVal in ["echo", "debugEcho"]:
-      return true
+    if n[0].kind in {nnkIdent, nnkSym} and n[0].strVal in ["echo", "debugEcho"]: return true
     for child in n:
-      if hasEchoStatement(child):
-        return true
+      if hasEchoStatement(child): return true
   else:
     for child in n:
-      if hasEchoStatement(child):
-        return true
+      if hasEchoStatement(child): return true
   return false
 
+proc isElementLevelWrite(stmt: NimNode): bool =
+  if stmt.kind != nnkCall or stmt.len < 4: return false
+  if stmt[0].kind != nnkSym or stmt[0].strVal != "[]=": return false
+  let a = stmt[1]
+  return a.kind == nnkCall and a.len >= 2 and a[0].kind == nnkSym and a[0].strVal == "[]"
+
+proc ind*(depth: int): string = "  ".repeat(depth)
+
 #[ ============================================================================
-   Compile-Time Expression Analysis (shared with OpenCL/SYCL)
+   C Code Generation Context
    ============================================================================ ]#
 
 type
-  OmpExprKind = enum
-    oekSiteProxy,    ## view[n]
-    oekMatMul,       ## A * B (matrix multiply)
-    oekMatVec,       ## M * v (matrix-vector)
-    oekMatAdd,       ## A + B or A - B
-    oekScalarMul,    ## scalar * A
-    oekScalarAdd,    ## scalar + A
-    oekLiteral,      ## numeric literal
-    oekUnknown
+  CodeCtx* = object
+    loopVarStr*: string
+    isComplex*: bool
+    scalarType*: string  # "double", "float", "int", "long long"
+    elemType*: string    # compound type for complex, scalar for real
+    info*: KernelInfo
+    tmpIdx*: int
 
-  OmpExprInfo = object
-    kind: OmpExprKind
-    viewName: string
-    isSubtract: bool
-    scalar: float64
-    left, right: ref OmpExprInfo
-    isNeighborAccess: bool  ## true if index comes from stencil.neighbor()
+proc newCodeCtx*(info: KernelInfo): CodeCtx =
+  result.loopVarStr = info.loopVarStr
+  result.isComplex = info.isComplex
+  result.scalarType = elementTypeToC(info.scalarType)
+  if info.isComplex:
+    result.elemType = "NComplex"
+  else:
+    result.elemType = result.scalarType
+  result.info = info
 
-  OmpViewInfo = object
-    name: NimNode
-    nameStr: string
-    isRead: bool
-    isWrite: bool
+proc nextTmp*(ctx: var CodeCtx): string =
+  result = "_t" & $ctx.tmpIdx
+  ctx.tmpIdx += 1
 
-  OmpDispatchKind = enum
-    odkCopy,        ## dst[n] = src[n]
-    odkAdd,         ## dst[n] = a[n] + b[n]
-    odkSub,         ## dst[n] = a[n] - b[n]
-    odkScalarMul,   ## dst[n] = s * a[n]
-    odkScalarAdd,   ## dst[n] = a[n] + s
-    odkMatMul,      ## dst[n] = a[n] * b[n] (matrix multiply)
-    odkMatVec,      ## dst[n] = m[n] * v[n] (matrix-vector)
-    odkUnknown      ## Fall back to per-site scalar loop
+proc simdUseMacro*(ctx: CodeCtx): string =
+  ## Returns the #define name to select the right SIMD type in simd_intrinsics.h
+  case ctx.scalarType
+  of "float": "SIMD_USE_FLOAT"
+  of "int": "SIMD_USE_INT32"
+  of "long long": "SIMD_USE_INT64"
+  else: "SIMD_USE_DOUBLE"
 
-  OmpDispatch = object
-    kind: OmpDispatchKind
-    lhsView: string
-    rhsViews: seq[string]
-    scalar: float64
-    hasStencil: bool
+proc cPtrType*(ctx: CodeCtx): string =
+  ## Returns the C pointer type for this element type
+  ctx.scalarType & "* "
 
-proc isViewAccess(n: NimNode, viewNames: seq[string]): bool =
-  ## Check if node is a view[n] access
-  if n.kind == nnkCall and n.len >= 2:
-    if n[0].kind == nnkSym and n[0].strVal == "[]":
-      if n[1].kind == nnkSym and n[1].strVal in viewNames:
-        return true
-  false
+#[ --- AoSoA Element Access ---
+   In SIMD mode, each "element" access loads/stores VW doubles at once.
+   The base address for element `elem` in group `group` is:
+     &data[group * (VW * elems) + elem * VW]
+   which is passed to simd_load / simd_store.
+]#
 
-proc findViewName(n: NimNode): string =
-  ## Extract view name from a site proxy expression
+proc aosoaBase*(dataVar, groupVar, elemsVar, elemExpr: string): string =
+  ## Return C expression for the base address of a VW-wide SIMD vector.
+  let vw = $VectorWidth
+  "&" & dataVar & "[" & groupVar & " * (" & vw & " * " & elemsVar & ") + (" & elemExpr & ") * " & vw & "]"
+
+proc aosoaIdx*(dataVar, groupVar, laneVar, elemsVar, elemExpr: string): string =
+  ## Legacy scalar element access — used only in stencil gather paths.
+  let vw = $VectorWidth
+  dataVar & "[" & groupVar & " * (" & vw & " * " & elemsVar & ") + (" & elemExpr & ") * " & vw & " + " & laneVar & "]"
+
+## Emit a flat-index expression used when lane varies inside a VW-wide inner loop.
+proc aosoaFlatIdx*(dataVar, groupVar, elemsVar, elemExpr: string, lane: string): string =
+  let vw = $VectorWidth
+  dataVar & "[" & groupVar & " * (" & vw & " * " & elemsVar & ") + (" & elemExpr & ") * " & vw & " + " & lane & "]"
+
+type SiteRef* = object
+  dataVar*: string
+  groupVar*: string
+  laneVar*: string
+  elemsVar*: string
+  isGauge*: bool
+  gaugeName*: string
+  dirExpr*: string
+  gaugeDim*: int
+
+proc resolveSiteRef*(viewExpr, siteExpr: NimNode, ctx: var CodeCtx): SiteRef =
+  var groupVar = "group"
+  var laneVar = "lane"
+
+  block resolveGL:
+    let sn = siteExpr
+    if sn.kind == nnkHiddenCallConv and sn.len >= 2 and sn[1].kind == nnkSym:
+      let nm = sn[1].strVal
+      groupVar = nm & "_group"
+      laneVar = nm & "_lane"
+      break resolveGL
+    if sn.kind == nnkSym:
+      let nm = sn.strVal
+      if nm == ctx.loopVarStr:
+        groupVar = "group"
+        laneVar = "lane"
+        break resolveGL
+      let lb = ctx.info.getLetBinding(nm)
+      if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor}:
+        groupVar = nm & "_group"
+        laneVar = nm & "_lane"
+        break resolveGL
+
+  # Check for GaugeFieldView double-index
+  if viewExpr.kind == nnkHiddenDeref and viewExpr[0].kind == nnkCall:
+    let ic = viewExpr[0]
+    if ic[0].kind == nnkSym and ic[0].strVal == "[]" and ic.len >= 3:
+      var gs: NimNode = nil
+      if ic[1].kind == nnkHiddenAddr and ic[1][0].kind == nnkSym:
+        gs = ic[1][0]
+      elif ic[1].kind == nnkSym:
+        gs = ic[1]
+      if gs != nil:
+        let gn = gs.strVal
+        var isGauge = false
+        for gv in ctx.info.gaugeViews:
+          if gv.name == gn: isGauge = true
+        if isGauge:
+          var dirCode = ""
+          let dirNode = ic[2]
+          if dirNode.kind == nnkSym: dirCode = dirNode.strVal
+          elif dirNode.kind in {nnkIntLit..nnkInt64Lit}: dirCode = $dirNode.intVal
+          else: dirCode = "0"
+
+          var dim = 4
+          for gv in ctx.info.gaugeViews:
+            if gv.name == gn: dim = gv.dim
+
+          return SiteRef(isGauge: true, gaugeName: gn, dirExpr: dirCode,
+                         gaugeDim: dim, groupVar: groupVar, laneVar: laneVar,
+                         elemsVar: gn & "_elems")
+
+  # Regular TensorFieldView
+  var vn = ""
+  if viewExpr.kind == nnkSym:
+    vn = viewExpr.strVal
+  elif viewExpr.kind == nnkHiddenDeref and viewExpr[0].kind == nnkSym:
+    vn = viewExpr[0].strVal
+  elif viewExpr.kind == nnkHiddenAddr and viewExpr[0].kind == nnkSym:
+    vn = viewExpr[0].strVal
+  else:
+    vn = "unknown"
+
+  return SiteRef(dataVar: vn & "_data", groupVar: groupVar, laneVar: laneVar,
+                 elemsVar: vn & "_elems")
+
+#[ ============================================================================
+   C Code Generation — Matrix Expression Transpiler
+   ============================================================================ ]#
+
+type MatResult* = tuple[code: string, elems: string]
+
+proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResult
+
+proc emitLoadView*(target: string, sr: SiteRef, ctx: var CodeCtx, d: int): MatResult =
+  ## Load tensor elements as SIMD vectors from AoSoA layout.
+  ## For contiguous access (same group), uses simd_load_d.
+  ## For stencil neighbors (different group per lane), uses simd_gather_d.
+  var s = ""
+  let p = ind(d)
+  let elems = sr.elemsVar
+  let isStencilAccess = sr.groupVar != "group"  # stencil neighbors have per-lane group/lane
+
+  if sr.isGauge:
+    for di in 0..<sr.gaugeDim:
+      let cond = if di == 0: "if" else: "else if"
+      s &= p & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+      if isStencilAccess:
+        # Stencil: gather from per-lane neighbor indices
+        let idxArray = sr.groupVar.replace("_group", "_indices")
+        s &= p & "  for (int _e = 0; _e < " & elems & "; _e++)\n"
+        s &= p & "    " & target & "[_e] = simd_gather(" & sr.gaugeName & "_" & $di & "_data, " & idxArray & ", _e, " & elems & ");\n"
+      else:
+        s &= p & "  for (int _e = 0; _e < " & elems & "; _e++)\n"
+        s &= p & "    " & target & "[_e] = simd_load(" &
+             aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, elems, "_e") & ");\n"
+      s &= p & "}\n"
+  else:
+    if isStencilAccess:
+      # Stencil: gather from per-lane neighbor indices
+      let idxArray = sr.groupVar.replace("_group", "_indices")
+      s &= p & "for (int _e = 0; _e < " & elems & "; _e++)\n"
+      s &= p & "  " & target & "[_e] = simd_gather(" & sr.dataVar & ", " & idxArray & ", _e, " & elems & ");\n"
+    else:
+      s &= p & "for (int _e = 0; _e < " & elems & "; _e++)\n"
+      s &= p & "  " & target & "[_e] = simd_load(" &
+           aosoaBase(sr.dataVar, sr.groupVar, elems, "_e") & ");\n"
+  return (s, elems)
+
+proc emitMatMul*(target, lhs, rhs, lhsElems, rhsElems: string, ctx: var CodeCtx, d: int): MatResult =
+  ## SIMD matrix multiply: all temporaries are simd_v vectors.
+  ## For complex: data is stored as (re, im) pairs of VW-wide doubles.
+  ##   With elems = elementsPerSite = 2*NC*NC, the tensor column count is elems/(2*NC).
+  ##   Element [i,j] has re at flat index 2*(i*cols+j) and im at 2*(i*cols+j)+1.
+  ##   Complex matmul uses simd_cmadd_d.
+  ## For real: standard i,j,k loop with simd_fmadd_d.
+  ##   With elems = elementsPerSite = NC*NC, column count is elems/NC.
+  var s = ""
+  let p = ind(d)
+  let lcVar = ctx.nextTmp() & "_lc"
+  let rcVar = ctx.nextTmp() & "_rc"
+  if ctx.isComplex:
+    # Complex: elems = elementsPerSite = 2*NC*NC doubles.
+    # Tensor column count = elems / (2*NC).
+    s &= p & "const int " & lcVar & " = " & lhsElems & " / (2*NC);\n"
+    s &= p & "const int " & rcVar & " = " & rhsElems & " / (2*NC);\n"
+    s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+    s &= p & "  for (int _j = 0; _j < " & rcVar & "; _j++) {\n"
+    s &= p & "    simd_v _sre = simd_setzero();\n"
+    s &= p & "    simd_v _sim = simd_setzero();\n"
+    s &= p & "    for (int _k = 0; _k < " & lcVar & "; _k++) {\n"
+    # a[i,k]: re at flat index 2*(i*lcVar+k), im at 2*(i*lcVar+k)+1
+    # b[k,j]: re at flat index 2*(k*rcVar+j), im at 2*(k*rcVar+j)+1
+    s &= p & "      simd_cmadd(&_sre, &_sim,\n"
+    s &= p & "        " & lhs & "[2*(_i*" & lcVar & "+_k)], " & lhs & "[2*(_i*" & lcVar & "+_k)+1],\n"
+    s &= p & "        " & rhs & "[2*(_k*" & rcVar & "+_j)], " & rhs & "[2*(_k*" & rcVar & "+_j)+1]);\n"
+    s &= p & "    }\n"
+    s &= p & "    " & target & "[2*(_i*" & rcVar & "+_j)] = _sre;\n"
+    s &= p & "    " & target & "[2*(_i*" & rcVar & "+_j)+1] = _sim;\n"
+    s &= p & "  }\n"
+    s &= p & "}\n"
+  else:
+    s &= p & "const int " & lcVar & " = " & lhsElems & " / NC;\n"
+    s &= p & "const int " & rcVar & " = " & rhsElems & " / NC;\n"
+    s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+    s &= p & "  for (int _j = 0; _j < " & rcVar & "; _j++) {\n"
+    s &= p & "    simd_v _s = simd_setzero();\n"
+    s &= p & "    for (int _k = 0; _k < " & lcVar & "; _k++)\n"
+    s &= p & "      _s = simd_fmadd(" & lhs & "[_i*" & lcVar & "+_k], " & rhs & "[_k*" & rcVar & "+_j], _s);\n"
+    s &= p & "    " & target & "[_i*" & rcVar & "+_j] = _s;\n"
+    s &= p & "  }\n"
+    s &= p & "}\n"
+  let resultElems = if ctx.isComplex: "2 * NC * " & rcVar else: "NC * " & rcVar
+  return (s, resultElems)
+
+proc emitAdjoint*(target, src, srcElems: string, ctx: var CodeCtx, d: int): MatResult =
+  ## SIMD adjoint (conjugate transpose): all elements are simd_v.
+  ## For complex: transpose matrix indices AND negate imaginary part.
+  ##   elems = elementsPerSite = 2*NC*NC, tensor cols = elems/(2*NC).
+  ## For real: just transpose matrix indices. elems = NC*NC, cols = elems/NC.
+  var s = ""
+  let p = ind(d)
+  let colsVar = ctx.nextTmp() & "_ac"
+  if ctx.isComplex:
+    s &= p & "const int " & colsVar & " = " & srcElems & " / (2*NC);\n"
+    s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+    s &= p & "  for (int _j = 0; _j < " & colsVar & "; _j++) {\n"
+    # src[i,j] re at 2*(i*cols+j), im at 2*(i*cols+j)+1
+    # target[j,i] re at 2*(j*NC+i), im at 2*(j*NC+i)+1
+    s &= p & "    " & target & "[2*(_j*NC+_i)] = " & src & "[2*(_i*" & colsVar & "+_j)];\n"
+    s &= p & "    " & target & "[2*(_j*NC+_i)+1] = simd_neg(" & src & "[2*(_i*" & colsVar & "+_j)+1]);\n"
+    s &= p & "  }\n"
+  else:
+    s &= p & "const int " & colsVar & " = " & srcElems & " / NC;\n"
+    s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+    s &= p & "  for (int _j = 0; _j < " & colsVar & "; _j++)\n"
+    s &= p & "    " & target & "[_j*NC+_i] = " & src & "[_i*" & colsVar & "+_j];\n"
+  return (s, srcElems)
+
+proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResult =
+  ## Recursively transpile a matrix expression to SIMD C code.
+  ## All temporaries are arrays of simd_v (one per AoSoA element).
   case n.kind
   of nnkCall:
     if n[0].kind == nnkSym:
-      if n[0].strVal == "[]" and n.len >= 2:
-        if n[1].kind == nnkSym:
-          return n[1].strVal
+      let fn = n[0].strVal
+      if fn == "[]" and n.len >= 3:
+        let sr = resolveSiteRef(n[1], n[2], ctx)
+        return emitLoadView(target, sr, ctx, d)
+      if fn == "adjoint" and n.len >= 2:
+        let tmp = ctx.nextTmp()
+        let p = ind(d)
+        var elemsGuess = "NC*NC"
+        if ctx.isComplex: elemsGuess = "2*NC*NC"
+        var s = p & "simd_v " & tmp & "[" & elemsGuess & "];\n"
+        let inner = emitMatExpr(tmp, n[1], ctx, d)
+        s &= inner.code
+        let adj = emitAdjoint(target, tmp, inner.elems, ctx, d)
+        s &= adj.code
+        return (s, adj.elems)
+
+    let defaultElems = if ctx.isComplex: "2*NC*NC" else: "NC*NC"
+    return (ind(d) & "// unhandled call: " & n[0].strVal & "\n", defaultElems)
+
+  of nnkSym:
+    let name = n.strVal
+    let p = ind(d)
+    let lb = ctx.info.getLetBinding(name)
+    if lb.kind == lbkMatMul or lb.kind == lbkOther:
+      let elemsName = name & "_elems"
+      return (p & "for (int _e = 0; _e < " & elemsName & "; _e++) " & target & "[_e] = " & name & "[_e];\n",
+              elemsName)
+    else:
+      let elemsName = name & "_elems"
+      return (p & "for (int _e = 0; _e < " & elemsName & "; _e++) " & target & "[_e] = " & name & "[_e];\n",
+              elemsName)
+
+  of nnkIntLit..nnkInt64Lit:
+    let p = ind(d)
+    let val = $n.intVal
+    if ctx.isComplex:
+      # Complex scalar literal: re = val for diagonal, im = 0
+      return (p & "for (int _e = 0; _e < 2*NC*NC; _e += 2) { " & target & "[_e] = simd_set1(" & val & ".0); " & target & "[_e+1] = simd_setzero(); }\n", "2*NC*NC")
+    else:
+      return (p & "for (int _e = 0; _e < NC*NC; _e++) " & target & "[_e] = simd_set1(" & val & ".0);\n", "NC*NC")
+
+  of nnkFloatLit..nnkFloat64Lit:
+    let p = ind(d)
+    let val = $n.floatVal
+    if ctx.isComplex:
+      return (p & "for (int _e = 0; _e < 2*NC*NC; _e += 2) { " & target & "[_e] = simd_set1(" & val & "); " & target & "[_e+1] = simd_setzero(); }\n", "2*NC*NC")
+    else:
+      return (p & "for (int _e = 0; _e < NC*NC; _e++) " & target & "[_e] = simd_set1(" & val & ");\n", "NC*NC")
+
+  of nnkInfix:
+    if n.len >= 3 and n[0].kind == nnkSym:
+      let op = n[0].strVal
+      if op == "*":
+        var isMM = false
+        try: isMM = isMatMulSym(n)
+        except: discard
+        if isMM:
+          let tmpL = ctx.nextTmp()
+          let tmpR = ctx.nextTmp()
+          let p = ind(d)
+          var elemsGuess = "NC*NC"
+          if ctx.isComplex: elemsGuess = "2*NC*NC"
+          var s = p & "simd_v " & tmpL & "[" & elemsGuess & "];\n"
+          s &= p & "simd_v " & tmpR & "[" & elemsGuess & "];\n"
+          let lRes = emitMatExpr(tmpL, n[1], ctx, d)
+          s &= lRes.code
+          let rRes = emitMatExpr(tmpR, n[2], ctx, d)
+          s &= rRes.code
+          let mmRes = emitMatMul(target, tmpL, tmpR, lRes.elems, rRes.elems, ctx, d)
+          s &= mmRes.code
+          return (s, mmRes.elems)
+        else:
+          # Element-wise multiply (scalar * tensor or tensor * scalar)
+          let tmpL = ctx.nextTmp()
+          let tmpR = ctx.nextTmp()
+          let p = ind(d)
+          var elemsGuess = "NC*NC"
+          if ctx.isComplex: elemsGuess = "2*NC*NC"
+          var s = p & "simd_v " & tmpL & "[" & elemsGuess & "];\n"
+          s &= p & "simd_v " & tmpR & "[" & elemsGuess & "];\n"
+          let lRes = emitMatExpr(tmpL, n[1], ctx, d)
+          s &= lRes.code
+          let rRes = emitMatExpr(tmpR, n[2], ctx, d)
+          s &= rRes.code
+          let outElems = lRes.elems
+          if ctx.isComplex:
+            # Complex element-wise multiply: (are,aim) * (bre,bim)
+            # outElems = elementsPerSite = 2*tensor_elems; loop over tensor_elems
+            s &= p & "for (int _e = 0; _e < " & outElems & " / 2; _e++) {\n"
+            s &= p & "  simd_v _tre, _tim;\n"
+            s &= p & "  simd_cmul(&_tre, &_tim, " & tmpL & "[2*_e], " & tmpL & "[2*_e+1], " & tmpR & "[2*_e], " & tmpR & "[2*_e+1]);\n"
+            s &= p & "  " & target & "[2*_e] = _tre;\n"
+            s &= p & "  " & target & "[2*_e+1] = _tim;\n"
+            s &= p & "}\n"
+          else:
+            s &= p & "for (int _e = 0; _e < " & outElems & "; _e++)\n"
+            s &= p & "  " & target & "[_e] = simd_mul(" & tmpL & "[_e], " & tmpR & "[_e]);\n"
+          return (s, outElems)
+
+      if op == "+" or op == "-":
+        let tmpL = ctx.nextTmp()
+        let tmpR = ctx.nextTmp()
+        let p = ind(d)
+        var elemsGuess = "NC*NC"
+        if ctx.isComplex: elemsGuess = "2*NC*NC"
+        var s = p & "simd_v " & tmpL & "[" & elemsGuess & "];\n"
+        s &= p & "simd_v " & tmpR & "[" & elemsGuess & "];\n"
+        let lRes = emitMatExpr(tmpL, n[1], ctx, d)
+        s &= lRes.code
+        let rRes = emitMatExpr(tmpR, n[2], ctx, d)
+        s &= rRes.code
+        let outElems = lRes.elems
+        if ctx.isComplex:
+          # Complex +/- : re and im parts are separate simd_v entries.
+          # outElems = elementsPerSite = 2*tensor_elems (already includes re,im).
+          let simdOp = if op == "+": "simd_add" else: "simd_sub"
+          s &= p & "for (int _e = 0; _e < " & outElems & "; _e++)\n"
+          s &= p & "  " & target & "[_e] = " & simdOp & "(" & tmpL & "[_e], " & tmpR & "[_e]);\n"
+        else:
+          let simdOp = if op == "+": "simd_add" else: "simd_sub"
+          s &= p & "for (int _e = 0; _e < " & outElems & "; _e++)\n"
+          s &= p & "  " & target & "[_e] = " & simdOp & "(" & tmpL & "[_e], " & tmpR & "[_e]);\n"
+        return (s, outElems)
+
+  of nnkHiddenCallConv:
+    if n.len >= 2:
+      return emitMatExpr(target, n[1], ctx, d)
+
+  of nnkHiddenDeref, nnkHiddenAddr, nnkHiddenStdConv, nnkConv, nnkHiddenSubConv:
+    if n.len > 0:
+      return emitMatExpr(target, n[^1], ctx, d)
+
+  else:
+    discard
+
+  let defaultElems2 = if ctx.isComplex: "2*NC*NC" else: "NC*NC"
+  return (ind(d) & "// unhandled expr kind: " & $n.kind & "\n", defaultElems2)
+
+#[ --- Scalar expression transpilation --- ]#
+
+proc transpileScalar*(n: NimNode, ctx: var CodeCtx): string =
+  case n.kind
   of nnkSym:
     return n.strVal
-  of nnkHiddenStdConv, nnkHiddenDeref, nnkConv:
-    if n.len > 0:
-      return findViewName(n[^1])
-  else:
-    discard
-  ""
-
-proc analyzeExpr(n: NimNode, viewNames: seq[string]): OmpExprInfo =
-  ## Recursively analyze an expression to determine its operation kind
-  case n.kind
-  of nnkCall:
-    let fnName = if n[0].kind == nnkSym: n[0].strVal else: ""
-    
-    if fnName == "[]" and n.len >= 2:
-      # View access: view[n]
-      if n[1].kind == nnkSym and n[1].strVal in viewNames:
-        result.kind = oekSiteProxy
-        result.viewName = n[1].strVal
-        # Check if index is a stencil neighbor variable
-        if n.len >= 3 and n[2].kind == nnkSym:
-          let idxName = n[2].strVal
-          if "nbr" in idxName.toLowerAscii or "neighbor" in idxName.toLowerAscii:
-            result.isNeighborAccess = true
-        return
-    
-    if fnName == "+" and n.len == 3:
-      let leftExpr = analyzeExpr(n[1], viewNames)
-      let rightExpr = analyzeExpr(n[2], viewNames)
-      if leftExpr.kind == oekLiteral:
-        result.kind = oekScalarAdd
-        result.scalar = leftExpr.scalar
-        result.left = new OmpExprInfo
-        result.left[] = rightExpr
-      elif rightExpr.kind == oekLiteral:
-        result.kind = oekScalarAdd
-        result.scalar = rightExpr.scalar
-        result.left = new OmpExprInfo
-        result.left[] = leftExpr
-      else:
-        result.kind = oekMatAdd
-        result.left = new OmpExprInfo
-        result.left[] = leftExpr
-        result.right = new OmpExprInfo
-        result.right[] = rightExpr
-      return
-    
-    if fnName == "-" and n.len == 3:
-      let leftExpr = analyzeExpr(n[1], viewNames)
-      let rightExpr = analyzeExpr(n[2], viewNames)
-      result.kind = oekMatAdd
-      result.isSubtract = true
-      result.left = new OmpExprInfo
-      result.left[] = leftExpr
-      result.right = new OmpExprInfo
-      result.right[] = rightExpr
-      return
-    
-    if fnName == "*" and n.len == 3:
-      let leftExpr = analyzeExpr(n[1], viewNames)
-      let rightExpr = analyzeExpr(n[2], viewNames)
-      if leftExpr.kind == oekLiteral:
-        result.kind = oekScalarMul
-        result.scalar = leftExpr.scalar
-        result.left = new OmpExprInfo
-        result.left[] = rightExpr
-      elif rightExpr.kind == oekLiteral:
-        result.kind = oekScalarMul
-        result.scalar = rightExpr.scalar
-        result.left = new OmpExprInfo
-        result.left[] = leftExpr
-      else:
-        result.kind = oekMatMul
-        result.left = new OmpExprInfo
-        result.left[] = leftExpr
-        result.right = new OmpExprInfo
-        result.right[] = rightExpr
-      return
-  
-  of nnkInfix:
-    let op = if n[0].kind in {nnkSym, nnkIdent}: n[0].strVal else: ""
-    if op in ["+", "-", "*"]:
-      # Convert to call-style and re-analyze
-      var callNode = newNimNode(nnkCall)
-      callNode.add(n[0])
-      callNode.add(n[1])
-      callNode.add(n[2])
-      return analyzeExpr(callNode, viewNames)
-  
-  of nnkFloatLit..nnkFloat64Lit:
-    result.kind = oekLiteral
-    result.scalar = n.floatVal
-    return
-  
   of nnkIntLit..nnkInt64Lit:
-    result.kind = oekLiteral
-    result.scalar = n.intVal.float64
-    return
-  
-  of nnkSym:
-    if n.strVal in viewNames:
-      result.kind = oekSiteProxy
-      result.viewName = n.strVal
-    else:
-      # Could be a scalar variable
-      result.kind = oekLiteral
-      result.scalar = 0.0  # Will be resolved at runtime
-    return
-  
-  of nnkHiddenStdConv, nnkHiddenDeref, nnkConv:
-    if n.len > 0:
-      return analyzeExpr(n[^1], viewNames)
-  
-  else:
-    discard
-  
-  result.kind = oekUnknown
-
-proc gatherViewInfo(body: NimNode, loopVar: NimNode): tuple[views: seq[OmpViewInfo], hasStencil: bool] =
-  ## Walk the typed AST to find all TensorFieldView accesses and their read/write roles
-  var viewTable: Table[string, OmpViewInfo]
-  var hasStencil = false
-  
-  proc analyzeNode(n: NimNode, isLHS: bool = false) =
-    case n.kind
-    of nnkCall:
-      if n[0].kind == nnkSym:
-        let fnName = n[0].strVal
-        if fnName == "[]=" and n.len >= 3:
-          # Write access: view[n] = ...
-          if n[1].kind == nnkSym:
-            let viewName = n[1].strVal
-            if viewName notin viewTable:
-              viewTable[viewName] = OmpViewInfo(name: n[1], nameStr: viewName)
-            viewTable[viewName].isWrite = true
-          # Analyze RHS
-          for i in 3..<n.len:
-            analyzeNode(n[i], false)
-          return
-        elif fnName == "[]" and n.len >= 2:
-          # Read access: view[n]
-          if n[1].kind == nnkSym:
-            let viewName = n[1].strVal
-            if viewName notin viewTable:
-              viewTable[viewName] = OmpViewInfo(name: n[1], nameStr: viewName)
-            viewTable[viewName].isRead = true
-          return
-        elif fnName == "neighbor":
-          hasStencil = true
-      for child in n:
-        analyzeNode(child, isLHS)
-    of nnkLetSection, nnkVarSection:
-      for def in n:
-        if def.kind == nnkIdentDefs and def.len >= 3:
-          analyzeNode(def[2], false)
-    of nnkAsgn:
-      analyzeNode(n[0], true)
-      analyzeNode(n[1], false)
-    else:
-      for child in n:
-        analyzeNode(child, isLHS)
-  
-  analyzeNode(body)
-  
-  for _, v in viewTable:
-    result.views.add v
-  result.hasStencil = hasStencil
-
-proc determineDispatch(expr: OmpExprInfo, lhsView: string): OmpDispatch =
-  ## Determine the dispatch operation from the expression tree
-  result.lhsView = lhsView
-  
-  case expr.kind
-  of oekSiteProxy:
-    result.kind = odkCopy
-    result.rhsViews = @[expr.viewName]
-    result.hasStencil = expr.isNeighborAccess
-  
-  of oekMatAdd:
-    if expr.left != nil and expr.right != nil:
-      if expr.left.kind == oekSiteProxy and expr.right.kind == oekSiteProxy:
-        if expr.isSubtract:
-          result.kind = odkSub
-        else:
-          result.kind = odkAdd
-        result.rhsViews = @[expr.left.viewName, expr.right.viewName]
-      else:
-        result.kind = odkUnknown
-    else:
-      result.kind = odkUnknown
-  
-  of oekScalarMul:
-    if expr.left != nil and expr.left.kind == oekSiteProxy:
-      result.kind = odkScalarMul
-      result.scalar = expr.scalar
-      result.rhsViews = @[expr.left.viewName]
-    else:
-      result.kind = odkUnknown
-  
-  of oekScalarAdd:
-    if expr.left != nil and expr.left.kind == oekSiteProxy:
-      result.kind = odkScalarAdd
-      result.scalar = expr.scalar
-      result.rhsViews = @[expr.left.viewName]
-    else:
-      result.kind = odkUnknown
-  
-  of oekMatMul:
-    if expr.left != nil and expr.right != nil and
-       expr.left.kind == oekSiteProxy and expr.right.kind == oekSiteProxy:
-      result.kind = odkMatMul
-      result.rhsViews = @[expr.left.viewName, expr.right.viewName]
-    else:
-      result.kind = odkUnknown
-  
-  of oekMatVec:
-    if expr.left != nil and expr.right != nil and
-       expr.left.kind == oekSiteProxy and expr.right.kind == oekSiteProxy:
-      result.kind = odkMatVec
-      result.rhsViews = @[expr.left.viewName, expr.right.viewName]
-    else:
-      result.kind = odkUnknown
-  
-  else:
-    result.kind = odkUnknown
+    return $n.intVal
+  of nnkFloatLit..nnkFloat64Lit:
+    return $n.floatVal
+  of nnkHiddenStdConv, nnkConv, nnkHiddenDeref, nnkHiddenAddr, nnkHiddenSubConv:
+    if n.len > 0: return transpileScalar(n[^1], ctx)
+  of nnkCall:
+    if n[0].kind == nnkSym:
+      var args: seq[string]
+      for i in 1..<n.len: args.add transpileScalar(n[i], ctx)
+      return n[0].strVal & "(" & args.join(", ") & ")"
+  of nnkInfix:
+    if n.len >= 3 and n[0].kind == nnkSym:
+      return "(" & transpileScalar(n[1], ctx) & " " & n[0].strVal & " " & transpileScalar(n[2], ctx) & ")"
+  of nnkDotExpr:
+    if n.len >= 2:
+      return transpileScalar(n[0], ctx) & "." & n[1].strVal
+  else: discard
+  return "0"
 
 #[ ============================================================================
-   Internal Typed Each Macro - SIMD dispatch
+   C Function Source Assembly
+   ============================================================================ ]#
+
+var ompKernelCounter {.compileTime.} = 0
+
+proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string, funcName: string] =
+  ## Generate a complete C function string with ``#pragma omp parallel for``.
+  ## The function takes raw pointers to AoSoA buffers and scalar parameters.
+  ##
+  ## Loop structure (SIMD intrinsic):
+  ##   #pragma omp parallel for
+  ##   for (group = 0; group < numGroups; ++group) {
+  ##     // Each tensor element is a simd_v vector (VW doubles)
+  ##     // All arithmetic uses explicit SIMD intrinsics — no scalar fallback
+  ##   }
+  ##
+  ## The outer loop distributes groups across threads. Within each group,
+  ## VW sites are processed simultaneously using SIMD intrinsics.
+  var ctx = newCodeCtx(info)
+  let vw = $VectorWidth
+
+  ompKernelCounter += 1
+  let funcName = "omp_each_" & $body.lineInfoObj.line & "_" & $ompKernelCounter
+
+  var src = ""
+
+  # Define VW and SIMD type before including simd_intrinsics.h
+  src &= "#define VW " & vw & "\n"
+  src &= "#define " & ctx.simdUseMacro() & "\n"
+  src &= "#include \"" & simdHeaderPath & "\"\n\n"
+
+  # Build parameter list — numGroups replaces numSites
+  var params: seq[string]
+  for v in info.views:
+    params.add ctx.cPtrType() & v.name & "_data"
+  for gv in info.gaugeViews:
+    for d in 0..<gv.dim:
+      params.add ctx.cPtrType() & gv.name & "_" & $d & "_data"
+  for v in info.views:
+    params.add "const int " & v.name & "_elems"
+  for gv in info.gaugeViews:
+    params.add "const int " & gv.name & "_elems"
+  params.add "const int numGroups"
+  params.add "const int NC"
+  for s in info.stencils:
+    params.add "const int* " & s.name & "_offsets"
+    params.add "const int " & s.name & "_npts"
+  let runtimeVars = findRuntimeIntVars(body, info)
+  for rv in runtimeVars:
+    params.add "const int " & rv.name
+
+  src &= "static void " & funcName & "(\n"
+  src &= "    " & params.join(",\n    ")
+  src &= "\n) {\n"
+  src &= "  #pragma omp parallel for\n"
+  src &= "  for (int group = 0; group < numGroups; ++group) {\n"
+
+  # Process each statement
+  var stmts: seq[NimNode]
+  if body.kind == nnkStmtList:
+    for child in body: stmts.add child
+  else:
+    stmts.add body
+
+  for stmt in stmts:
+    case stmt.kind
+    of nnkLetSection:
+      for idefs in stmt:
+        if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+          let vn = idefs[0].strVal
+          let val = idefs[2]
+          let lb = info.getLetBinding(vn)
+
+          case lb.kind
+          of lbkStencilFwd:
+            # For stencil access in SIMD mode, we need per-lane indices.
+            # Build an array of VW neighbor flat indices.
+            src &= "    // fwd neighbor: " & vn & "\n"
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _lane = 0; _lane < VW; _lane++) {\n"
+            src &= "      int _site = group * VW + _lane;\n"
+            src &= "      " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & "];\n"
+            src &= "    }\n\n"
+          of lbkStencilBwd:
+            src &= "    // bwd neighbor: " & vn & "\n"
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _lane = 0; _lane < VW; _lane++) {\n"
+            src &= "      int _site = group * VW + _lane;\n"
+            src &= "      " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & " + 1];\n"
+            src &= "    }\n\n"
+          of lbkStencilNeighbor:
+            src &= "    // stencil neighbor: " & vn & "\n"
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _lane = 0; _lane < VW; _lane++) {\n"
+            src &= "      int _site = group * VW + _lane;\n"
+            src &= "      " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+            src &= "    }\n\n"
+          of lbkMatMul:
+            src &= "    // matrix temp: " & vn & "\n"
+            var elemsGuess = "NC*NC"
+            if ctx.isComplex: elemsGuess = "2*NC*NC"
+            src &= "    simd_v " & vn & "[" & elemsGuess & "];\n"
+            let matRes = emitMatExpr(vn, val, ctx, 2)
+            src &= matRes.code
+            src &= "    const int " & vn & "_elems = " & matRes.elems & ";\n\n"
+          of lbkOther:
+            let code = transpileScalar(val, ctx)
+            src &= "    " & ctx.scalarType & " " & vn & " = " & code & ";\n"
+
+    of nnkInfix:
+      if stmt.len >= 3 and stmt[0].kind == nnkSym and stmt[0].strVal == "+=":
+        let lhs = stmt[1]
+        let rhs = stmt[2]
+        if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
+          let sr = resolveSiteRef(lhs[1], lhs[2], ctx)
+          let tmp = ctx.nextTmp()
+          src &= "    { // +=\n"
+          var elemsGuess = "NC*NC"
+          if ctx.isComplex: elemsGuess = "2*NC*NC"
+          src &= "      simd_v " & tmp & "[" & elemsGuess & "];\n"
+          let matRes = emitMatExpr(tmp, rhs, ctx, 3)
+          src &= matRes.code
+          let storeElems = sr.elemsVar
+          # storeElems = elementsPerSite (doubles) — already 2*NC*NC for complex
+          if sr.isGauge:
+            for di in 0..<sr.gaugeDim:
+              let cond = if di == 0: "if" else: "else if"
+              src &= "      " & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+              src &= "        for (int _e = 0; _e < " & storeElems & "; _e++) {\n"
+              src &= "          simd_v _cur = simd_load(" & aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, sr.elemsVar, "_e") & ");\n"
+              src &= "          simd_store(" & aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, sr.elemsVar, "_e") & ", simd_add(_cur, " & tmp & "[_e]));\n"
+              src &= "        }\n"
+              src &= "      }\n"
+          else:
+            src &= "      for (int _e = 0; _e < " & storeElems & "; _e++) {\n"
+            src &= "        simd_v _cur = simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ");\n"
+            src &= "        simd_store(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ", simd_add(_cur, " & tmp & "[_e]));\n"
+            src &= "      }\n"
+          src &= "    }\n"
+
+    of nnkCall:
+      if stmt.len >= 2 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
+        if isElementLevelWrite(stmt):
+          let innerCall = stmt[1]
+          var viewName = "output"
+          if innerCall.len >= 3 and innerCall[1].kind == nnkSym:
+            viewName = innerCall[1].strVal
+
+          let siteNode = innerCall[2]
+          var elGroupVar = "group"
+          if siteNode.kind == nnkSym:
+            let sn = siteNode.strVal
+            if sn != ctx.loopVarStr:
+              let lb = ctx.info.getLetBinding(sn)
+              if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor}:
+                elGroupVar = sn & "_group"
+
+          if stmt.len == 4:
+            # 1D: view[n][idx] = val — broadcast scalar to all VW lanes
+            let idxCode = transpileScalar(stmt[2], ctx)
+            let valCode = transpileScalar(stmt[3], ctx)
+            src &= "    simd_store(" & aosoaBase(viewName & "_data", elGroupVar, viewName & "_elems", idxCode) & ", simd_set1(" & valCode & "));\n"
+          elif stmt.len >= 5:
+            # 2D: view[n][row, col] = val
+            let rowCode = transpileScalar(stmt[2], ctx)
+            let colCode = transpileScalar(stmt[3], ctx)
+            let valCode = transpileScalar(stmt[4], ctx)
+            let flatIdx = "(" & rowCode & ")*NC+(" & colCode & ")"
+            src &= "    simd_store(" & aosoaBase(viewName & "_data", elGroupVar, viewName & "_elems", flatIdx) & ", simd_set1(" & valCode & "));\n"
+        else:
+          # Tensor-level: view[n] = matrix_expr
+          let viewNode = stmt[1]
+          let siteNode = stmt[2]
+          let rhsNode = stmt[3]
+          let sr = resolveSiteRef(viewNode, siteNode, ctx)
+
+          let tmp = ctx.nextTmp()
+          src &= "    { // assign\n"
+          var elemsGuess = "NC*NC"
+          if ctx.isComplex: elemsGuess = "2*NC*NC"
+          src &= "      simd_v " & tmp & "[" & elemsGuess & "];\n"
+          let matRes = emitMatExpr(tmp, rhsNode, ctx, 3)
+          src &= matRes.code
+          let storeElems = sr.elemsVar
+          # storeElems = elementsPerSite — already correct for both real and complex
+          if sr.isGauge:
+            for di in 0..<sr.gaugeDim:
+              let cond = if di == 0: "if" else: "else if"
+              src &= "      " & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+              src &= "        for (int _e = 0; _e < " & storeElems & "; _e++)\n"
+              src &= "          simd_store(" & aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, sr.elemsVar, "_e") & ", " & tmp & "[_e]);\n"
+              src &= "      }\n"
+          else:
+            src &= "      for (int _e = 0; _e < " & storeElems & "; _e++)\n"
+            src &= "        simd_store(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ", " & tmp & "[_e]);\n"
+          src &= "    }\n"
+
+    of nnkIfStmt:
+      for branch in stmt:
+        if branch.kind == nnkElifBranch:
+          let condCode = transpileScalar(branch[0], ctx)
+          src &= "    if (" & condCode & ") {\n"
+          let branchBody = branch[1]
+          var innerStmts: seq[NimNode]
+          if branchBody.kind == nnkStmtList:
+            for child in branchBody: innerStmts.add child
+          else:
+            innerStmts.add branchBody
+          for innerStmt in innerStmts:
+            if innerStmt.kind == nnkInfix and innerStmt.len >= 3 and
+               innerStmt[0].kind == nnkSym and innerStmt[0].strVal == "+=":
+              let lhs = innerStmt[1]
+              let rhs = innerStmt[2]
+              if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
+                let sr = resolveSiteRef(lhs[1], lhs[2], ctx)
+                let tmp = ctx.nextTmp()
+                src &= "      { // += inside if\n"
+                var elemsGuess = "NC*NC"
+                if ctx.isComplex: elemsGuess = "2*NC*NC"
+                src &= "        simd_v " & tmp & "[" & elemsGuess & "];\n"
+                let matRes = emitMatExpr(tmp, rhs, ctx, 4)
+                src &= matRes.code
+                let storeElems = sr.elemsVar
+                # storeElems = elementsPerSite — already correct for both real and complex
+                src &= "        for (int _e = 0; _e < " & storeElems & "; _e++) {\n"
+                src &= "          simd_v _cur = simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ");\n"
+                src &= "          simd_store(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ", simd_add(_cur, " & tmp & "[_e]));\n"
+                src &= "        }\n"
+                src &= "      }\n"
+          src &= "    }\n"
+
+    else:
+      src &= "    // skipped: " & $stmt.kind & "\n"
+
+  src &= "  }\n"  # end for group
+  src &= "}\n"    # end function
+  return (src, funcName)
+
+#[ ============================================================================
+   Typed Each Implementation — C Codegen
    ============================================================================ ]#
 
 macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
-  ## Internal typed macro that receives full type information.
-  ## Analyzes the expression pattern and generates SIMD-vectorized code
-  ## using loadSimdVectorDyn/storeSimdVectorDyn on AoSoA data.
-  
   let loopVarSym = loopVar
-  let (info, hasStencil) = gatherViewInfo(body, loopVarSym)
-  
-  if info.len == 0 or hasEchoStatement(body) or hasStencil:
-    # Fall back to scalar per-site loop for:
-    # - No views found
-    # - Echo statements (need serial)
-    # - Stencil access (neighbor indices aren't vectorizable without gather)
-    # Note: must assign to loopVarSym (not create new local) because the typed
-    # body's symbols are already bound to the injected global variable.
-    let siteIdxSym = genSym(nskForVar, "siteIdx")
-    let assignStmt = newNimNode(nnkAsgn).add(loopVarSym, siteIdxSym)
-    let loopBody = newStmtList(assignStmt, body)
-    let rangeExpr = newNimNode(nnkInfix).add(ident"..<", lo, hi)
-    let forLoop = newNimNode(nnkForStmt).add(siteIdxSym, rangeExpr, loopBody)
-    result = newNimNode(nnkBlockStmt).add(newEmptyNode(), newStmtList(forLoop))
-    return
-  
-  # Gather view names
-  var viewNames: seq[string]
-  for v in info:
-    viewNames.add v.nameStr
-  
-  # Find output (LHS) view
-  var lhsViewSym: NimNode = nil
-  var lhsViewName = ""
-  for v in info:
-    if v.isWrite:
-      lhsViewSym = v.name
-      lhsViewName = v.nameStr
-      break
-  
-  if lhsViewSym == nil:
-    # No write detected, fall back to scalar per-site loop
-    let siteIdxSym = genSym(nskForVar, "siteIdx")
-    let assignStmt = newNimNode(nnkAsgn).add(loopVarSym, siteIdxSym)
-    let loopBody = newStmtList(assignStmt, body)
-    let rangeExpr = newNimNode(nnkInfix).add(ident"..<", lo, hi)
-    let forLoop = newNimNode(nnkForStmt).add(siteIdxSym, rangeExpr, loopBody)
-    result = newNimNode(nnkBlockStmt).add(newEmptyNode(), newStmtList(forLoop))
-    return
-  
-  # Extract the RHS expression from the body
-  var stmt: NimNode
-  if body.kind == nnkStmtList and body.len > 0:
-    stmt = body[0]
+  let info = gatherInfo(body, loopVarSym)
+
+  # CPU fallback for echo/debugEcho
+  if hasEchoStatement(body):
+    result = quote do:
+      block:
+        for cpuIdx in `lo`..<`hi`:
+          `loopVarSym` = cpuIdx
+          `body`
+    return result
+
+  if info.views.len == 0 and info.gaugeViews.len == 0:
+    error("No TensorFieldView found in loop body. The each macro requires at least one view access.")
+
+  let (funcSrc, funcName) = generateOmpFunction(body, info)
+
+  # Write the C function to a file at compile time, then -include it via passC
+  # This avoids the problem where {.emit.} inside a proc body places C code
+  # inside the generated C function body instead of at file scope.
+  let kernelDir = querySetting(SingleValueSetting.nimcacheDir) & "/omp_kernels"
+  discard staticExec("mkdir -p " & kernelDir)
+  let kernelFile = kernelDir & "/" & funcName & ".c"
+  writeFile(kernelFile, funcSrc)
+  let passCPragma = newNimNode(nnkPragma).add(
+    newNimNode(nnkExprColonExpr).add(ident"passC", newLit("-include " & kernelFile)))
+
+  # Find a view sym for NC computation
+  var shapeViewSym: NimNode = nil
+  for v in info.views:
+    shapeViewSym = v.nimSym; break
+  if shapeViewSym == nil and info.gaugeViews.len > 0:
+    shapeViewSym = info.gaugeViews[0].nimSym
+
+  # Build an {.importc, cdecl, nodecl.} proc declaration and normal Nim call
+  var argSetupStmts = newStmtList()
+
+  let ncSym = genSym(nskLet, "nc")
+  let nsSym = genSym(nskLet, "ns")
+
+  if info.gaugeViews.len > 0 and info.views.len == 0:
+    let gSym = info.gaugeViews[0].nimSym
+    argSetupStmts.add quote do:
+      let `ncSym` = `gSym`.field[0].shape[0]
+      let `nsSym` = `gSym`.field[0].numSites()
   else:
-    stmt = body
-  
-  # Analyze the RHS expression
-  var rhsExpr: OmpExprInfo
-  if stmt.kind == nnkCall and stmt.len >= 4 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
-    rhsExpr = analyzeExpr(stmt[3], viewNames)
-  else:
-    rhsExpr = OmpExprInfo(kind: oekUnknown)
-  
-  let dispatch = determineDispatch(rhsExpr, lhsViewName)
-  
-  # Find RHS view symbols
-  var rhsView1Sym, rhsView2Sym: NimNode = nil
-  for v in info:
-    if dispatch.rhsViews.len >= 1 and v.nameStr == dispatch.rhsViews[0]:
-      rhsView1Sym = v.name
-    if dispatch.rhsViews.len >= 2 and v.nameStr == dispatch.rhsViews[1]:
-      rhsView2Sym = v.name
-  
-  # Generate SIMD-vectorized code based on dispatch kind
-  # Helper template for scalar fallback (sequential per-site loop)
-  # Must assign to loopVarSym because the typed body references the injected global.
-  template scalarFallback() =
-    let siteIdxSym = genSym(nskForVar, "siteIdx")
-    let assignStmt = newNimNode(nnkAsgn).add(loopVarSym, siteIdxSym)
-    let loopBodyStmt = newStmtList(assignStmt, body)
-    let rangeExpr = newNimNode(nnkInfix).add(ident"..<", lo, hi)
-    let forLoop = newNimNode(nnkForStmt).add(siteIdxSym, rangeExpr, loopBodyStmt)
-    result = newNimNode(nnkBlockStmt).add(newEmptyNode(), newStmtList(forLoop))
-  
-  case dispatch.kind
-  of odkCopy:
-    if rhsView1Sym == nil:
-      scalarFallback()
-      return
-    
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcData = `rhsView1Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let elemsPerSite = `lhsViewSym`.data.tensorElementsPerSite
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for e in 0..<elemsPerSite:
-              var vec = loadSimdVectorDyn[ElemT](
-                srcData, outerIdx, e, elemsPerSite, nInner)
-              storeSimdVectorDyn(vec, dstData, outerIdx, e, elemsPerSite, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkAdd:
-    if rhsView1Sym == nil or rhsView2Sym == nil:
-      scalarFallback()
-      return
-    
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcAData = `rhsView1Sym`.aosoaDataPtr
-        let srcBData = `rhsView2Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let elemsPerSite = `lhsViewSym`.data.tensorElementsPerSite
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for e in 0..<elemsPerSite:
-              var vecA = loadSimdVectorDyn[ElemT](
-                srcAData, outerIdx, e, elemsPerSite, nInner)
-              var vecB = loadSimdVectorDyn[ElemT](
-                srcBData, outerIdx, e, elemsPerSite, nInner)
-              var vecR = vecA + vecB
-              storeSimdVectorDyn(vecR, dstData, outerIdx, e, elemsPerSite, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkSub:
-    if rhsView1Sym == nil or rhsView2Sym == nil:
-      scalarFallback()
-      return
-    
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcAData = `rhsView1Sym`.aosoaDataPtr
-        let srcBData = `rhsView2Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let elemsPerSite = `lhsViewSym`.data.tensorElementsPerSite
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for e in 0..<elemsPerSite:
-              var vecA = loadSimdVectorDyn[ElemT](
-                srcAData, outerIdx, e, elemsPerSite, nInner)
-              var vecB = loadSimdVectorDyn[ElemT](
-                srcBData, outerIdx, e, elemsPerSite, nInner)
-              var vecR = vecA - vecB
-              storeSimdVectorDyn(vecR, dstData, outerIdx, e, elemsPerSite, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkScalarMul:
-    if rhsView1Sym == nil:
-      scalarFallback()
-      return
-    
-    let scalarLit = newLit(dispatch.scalar)
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcData = `rhsView1Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let elemsPerSite = `lhsViewSym`.data.tensorElementsPerSite
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for e in 0..<elemsPerSite:
-              var vec = loadSimdVectorDyn[ElemT](
-                srcData, outerIdx, e, elemsPerSite, nInner)
-              var vecR = ElemT(`scalarLit`) * vec
-              storeSimdVectorDyn(vecR, dstData, outerIdx, e, elemsPerSite, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkScalarAdd:
-    if rhsView1Sym == nil:
-      scalarFallback()
-      return
-    
-    let scalarLit = newLit(dispatch.scalar)
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcData = `rhsView1Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let elemsPerSite = `lhsViewSym`.data.tensorElementsPerSite
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for e in 0..<elemsPerSite:
-              var vec = loadSimdVectorDyn[ElemT](
-                srcData, outerIdx, e, elemsPerSite, nInner)
-              var vecR = vec + ElemT(`scalarLit`)
-              storeSimdVectorDyn(vecR, dstData, outerIdx, e, elemsPerSite, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkMatMul:
-    if rhsView1Sym == nil or rhsView2Sym == nil:
-      scalarFallback()
-      return
-    
-    # Matrix multiply: C[i,j] = sum_k A[i,k] * B[k,j]
-    # SIMD vectorization is across sites (lanes), not across matrix elements
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcAData = `rhsView1Sym`.aosoaDataPtr
-        let srcBData = `rhsView2Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        
-        let outShape = `lhsViewSym`.shape
-        let rows = outShape[0]
-        let cols = if outShape.len > 1: outShape[1] else: 1
-        let innerDim = if `rhsView1Sym`.shape.len > 1: `rhsView1Sym`.shape[1] else: 1
-        let elemsA = `rhsView1Sym`.data.tensorElementsPerSite
-        let elemsB = `rhsView2Sym`.data.tensorElementsPerSite
-        let elemsC = `lhsViewSym`.data.tensorElementsPerSite
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for i in 0..<rows:
-              for j in 0..<cols:
-                var acc = newSimdVecDyn[ElemT](nInner)
-                for k in 0..<innerDim:
-                  let aElemIdx = i * innerDim + k
-                  let bElemIdx = k * cols + j
-                  var vecA = loadSimdVectorDyn[ElemT](
-                    srcAData, outerIdx, aElemIdx, elemsA, nInner)
-                  var vecB = loadSimdVectorDyn[ElemT](
-                    srcBData, outerIdx, bElemIdx, elemsB, nInner)
-                  acc = acc + vecA * vecB
-                let cElemIdx = i * cols + j
-                storeSimdVectorDyn(acc, dstData, outerIdx, cElemIdx, elemsC, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkMatVec:
-    if rhsView1Sym == nil or rhsView2Sym == nil:
-      scalarFallback()
-      return
-    
-    # Matrix-vector: y[i] = sum_j M[i,j] * x[j]
-    result = quote do:
-      block:
-        let dstData = `lhsViewSym`.aosoaDataPtr
-        let srcMData = `rhsView1Sym`.aosoaDataPtr
-        let srcVData = `rhsView2Sym`.aosoaDataPtr
-        let layout = `lhsViewSym`.data.simdLayout
-        let nInner = layout.nSitesInner
-        let nOuter = layout.nSitesOuter
-        type ElemT = typeof(dstData[0])
-        
-        let matRows = `rhsView1Sym`.shape[0]
-        let matCols = if `rhsView1Sym`.shape.len > 1: `rhsView1Sym`.shape[1] else: 1
-        let elemsM = `rhsView1Sym`.data.tensorElementsPerSite
-        let elemsV = `rhsView2Sym`.data.tensorElementsPerSite
-        let elemsOut = `lhsViewSym`.data.tensorElementsPerSite
-        proc simdLoop(chunkStart, chunkEnd: int64, ctx: pointer) {.cdecl.} =
-          for outer in chunkStart..<chunkEnd:
-            let outerIdx = int(outer)
-            for i in 0..<matRows:
-              var acc = newSimdVecDyn[ElemT](nInner)
-              for j in 0..<matCols:
-                let mElemIdx = i * matCols + j
-                var vecM = loadSimdVectorDyn[ElemT](
-                  srcMData, outerIdx, mElemIdx, elemsM, nInner)
-                var vecV = loadSimdVectorDyn[ElemT](
-                  srcVData, outerIdx, j, elemsV, nInner)
-                acc = acc + vecM * vecV
-              storeSimdVectorDyn(acc, dstData, outerIdx, i, elemsOut, nInner)
-        ompParallelForChunked(0'i64, int64(nOuter), simdLoop, nil)
-  
-  of odkUnknown:
-    # Unknown pattern — fall back to scalar per-site loop
-    scalarFallback()
+    argSetupStmts.add quote do:
+      let `ncSym` = if `shapeViewSym`.shape.len >= 1: `shapeViewSym`.shape[0] else: 1
+      let `nsSym` = `shapeViewSym`.numSites()
+
+  # Build parameter list for the importc proc and call arguments
+  var params = newNimNode(nnkFormalParams)
+  params.add newEmptyNode()  # void return
+
+  var callArgs: seq[NimNode]
+  var paramIdx = 0
+
+  template addParam(argExpr: NimNode, argType: NimNode) =
+    let pname = ident("p" & $paramIdx)
+    params.add newIdentDefs(pname, argType)
+    callArgs.add argExpr
+    paramIdx += 1
+
+  # View data pointers
+  for v in info.views:
+    let dataSym = v.nimSym
+    let dataExpr = quote do: cast[pointer](`dataSym`.data.aosoaData)
+    addParam(dataExpr, ident"pointer")
+
+  # Gauge view data pointers (D per view)
+  for gv in info.gaugeViews:
+    for d in 0..<gv.dim:
+      let gSym = gv.nimSym
+      let dLit = newLit(d)
+      let dataExpr = quote do: cast[pointer](`gSym`.field[`dLit`].data.aosoaData)
+      addParam(dataExpr, ident"pointer")
+
+  # Per-view elems — always use elementsPerSite (count of doubles), since
+  # SIMD works with double* pointers. For complex fields, elementsPerSite
+  # = 2*NC*NC (re and im are separate contiguous VW-wide AoSoA slots).
+  for v in info.views:
+    let vSym = v.nimSym
+    let elemsExpr = quote do: `vSym`.data.elementsPerSite.cint
+    addParam(elemsExpr, ident"cint")
+
+  for gv in info.gaugeViews:
+    let gSym = gv.nimSym
+    let elemsExpr = quote do: `gSym`.field[0].data.elementsPerSite.cint
+    addParam(elemsExpr, ident"cint")
+
+  # numGroups = ceil(numSites / VectorWidth)
+  let vwLit = newLit(VectorWidth)
+  let ngExpr = quote do: ((`nsSym` + `vwLit` - 1) div `vwLit`).cint
+  addParam(ngExpr, ident"cint")
+
+  # NC
+  let ncExpr = quote do: `ncSym`.cint
+  addParam(ncExpr, ident"cint")
+
+  # Stencil args: offsets pointer + nPoints
+  for s in info.stencils:
+    let sSym = s.nimSym
+    let offsetExpr = quote do: cast[pointer](addr `sSym`.offsets[0])
+    addParam(offsetExpr, ident"pointer")
+    let npExpr = quote do: `sSym`.nPoints.cint
+    addParam(npExpr, ident"cint")
+
+  # Runtime int vars
+  let runtimeVars = findRuntimeIntVars(body, info)
+  for rv in runtimeVars:
+    let rvSym = rv.sym
+    let rvExpr = quote do: `rvSym`.cint
+    addParam(rvExpr, ident"cint")
+
+  # Build the importc proc declaration
+  let wrapperName = genSym(nskProc, funcName)
+  let funcNameLit = newLit(funcName)
+  let procDecl = newNimNode(nnkProcDef).add(
+    wrapperName,           # name
+    newEmptyNode(),        # pattern
+    newEmptyNode(),        # generic params
+    params,                # formal params
+    newNimNode(nnkPragma).add(  # pragmas
+      newNimNode(nnkExprColonExpr).add(ident"importc", funcNameLit),
+      ident"cdecl",
+      ident"nodecl"
+    ),
+    newEmptyNode(),        # reserved
+    newEmptyNode()         # body (empty for importc)
+  )
+
+  # Build the call
+  var callNode = newNimNode(nnkCall).add(wrapperName)
+  for arg in callArgs:
+    callNode.add arg
+
+  result = newStmtList(
+    passCPragma,
+    argSetupStmts,
+    procDecl,
+    callNode
+  )
 
 #[ ============================================================================
-   Public Each Macro
+   Public Each Macro (ForLoopStmt)
    ============================================================================ ]#
 
 macro each*(forLoop: ForLoopStmt): untyped =
-  ## SIMD-vectorized parallel each loop for TensorFieldView (OpenMP backend)
+  ## OpenMP parallel each loop for TensorFieldView.
   ##
-  ## Analyzes the loop body at compile time to detect operation patterns,
-  ## then generates SIMD-vectorized code using the AoSoA layout and
-  ## SimdVecDyn load/store/arithmetic from simd/.
+  ## Transpiles the loop body to a complete C function with
+  ## ``#pragma omp parallel for`` and emits it at file scope.
+  ## Handles all expression patterns (copy, add, sub, matmul,
+  ## scalar ops, stencil, gauge, adjoint, element writes, etc.).
   ##
-  ## Recognized patterns (SIMD-vectorized):
-  ##   viewC[n] = viewA[n]                     # Copy
-  ##   viewC[n] = viewA[n] + viewB[n]          # Addition
-  ##   viewC[n] = viewA[n] - viewB[n]          # Subtraction
-  ##   viewC[n] = 2.0 * viewA[n]               # Scalar multiply
-  ##   viewC[n] = viewA[n] + 3.0               # Scalar add
-  ##   viewC[n] = viewA[n] * viewB[n]          # Matrix multiply
-  ##
-  ## Falls back to scalar per-site loop for:
-  ##   - Echo/print statements
-  ##   - Stencil neighbor access
-  ##   - Complex/unrecognized expressions
+  ## Echo/debugEcho falls back to a sequential CPU loop.
   ##
   ## Usage:
-  ##   for n in each 0..<view.numSites():
+  ##   for n in each view.all:
   ##     viewC[n] = viewA[n] + viewB[n]
-  
+
   let loopVar = forLoop[0]
   let loopRangeNode = forLoop[1][1]  # Skip 'each' wrapper
   let body = forLoop[2]
-  
-  # Check for echo - needs serial execution
-  let needsSerial = hasEchoStatement(body)
-  
-  if loopRangeNode.kind == nnkInfix and loopRangeNode[0].strVal == "..<":
-    let startExpr = loopRangeNode[1]
-    let endExpr = loopRangeNode[2]
-    
-    if needsSerial:
-      result = quote do:
-        block:
-          for `loopVar` in `startExpr`..<`endExpr`:
-            `body`
-    else:
-      result = quote do:
-        block:
-          var `loopVar` {.inject.}: int = 0
-          eachImpl(`loopVar`, `startExpr`, `endExpr`, `body`)
+
+  var isRange = false
+  var startExpr, endExpr: NimNode
+  if loopRangeNode.kind == nnkInfix:
+    let opNode = loopRangeNode[0]
+    let opStr = if opNode.kind in {nnkIdent, nnkSym, nnkOpenSymChoice, nnkClosedSymChoice}:
+                  (if opNode.kind in {nnkOpenSymChoice, nnkClosedSymChoice}: opNode[0].strVal else: opNode.strVal)
+                else: ""
+    if opStr == "..<" or opStr == "..":
+      isRange = true
+      startExpr = loopRangeNode[1]
+      endExpr = loopRangeNode[2]
+  elif loopRangeNode.kind == nnkDotExpr and loopRangeNode.len >= 2:
+    # Handle view.all before template expansion
+    if loopRangeNode[1].eqIdent("all"):
+      isRange = true
+      startExpr = newLit(0)
+      endExpr = newCall(ident"numSites", loopRangeNode[0])
+
+  if isRange:
+    result = quote do:
+      block:
+        var `loopVar` {.inject.}: int = 0
+        eachImpl(`loopVar`, `startExpr`, `endExpr`, `body`)
   else:
     result = quote do:
       block:
@@ -733,7 +1275,7 @@ macro each*(forLoop: ForLoopStmt): untyped =
 
 when isMainModule:
   import ../tensor/sitetensor
-  
+
   initOpenMP()
-  echo "OpenMP SIMD dispatch module loaded"
+  echo "OpenMP C codegen dispatch module loaded"
   echo "Max threads: ", getNumThreads()

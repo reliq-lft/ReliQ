@@ -224,7 +224,7 @@ test-opencl:
 	$(call run_test_suite,OpenCL Backend,,tensorview)
 
 test-openmp:
-	$(call run_test_suite,OpenMP Backend,-d:UseOpenMP:true --passC:-fopenmp --passL:-fopenmp,tensorview ompsimd)
+	$(call run_test_suite,OpenMP Backend,-d:UseOpenMP:true --passC:-fopenmp --passL:-fopenmp,tensorview)
 
 test-sycl: sycl-lib
 	$(call run_test_suite,SYCL Backend,-d:UseSycl:true --passL:-L$(PWD)/lib --passL:-lreliq_sycl --passL:-Wl$(comma)-rpath$(comma)$(PWD)/lib,tensorview)

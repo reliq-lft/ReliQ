@@ -91,7 +91,16 @@ macro all*(forLoop: ForLoopStmt): untyped =
   # Check for echo - needs serial execution
   let needsSerial = hasEchoStatement(body)
   
-  if loopRangeNode.kind == nnkInfix and loopRangeNode[0].strVal == "..<":
+  # Helper to get symbol name from various node kinds
+  proc nodeStr(n: NimNode): string =
+    case n.kind
+    of nnkIdent, nnkSym: n.strVal
+    of nnkOpenSymChoice, nnkClosedSymChoice: n[0].strVal
+    else: ""
+
+  let isRangeInfix = loopRangeNode.kind == nnkInfix and
+    nodeStr(loopRangeNode[0]) == "..<"
+  if isRangeInfix:
     let startExpr = loopRangeNode[1]
     let endExpr = loopRangeNode[2]
     
@@ -101,13 +110,12 @@ macro all*(forLoop: ForLoopStmt): untyped =
           for `loopVar` in `startExpr`..<`endExpr`:
             `body`
     else:
-      # Use ompParallelFor for CPU thread parallelization
+      # Use a plain for loop for LocalTensorField operations.
+      # Performance-critical loops use each/reduce on TensorFieldViews instead.
       result = quote do:
         block:
-          proc loopBody(idx: int64, ctx: pointer) {.cdecl.} =
-            let `loopVar` = int(idx)
+          for `loopVar` in `startExpr`..<`endExpr`:
             `body`
-          ompParallelFor(int64(`startExpr`), int64(`endExpr`), loopBody, nil)
   else:
     result = quote do:
       block:

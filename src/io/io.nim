@@ -41,12 +41,12 @@
 ## ```nim
 ## import io
 ##
-## # Read a gauge configuration
-## let gauge = readGaugeField("config.lime")
+## # Read a gauge configuration (low-level QIO)
+## let gauge = readQIOGaugeField("config.lime")
 ## echo "Lattice dimensions: ", gauge.dims
 ##
-## # Write a gauge configuration  
-## discard writeGaugeField("output.lime", gauge, "<info>My config</info>")
+## # Write a gauge configuration (low-level QIO)
+## discard writeQIOGaugeField("output.lime", gauge, "<info>My config</info>")
 ##
 ## # Low-level LIME access
 ## let reader = newLimeReader("file.lime")
@@ -63,18 +63,21 @@ import lime
 import scidac
 import qio
 import tensorio
+import gaugeio
 
 export lime
 export scidac
 export qio
 export tensorio
+export gaugeio
 
 when isMainModule:
   import std/[unittest, os, strformat, math, strutils]
   
   import ../parallel
   import ../lattice
-  import ../tensor/[globaltensor, localtensor]
+  import ../tensor/[globaltensor, localtensor, tensorview]
+  import ../lattice/stencil
   import ../globalarrays/[gawrap]
   import ../utils/[complex]
   from ../lattice/simplecubiclattice import SimpleCubicLattice
@@ -377,12 +380,12 @@ when isMainModule:
         for i in 0..<data.len:
           data[i] = float64(i) * 0.0001
         
-        let field = GaugeField[float64](dims: dims, data: data)
+        let field = QIOGaugeField[float64](dims: dims, data: data)
         
-        check writeGaugeField(TestQIOFile, field, "<info>Test config</info>") == lsSuccess
+        check writeQIOGaugeField(TestQIOFile, field, "<info>Test config</info>") == lsSuccess
         check fileExists(TestQIOFile)
         
-        let readField = readGaugeField(TestQIOFile)
+        let readField = readQIOGaugeField(TestQIOFile)
         check readField.dims == dims
         check readField.data.len == data.len
         
@@ -412,16 +415,16 @@ when isMainModule:
         for i in 0..<originalData.len:
           originalData[i] = sin(float64(i) * 0.01) * cos(float64(i) * 0.007)
         
-        let field = GaugeField[float64](dims: dims, data: originalData)
+        let field = QIOGaugeField[float64](dims: dims, data: originalData)
         let userXml = """<info>
     <beta>6.0</beta>
     <trajectory>1000</trajectory>
     <algorithm>HMC</algorithm>
   </info>"""
         
-        check writeGaugeField(TestQIOFile, field, userXml) == lsSuccess
+        check writeQIOGaugeField(TestQIOFile, field, userXml) == lsSuccess
         
-        let readField = readGaugeField(TestQIOFile)
+        let readField = readQIOGaugeField(TestQIOFile)
         
         check readField.dims == dims
         check readField.data.len == originalData.len
@@ -458,22 +461,19 @@ when isMainModule:
         let dims: array[4, int] = [8, 8, 8, 16]
         let lattice = newSimpleCubicLattice(dims)
         
-        # Create 4 tensor fields for the 4 link directions
-        var gaugeField0 = lattice.newTensorField([3, 3]): Complex64
-        var gaugeField1 = lattice.newTensorField([3, 3]): Complex64
-        var gaugeField2 = lattice.newTensorField([3, 3]): Complex64
-        var gaugeField3 = lattice.newTensorField([3, 3]): Complex64
-        var gaugeField = [gaugeField0, gaugeField1, gaugeField2, gaugeField3]
+        # Create a GaugeField (SU(3) fundamental)
+        let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
+        var u = lattice.newGaugeField(ctx)
         
         if GA_Nodeid() == 0:
           echo "Reading sample ILDG file: ", SampleILDGFile
           
-        readGaugeField(gaugeField, SampleILDGFile)
+        gaugeio.readGaugeField(u, SampleILDGFile)
         
         # Verify we read something non-zero
         var nonZeroCount = 0
         for mu in 0..<4:
-          var localField = gaugeField[mu].newLocalTensorField()
+          var localField = u.field[mu].newLocalTensorField()
           let numElems = min(25, localField.numElements())
           for i in 0..<numElems:
             if abs(localField.data[i]) > 1e-15:
@@ -483,6 +483,61 @@ when isMainModule:
           echo "  Non-zero elements (first 100 across all dirs): ", nonZeroCount
         
         check nonZeroCount > 0
+      
+      test "GaugeField write-read round-trip with plaquette validation":
+        # Read the sample ILDG file into a GaugeField
+        let dims: array[4, int] = [8, 8, 8, 16]
+        let lattice = newSimpleCubicLattice(dims)
+        let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
+        var u = lattice.newGaugeField(ctx)
+        
+        gaugeio.readGaugeField(u, SampleILDGFile, validate = false)
+        
+        # Write via gaugeio (embeds plaquette/linkTrace in userXml)
+        let outFile = SharedTestDir / "gauge_roundtrip.lime"
+        let status = gaugeio.writeGaugeField(u, outFile, "<note>round-trip test</note>")
+        check status == lsSuccess
+        
+        GA_Sync()
+        
+        # Re-read and validate stored plaquette/linkTrace match computed values
+        var u2 = lattice.newGaugeField(ctx)
+        
+        if GA_Nodeid() == 0:
+          echo "Round-trip validation:"
+        
+        gaugeio.readGaugeField(u2, outFile)
+        
+        # Also verify raw plaquette/linkTrace values on rank 0
+        if GA_Nodeid() == 0:
+          let reader = newTensorFieldReader(outFile)
+          reader.loadBinaryData(validate = false)
+          let nc = reader.colors
+          let rdims = reader.dims
+          let plaq = computePlaquetteFromBinary(reader.binaryData, rdims, nc, true)
+          let lt = computeLinkTraceFromBinary(reader.binaryData, rdims, nc, true)
+          let storedUserXml = reader.userXml
+          reader.close()
+          
+          # Known reference values from Python computation
+          let refPlaq = 0.951249133097204
+          let refLt = 0.987260784992965
+          
+          echo fmt"  Computed plaquette: {plaq:.15g}"
+          echo fmt"  Reference plaquette: {refPlaq:.15g}"
+          echo fmt"  Computed link trace: {lt:.15g}"
+          echo fmt"  Reference link trace: {refLt:.15g}"
+          
+          check abs(plaq - refPlaq) < 1.0e-10
+          check abs(lt - refLt) < 1.0e-10
+          
+          # Verify the stored XML contains plaquette/linkTrace
+          let (hasPlaq, storedPlaq) = parseStoredValue(storedUserXml, "plaquette")
+          let (hasLt, storedLt) = parseStoredValue(storedUserXml, "linkTrace")
+          check hasPlaq
+          check hasLt
+          check abs(storedPlaq - refPlaq) < 1.0e-10
+          check abs(storedLt - refLt) < 1.0e-10
       
       test "Write and read real TensorField":
         let dims: array[4, int] = [4, 4, 4, 8]

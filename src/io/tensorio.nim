@@ -99,7 +99,8 @@ type
     recordInfo*: SciDACRecordInfo
     storedChecksum*: SciDACChecksum
     computedChecksum*: SciDACChecksum
-    binaryData: seq[byte]
+    userXml*: string
+    binaryData*: seq[byte]
     hasData: bool
     hasChecksum*: bool
 
@@ -164,6 +165,7 @@ proc loadBinaryData*(reader: TensorFieldReader, validate: bool = true) =
   if not reader.hasData:
     for (recInfo, userXml, checksum) in reader.scidac.messages:
       reader.recordInfo = recInfo
+      reader.userXml = userXml
       # Read binary data first - this also reads the checksum record that follows
       reader.binaryData = reader.scidac.readBinaryData()
       # Now get checksum info (updated by readBinaryData)
@@ -568,7 +570,8 @@ proc writeTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
 proc readGaugeField*[D: static[int], L: Lattice[D]](
   gaugeField: var array[4, TensorField[D, 2, L, Complex64]],
   filename: string,
-  swapBytes: bool = true
+  swapBytes: bool = true,
+  printInfo: bool = true
 ) =
   ## Read a gauge configuration into an array of 4 TensorFields with shape [3, 3]
   ## 
@@ -601,7 +604,8 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
     defer: reader.close()
     
     # Print file metadata
-    reader.printFileInfo()
+    if printInfo:
+      reader.printFileInfo()
     
     # Verify dimensions match
     let fileDims = reader.dims
@@ -614,7 +618,8 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
     reader.loadBinaryData(validate = true)
     
     # Print record info including checksum status
-    reader.printRecordInfo()
+    if printInfo:
+      reader.printRecordInfo()
     
     data = reader.binaryData
     
@@ -686,14 +691,16 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
 proc writeGaugeField*[D: static[int], L: Lattice[D]](
   gaugeField: array[4, TensorField[D, 2, L, Complex64]],
   filename: string,
-  userXml: string = ""
+  userXml: string = "",
+  recordXml: string = ""
 ): LimeStatus =
   ## Write a gauge configuration from an array of 4 TensorFields to file
   ##
   ## Parameters:
   ##   gaugeField: Array of 4 TensorFields, each with shape [3, 3]
   ##   filename: Path to the output file
-  ##   userXml: Optional user metadata XML
+  ##   userXml: Optional file-level user metadata XML
+  ##   recordXml: Optional record-level user metadata XML (for plaquette etc.)
   
   GA_Sync()
   
@@ -779,7 +786,7 @@ proc writeGaugeField*[D: static[int], L: Lattice[D]](
       datacount: 4
     )
     
-    result = writer.scidac.writeField(globalData, recordInfo, "")
+    result = writer.scidac.writeField(globalData, recordInfo, recordXml)
   else:
     result = lsSuccess
   

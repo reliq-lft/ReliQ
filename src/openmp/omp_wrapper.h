@@ -23,6 +23,12 @@ typedef void (*omp_loop_callback)(int64_t idx, void* context);
 /* Callback function type for chunked loop body (range per thread) */
 typedef void (*omp_chunk_callback)(int64_t start, int64_t end, void* context);
 
+/* Callback function type for reduction loop body (returns per-site contribution) */
+typedef double (*omp_reduce_callback)(int64_t idx, void* context);
+
+/* Callback function type for chunked reduction (returns partial sum for chunk) */
+typedef double (*omp_chunk_reduce_callback)(int64_t start, int64_t end, void* context);
+
 /* CPU parallel for loop with static scheduling (per-iteration callback) */
 void omp_parallel_for(
     int64_t start,
@@ -38,6 +44,28 @@ void omp_parallel_for_chunked(
     int64_t start,
     int64_t end,
     omp_chunk_callback callback,
+    void* context
+);
+
+/* CPU parallel for loop with OpenMP reduction(+:)
+ * Each iteration calls the callback which returns a double contribution.
+ * Returns the total sum across all iterations, computed in parallel. */
+double omp_parallel_reduce_sum(
+    int64_t start,
+    int64_t end,
+    omp_reduce_callback callback,
+    void* context
+);
+
+/* CPU chunked parallel reduction with OpenMP reduction(+:)
+ * Each thread gets a [chunk_start, chunk_end) range, calls the callback
+ * which returns the partial sum for that chunk. OpenMP reduction(+:)
+ * sums the partial sums across threads.
+ * This is the reduction analog of omp_parallel_for_chunked. */
+double omp_parallel_reduce_sum_chunked(
+    int64_t start,
+    int64_t end,
+    omp_chunk_reduce_callback callback,
     void* context
 );
 

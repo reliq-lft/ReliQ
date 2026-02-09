@@ -47,6 +47,8 @@ proc initGA*(argc: ptr cint, argv: ptr cstringArray)
 
 proc finalizeGA*() {.importc: "GA_Terminate", ga.}
 
+var gaIsLive* = false  ## Tracks whether GA library is initialized
+
 #[ unit tests ]#
 
 when isMainModule:

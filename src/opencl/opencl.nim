@@ -29,12 +29,17 @@
 
 import clbase
 import cldisp
+import clreduce
 
 export cldisp
+export clreduce
 
 template clParallel*(body: untyped): untyped =
   initCL()
-  body
+  block:
+    body
+    # Views declared in body are destroyed here (end of block),
+    # while OpenCL queues and context are still alive.
   finalizeCL()
 
 when isMainModule:

@@ -27,3 +27,27 @@ type Lattice*[D: static[int]] = concept x
   x.globalGrid is array[D, int]
   x.mpiGrid is array[D, int]
   x.ghostGrid is array[D, int]
+
+proc numSites*[D: static[int], L: Lattice[D]](lat: L): int =
+  ## Total number of local lattice sites on this MPI rank.
+  ## When mpiGrid has valid values (> 0), divides globalGrid by mpiGrid.
+  ## When mpiGrid has auto-detect sentinels (<= 0), returns globalVolume
+  ## (correct for single-rank; multi-rank code should use view/stencil counts).
+  result = 1
+  for d in 0..<D:
+    if lat.mpiGrid[d] > 0:
+      result *= lat.globalGrid[d] div lat.mpiGrid[d]
+    else:
+      result *= lat.globalGrid[d]
+
+proc globalVolume*[D: static[int], L: Lattice[D]](lat: L): int =
+  ## Total global lattice volume (same as numSites for single-rank)
+  result = 1
+  for d in 0..<D:
+    result *= lat.globalGrid[d]
+
+template all*(lat: untyped): untyped =
+  ## Returns a range over all local sites: ``0 ..< numSites``.
+  ## Use with ``each`` and ``reduce`` loops:
+  ##   ``for n in each lattice.all:``
+  0 ..< lat.numSites()

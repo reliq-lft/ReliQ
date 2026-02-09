@@ -234,6 +234,10 @@ proc newTensorField*[D: static[int], R: static[int], L: Lattice[D]](
   elif isComplex64(T):
     result.data = newGlobalArray(globalGrid, mpiGrid, ghostGrid): float64
 
+proc newScalarField*[D: static[int], L: Lattice[D]](lattice: L, T: typedesc): TensorField[D, 1, L, T] =
+  ## Create a new scalar field (rank-0 tensor)
+  newTensorField(lattice, [1], T)
+
 #[ ============================================================================
    Halo Exchange (Ghost Region Update) for Distributed Tensor Fields
    ============================================================================ ]#

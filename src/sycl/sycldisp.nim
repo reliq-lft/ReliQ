@@ -1718,8 +1718,11 @@ macro each*(x: ForLoopStmt): untyped =
   if iterNode.kind == nnkInfix:
     lo = iterNode[1]
     hi = iterNode[2]
+  elif iterNode.kind == nnkDotExpr and iterNode[1].eqIdent("all"):
+    lo = newLit(0)
+    hi = newCall(ident"numSites", iterNode[0])
   else:
-    error("each requires a range expression like 0..<N")
+    error("each requires a range expression like 0..<N or obj.all")
   
   result = quote do:
     block:

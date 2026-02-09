@@ -313,21 +313,23 @@ proc writeField*[T](w: QIOFieldWriter[T],
 # ===========================================================================
 
 type
-  GaugeField*[T] = object
-    ## 4D gauge field (4 SU(3) matrices per site)
+  QIOGaugeField*[T] = object
+    ## Low-level QIO gauge field container (flat seq-based, non-distributed).
+    ## For distributed gauge fields, use ``GaugeField`` from ``gauge/gaugefield``.
     dims*: array[4, int]
     data*: seq[T]  # Stored as real numbers
 
-  PropagatorField*[T] = object
-    ## Propagator field (12x12 complex per site)
+  QIOPropagatorField*[T] = object
+    ## Low-level QIO propagator field container (flat seq-based, non-distributed).
     dims*: array[4, int]
     data*: seq[T]
 
 proc volume*(dims: array[4, int]): int =
   dims[0] * dims[1] * dims[2] * dims[3]
 
-proc readGaugeField*(filename: string): GaugeField[float64] =
-  ## Read a gauge configuration file
+proc readQIOGaugeField*(filename: string): QIOGaugeField[float64] =
+  ## Read a gauge configuration from a QIO file into a flat (non-distributed) container.
+  ## For distributed reads, use ``gaugeio.readGaugeField`` with a ``GaugeField``.
   let reader = newQIOFieldReader[float64](filename)
   defer: reader.close()
   
@@ -337,9 +339,10 @@ proc readGaugeField*(filename: string): GaugeField[float64] =
   result.dims = [dims[0], dims[1], dims[2], dims[3]]
   result.data = reader.readField[:float64]()
 
-proc writeGaugeField*(filename: string, field: GaugeField[float64], 
-                      userXml: string = ""): LimeStatus =
-  ## Write a gauge configuration file
+proc writeQIOGaugeField*(filename: string, field: QIOGaugeField[float64], 
+                         userXml: string = ""): LimeStatus =
+  ## Write a gauge configuration from a flat (non-distributed) container to a QIO file.
+  ## For distributed writes, use ``gaugeio.writeGaugeField`` with a ``GaugeField``.
   let writer = newQIOFieldWriter[float64](filename, field.dims)
   defer: discard writer.close()
   
@@ -373,13 +376,13 @@ when isMainModule:
     for i in 0..<data.len:
       data[i] = float64(i) * 0.0001
     
-    let field = GaugeField[float64](
+    let field = QIOGaugeField[float64](
       dims: [4, 4, 4, 8],
       data: data
     )
     
-    discard writeGaugeField("/tmp/test_qio.lime", field, 
-                            "<info>Test gauge configuration</info>")
+    discard writeQIOGaugeField("/tmp/test_qio.lime", field, 
+                               "<info>Test gauge configuration</info>")
     echo "  Written /tmp/test_qio.lime"
   
   echo "\nDone! Testing complete."

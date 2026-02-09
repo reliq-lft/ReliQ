@@ -43,9 +43,11 @@
 import ompbase
 import ompdisp
 import omplocal
+import ompreduce
 import ompwrap
 
 export ompbase
 export ompdisp
 export omplocal
+export ompreduce
 export ompwrap

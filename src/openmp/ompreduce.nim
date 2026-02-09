@@ -1,0 +1,762 @@
+#[ 
+  ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
+  Source file: src/openmp/ompreduce.nim
+  Contact: reliq-lft@proton.me
+
+  Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
+
+  MIT License
+  
+  Copyright (c) 2025 reliq-lft
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+]#
+
+## Parallel Reduce Macro for TensorFieldView (OpenMP backend) — C Codegen
+##
+## This module provides the ``reduce`` macro for parallel reduction loops
+## on TensorFieldView objects using the same AST-to-C transpiler approach
+## as ``ompdisp.nim``.
+##
+## The generated C function uses ``#pragma omp parallel for reduction(+:accum)``
+## and contains the fully transpiled loop body. No Nim gotos or closure
+## captures are involved.
+##
+## After the OpenMP parallel reduction, ``GA_Dgop`` is called to sum
+## across MPI ranks.
+##
+## Usage:
+##   var traceSum = 0.0
+##   for n in reduce view.all:
+##     traceSum += trace(view[n]).re
+
+import std/[macros, tables, strutils, sets, sequtils, compilesettings, os]
+
+import ./ompbase
+import ./ompdisp
+import ./ompwrap
+
+{.passC: "-fopenmp".}
+{.passL: "-fopenmp".}
+
+#[ ============================================================================
+   Helper: Find += accumulation variable in typed AST
+   ============================================================================ ]#
+
+proc findAccumTarget(body: NimNode): NimNode =
+  case body.kind
+  of nnkInfix:
+    if body.len >= 3 and body[0].kind in {nnkSym, nnkIdent}:
+      if body[0].strVal == "+=":
+        return body[1]
+  of nnkCall:
+    if body.len >= 3 and body[0].kind == nnkSym and body[0].strVal == "+=":
+      return body[1]
+  else:
+    discard
+  for child in body:
+    let found = findAccumTarget(child)
+    if found != nil:
+      return found
+  return nil
+
+proc unwrapSym(n: NimNode): NimNode =
+  var cur = n
+  while cur.kind in {nnkHiddenAddr, nnkHiddenDeref, nnkAddr, nnkDerefExpr,
+                      nnkHiddenStdConv, nnkHiddenSubConv, nnkConv}:
+    cur = cur[0]
+  return cur
+
+#[ ============================================================================
+   Reduce Expression Transpilation
+   ============================================================================ ]#
+
+proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var CodeCtx): string =
+  ## Transpile a reduce body expression to C code.
+  ## For example: ``trace(view[n]).re`` becomes a sum of diagonal .re fields.
+  case n.kind
+  of nnkDotExpr:
+    if n.len >= 2 and n[1].kind == nnkSym:
+      let field = n[1].strVal
+      if field == "re" or field == "im":
+        # e.g. trace(view[n]).re or complex_expr.im
+        let inner = transpileReduceExpr(n[0], info, ctx)
+        return inner & "." & field
+      else:
+        let obj = transpileReduceExpr(n[0], info, ctx)
+        return obj & "." & field
+
+  of nnkCall:
+    if n[0].kind == nnkSym:
+      let fn = n[0].strVal
+      if fn == "trace" and n.len >= 2:
+        # trace(view[n]) — sum of diagonal elements of a matrix
+        # In AoSoA layout, we load the diagonal elements:
+        #   sum = data[group * (VW * elems) + 0*NC*VW + 0*VW + lane]
+        #       + data[group * (VW * elems) + 1*NC*VW + 1*VW + lane]
+        #       + ...
+        let arg = n[1]
+        if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
+          let sr = resolveSiteRef(arg[1], arg[2], ctx)
+          if ctx.isComplex:
+            # Return a complex trace: { sum_re, sum_im }
+            return "_trace_" & sr.dataVar.replace("_data", "")
+          else:
+            return "_trace_" & sr.dataVar.replace("_data", "")
+
+      if fn == "[]" and n.len >= 3:
+        let sr = resolveSiteRef(n[1], n[2], ctx)
+        return sr.dataVar & "_site"
+
+      # General function call
+      var args: seq[string]
+      for i in 1..<n.len:
+        args.add transpileReduceExpr(n[i], info, ctx)
+      return fn & "(" & args.join(", ") & ")"
+
+  of nnkSym:
+    return n.strVal
+
+  of nnkIntLit..nnkInt64Lit:
+    return $n.intVal
+
+  of nnkFloatLit..nnkFloat64Lit:
+    return $n.floatVal
+
+  of nnkInfix:
+    if n.len >= 3 and n[0].kind == nnkSym:
+      let op = n[0].strVal
+      let l = transpileReduceExpr(n[1], info, ctx)
+      let r = transpileReduceExpr(n[2], info, ctx)
+      return "(" & l & " " & op & " " & r & ")"
+
+  of nnkHiddenStdConv, nnkConv, nnkHiddenDeref, nnkHiddenAddr, nnkHiddenSubConv:
+    if n.len > 0:
+      return transpileReduceExpr(n[^1], info, ctx)
+
+  of nnkHiddenCallConv:
+    if n.len >= 2:
+      return transpileReduceExpr(n[1], info, ctx)
+
+  else: discard
+  return "0"
+
+#[ ============================================================================
+   Reduce RHS Transpilation
+   ============================================================================ ]#
+
+proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
+  ## Generate C code that computes a SIMD vector contribution and adds it
+  ## to accum_vec (a simd_v accumulator).
+  ##
+  ## The generated code adds VW-wide SIMD results to ``accum_vec``.
+  ## The caller horizontally sums accum_vec to a scalar at the end.
+  ##
+  ## Supported patterns:
+  ##   - trace(view[n]).re / .im
+  ##   - trace(matexpr).re / .im  (matexpr = matmul, adjoint, +/-, etc.)
+  ##   - trace(view[n])  (real or complex→.re)
+  ##   - trace(matexpr)
+  ##   - scalar_expr * scalar_expr, scalar + scalar, etc.
+  ##   - literal constants
+  ##   - let-bound scalars
+  ##   - view[n][i,j].re  (element access)
+  ##   - norm2/normsq
+  let p = ind(d)
+
+  # --- Pattern: expr.re or expr.im ---
+  if rhs.kind == nnkDotExpr and rhs.len >= 2 and rhs[1].kind == nnkSym:
+    let field = rhs[1].strVal
+    if field in ["re", "im"]:
+      let inner = rhs[0]
+
+      # trace(something).re
+      if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "trace":
+        let traceArg = inner[1]
+        # trace(view[n]).re — direct SIMD load from AoSoA diagonal
+        if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
+          let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+          var s = ""
+          let isStencilAccess = sr.groupVar != "group"
+          if sr.isGauge:
+            let elems = sr.elemsVar
+            for di in 0..<sr.gaugeDim:
+              let cond = if di == 0: "if" else: "else if"
+              s &= p & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+              s &= p & "  for (int _i = 0; _i < NC; _i++) {\n"
+              # Complex: diagonal element [i,i] re at flat index 2*(i*NC+i), im at 2*(i*NC+i)+1
+              let elemExpr = if ctx.isComplex:
+                (if field == "re": "2*(_i*NC+_i)" else: "2*(_i*NC+_i)+1")
+              else: "_i*NC+_i"
+              if isStencilAccess:
+                let idxArray = sr.groupVar.replace("_group", "_indices")
+                s &= p & "    accum_vec = simd_add(accum_vec, simd_gather(" & sr.gaugeName & "_" & $di & "_data, " & idxArray & ", " & elemExpr & ", " & elems & "));\n"
+              else:
+                s &= p & "    accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, elems, elemExpr) & "));\n"
+              s &= p & "  }\n"
+              s &= p & "}\n"
+          else:
+            let elems = sr.elemsVar
+            s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+            let elemExpr = if ctx.isComplex:
+              (if field == "re": "2*(_i*NC+_i)" else: "2*(_i*NC+_i)+1")
+            else: "_i*NC+_i"
+            if isStencilAccess:
+              let idxArray = sr.groupVar.replace("_group", "_indices")
+              s &= p & "  accum_vec = simd_add(accum_vec, simd_gather(" & sr.dataVar & ", " & idxArray & ", " & elemExpr & ", " & elems & "));\n"
+            else:
+              s &= p & "  accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, elems, elemExpr) & "));\n"
+            s &= p & "}\n"
+          return s
+
+        # trace(matexpr).re — full matrix expression, then SIMD trace
+        else:
+          var s = ""
+          let tmp = ctx.nextTmp()
+          var elemsGuess = "NC*NC"
+          if ctx.isComplex: elemsGuess = "2*NC*NC"
+          s &= p & "simd_v " & tmp & "[" & elemsGuess & "];\n"
+          let matRes = emitMatExpr(tmp, traceArg, ctx, d)
+          s &= matRes.code
+          s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+          if ctx.isComplex:
+            let elemExpr = if field == "re": "2*(_i*NC+_i)" else: "2*(_i*NC+_i)+1"
+            s &= p & "  accum_vec = simd_add(accum_vec, " & tmp & "[" & elemExpr & "]);\n"
+          else:
+            s &= p & "  accum_vec = simd_add(accum_vec, " & tmp & "[_i*NC+_i]);\n"
+          s &= p & "}\n"
+          return s
+
+      # view[n][i,j].re — element access, SIMD load
+      if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "[]":
+        if inner.len >= 4:
+          # 2D element access: view[n][i,j].re
+          let viewCall = inner[1]
+          if viewCall.kind == nnkCall and viewCall[0].kind == nnkSym and viewCall[0].strVal == "[]":
+            let sr = resolveSiteRef(viewCall[1], viewCall[2], ctx)
+            let row = transpileScalar(inner[2], ctx)
+            let col = transpileScalar(inner[3], ctx)
+            let flatIdx = if ctx.isComplex:
+              (if field == "re": "2*((" & row & ")*NC+(" & col & "))" else: "2*((" & row & ")*NC+(" & col & "))+1")
+            else: "(" & row & ")*NC+(" & col & ")"
+            let isStencilAccess = sr.groupVar != "group"
+            if isStencilAccess:
+              let idxArray = sr.groupVar.replace("_group", "_indices")
+              return p & "accum_vec = simd_add(accum_vec, simd_gather(" & sr.dataVar & ", " & idxArray & ", " & flatIdx & ", " & sr.elemsVar & "));\n"
+            else:
+              return p & "accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, flatIdx) & "));\n"
+        elif inner.len >= 3:
+          # 1D element access: view[n][i].re
+          let viewCall = inner[1]
+          if viewCall.kind == nnkCall and viewCall[0].kind == nnkSym and viewCall[0].strVal == "[]":
+            let sr = resolveSiteRef(viewCall[1], viewCall[2], ctx)
+            let idx = transpileScalar(inner[2], ctx)
+            let flatIdx = if ctx.isComplex:
+              (if field == "re": "2*(" & idx & ")" else: "2*(" & idx & ")+1")
+            else: idx
+            let isStencilAccess = sr.groupVar != "group"
+            if isStencilAccess:
+              let idxArray = sr.groupVar.replace("_group", "_indices")
+              return p & "accum_vec = simd_add(accum_vec, simd_gather(" & sr.dataVar & ", " & idxArray & ", " & flatIdx & ", " & sr.elemsVar & "));\n"
+            else:
+              return p & "accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, flatIdx) & "));\n"
+
+      # Generic complex expression .re — recurse
+      var s = ""
+      let tmp = ctx.nextTmp()
+      var elemsGuess = "NC*NC"
+      if ctx.isComplex: elemsGuess = "2*NC*NC"
+      s &= p & "simd_v " & tmp & "[" & elemsGuess & "];\n"
+      let matRes = emitMatExpr(tmp, inner, ctx, d)
+      s &= matRes.code
+      if ctx.isComplex:
+        let elemExpr = if field == "re": "0" else: "1"
+        s &= p & "accum_vec = simd_add(accum_vec, " & tmp & "[" & elemExpr & "]);\n"
+      else:
+        s &= p & "accum_vec = simd_add(accum_vec, " & tmp & "[0]);\n"
+      return s
+
+  # --- Pattern: trace(something) without .re/.im ---
+  if rhs.kind == nnkCall and rhs[0].kind == nnkSym and rhs[0].strVal == "trace":
+    let traceArg = rhs[1]
+    # trace(view[n]) — direct SIMD load from diagonal
+    if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
+      let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+      var s = ""
+      let isStencilAccess = sr.groupVar != "group"
+      if sr.isGauge:
+        let elems = sr.elemsVar
+        for di in 0..<sr.gaugeDim:
+          let cond = if di == 0: "if" else: "else if"
+          s &= p & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+          s &= p & "  for (int _i = 0; _i < NC; _i++) {\n"
+          # For complex, trace sums .re of diagonal; for real, sums diagonal
+          let elemExpr = if ctx.isComplex: "2*(_i*NC+_i)" else: "_i*NC+_i"
+          if isStencilAccess:
+            let idxArray = sr.groupVar.replace("_group", "_indices")
+            s &= p & "    accum_vec = simd_add(accum_vec, simd_gather(" & sr.gaugeName & "_" & $di & "_data, " & idxArray & ", " & elemExpr & ", " & elems & "));\n"
+          else:
+            s &= p & "    accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.gaugeName & "_" & $di & "_data", sr.groupVar, elems, elemExpr) & "));\n"
+          s &= p & "  }\n"
+          s &= p & "}\n"
+        return s
+      else:
+        let elems = sr.elemsVar
+        s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+        let elemExpr = if ctx.isComplex: "2*(_i*NC+_i)" else: "_i*NC+_i"
+        if isStencilAccess:
+          let idxArray = sr.groupVar.replace("_group", "_indices")
+          s &= p & "  accum_vec = simd_add(accum_vec, simd_gather(" & sr.dataVar & ", " & idxArray & ", " & elemExpr & ", " & elems & "));\n"
+        else:
+          s &= p & "  accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, elems, elemExpr) & "));\n"
+        s &= p & "}\n"
+        return s
+
+    # trace(matexpr) — full matrix expression, then SIMD trace
+    var s = ""
+    let tmp = ctx.nextTmp()
+    var elemsGuess = "NC*NC"
+    if ctx.isComplex: elemsGuess = "2*NC*NC"
+    s &= p & "simd_v " & tmp & "[" & elemsGuess & "];\n"
+    let matRes = emitMatExpr(tmp, traceArg, ctx, d)
+    s &= matRes.code
+    s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+    if ctx.isComplex:
+      s &= p & "  accum_vec = simd_add(accum_vec, " & tmp & "[2*(_i*NC+_i)]);\n"
+    else:
+      s &= p & "  accum_vec = simd_add(accum_vec, " & tmp & "[_i*NC+_i]);\n"
+    return s
+
+  # --- Pattern: scalar arithmetic (*, +, -, /) ---
+  if rhs.kind == nnkInfix and rhs.len >= 3 and rhs[0].kind == nnkSym:
+    let op = rhs[0].strVal
+    if op in ["*", "+", "-", "/"]:
+      # Each operand produces a SIMD contribution; use temporary SIMD accumulators
+      var s = ""
+      let lhsTmp = ctx.nextTmp() & "_l"
+      let rhsTmp = ctx.nextTmp() & "_r"
+      s &= p & "simd_v " & lhsTmp & " = simd_setzero();\n"
+      s &= p & "simd_v " & rhsTmp & " = simd_setzero();\n"
+      s &= p & "{\n"
+      s &= p & "  simd_v accum_vec_save = accum_vec;\n"
+      s &= p & "  accum_vec = simd_setzero();\n"
+      s &= transpileReduceRhs(rhs[1], ctx, d+1)
+      s &= p & "  " & lhsTmp & " = accum_vec;\n"
+      s &= p & "  accum_vec = simd_setzero();\n"
+      s &= transpileReduceRhs(rhs[2], ctx, d+1)
+      s &= p & "  " & rhsTmp & " = accum_vec;\n"
+      # Combine: accum_vec = saved + lhs OP rhs
+      let simdOp = case op
+        of "*": "simd_mul(" & lhsTmp & ", " & rhsTmp & ")"
+        of "+": "simd_add(" & lhsTmp & ", " & rhsTmp & ")"
+        of "-": "simd_sub(" & lhsTmp & ", " & rhsTmp & ")"
+        else: "simd_mul(" & lhsTmp & ", " & rhsTmp & ")"  # / not easily vectorized
+      s &= p & "  accum_vec = simd_add(accum_vec_save, " & simdOp & ");\n"
+      s &= p & "}\n"
+      return s
+
+  # --- Pattern: norm2 / normsq ---
+  if rhs.kind == nnkCall and rhs[0].kind == nnkSym:
+    let fn = rhs[0].strVal
+    if fn in ["norm2", "normsq"] and rhs.len >= 2:
+      let arg = rhs[1]
+      if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
+        let sr = resolveSiteRef(arg[1], arg[2], ctx)
+        var s = ""
+        let elems = sr.elemsVar
+        let isStencilAccess = sr.groupVar != "group"
+        # norm2: sum of re^2 + im^2 for all elements. With elementsPerSite,
+        # this is just sum of e[i]^2 for all i (re and im are separate entries)
+        s &= p & "for (int _e = 0; _e < " & elems & "; _e++) {\n"
+        if isStencilAccess:
+          let idxArray = sr.groupVar.replace("_group", "_indices")
+          let tmpVec = ctx.nextTmp() & "_nv"
+          s &= p & "  simd_v " & tmpVec & " = simd_gather(" & sr.dataVar & ", " & idxArray & ", _e, " & elems & ");\n"
+          s &= p & "  accum_vec = simd_fmadd(" & tmpVec & ", " & tmpVec & ", accum_vec);\n"
+        else:
+          let tmpVec = ctx.nextTmp() & "_nv"
+          s &= p & "  simd_v " & tmpVec & " = simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, elems, "_e") & ");\n"
+          s &= p & "  accum_vec = simd_fmadd(" & tmpVec & ", " & tmpVec & ", accum_vec);\n"
+        s &= p & "}\n"
+        return s
+
+  # --- Pattern: literal scalars ---
+  if rhs.kind in {nnkIntLit..nnkInt64Lit}:
+    return p & "accum_vec = simd_add(accum_vec, simd_set1(" & $rhs.intVal & ".0));\n"
+  if rhs.kind in {nnkFloatLit..nnkFloat64Lit}:
+    return p & "accum_vec = simd_add(accum_vec, simd_set1(" & $rhs.floatVal & "));\n"
+
+  # --- Pattern: let-bound scalar ---
+  if rhs.kind == nnkSym:
+    let name = rhs.strVal
+    let lb = ctx.info.getLetBinding(name)
+    if lb.kind == lbkOther:
+      return p & "accum_vec = simd_add(accum_vec, simd_set1(" & name & "));\n"
+
+  # --- Unwrap hidden conversions ---
+  if rhs.kind in {nnkHiddenStdConv, nnkConv, nnkHiddenDeref, nnkHiddenAddr, nnkHiddenSubConv}:
+    if rhs.len > 0:
+      return transpileReduceRhs(rhs[^1], ctx, d)
+
+  if rhs.kind == nnkHiddenCallConv:
+    if rhs.len >= 2:
+      return transpileReduceRhs(rhs[1], ctx, d)
+
+  # --- Fallback: generic scalar expression ---
+  let code = transpileReduceExpr(rhs, ctx.info, ctx)
+  return p & "accum_vec = simd_add(accum_vec, simd_set1(" & code & "));\n"
+
+#[ ============================================================================
+   Generate Reduce C Function
+   ============================================================================ ]#
+
+var ompReduceCounter {.compileTime.} = 0
+
+proc generateReduceFunction(body: NimNode, info: KernelInfo, accumName: string):
+    tuple[funcSrc: string, funcName: string] =
+  var ctx = newCodeCtx(info)
+  let vw = $VectorWidth
+
+  ompReduceCounter += 1
+  let funcName = "omp_reduce_" & $body.lineInfoObj.line & "_" & $ompReduceCounter
+
+  var src = ""
+
+  # SIMD intrinsics header
+  src &= "#define VW " & vw & "\n"
+  src &= "#define " & ctx.simdUseMacro() & "\n"
+  src &= "#include \"" & simdHeaderPath & "\"\n\n"
+
+  # Build parameter list
+  var params: seq[string]
+  params.add ctx.cPtrType() & "result_ptr"
+  for v in info.views:
+    params.add ctx.cPtrType() & v.name & "_data"
+  for gv in info.gaugeViews:
+    for d in 0..<gv.dim:
+      params.add ctx.cPtrType() & gv.name & "_" & $d & "_data"
+  for v in info.views:
+    params.add "const int " & v.name & "_elems"
+  for gv in info.gaugeViews:
+    params.add "const int " & gv.name & "_elems"
+  params.add "const int numGroups"
+  params.add "const int NC"
+  for s in info.stencils:
+    params.add "const int* " & s.name & "_offsets"
+    params.add "const int " & s.name & "_npts"
+  let runtimeVars = findRuntimeIntVars(body, info)
+  for rv in runtimeVars:
+    params.add "const int " & rv.name
+
+  src &= "static void " & funcName & "(\n"
+  src &= "    " & params.join(",\n    ")
+  src &= "\n) {\n"
+  let cType = ctx.scalarType
+  let cZero = case cType
+    of "float": "0.0f"
+    of "int": "0"
+    of "long long": "0LL"
+    else: "0.0"
+  src &= "  " & cType & " accum = " & cZero & ";\n"
+  src &= "  #pragma omp parallel for reduction(+:accum)\n"
+  src &= "  for (int group = 0; group < numGroups; ++group) {\n"
+  src &= "    simd_v accum_vec = simd_setzero();\n"
+
+  var stmts: seq[NimNode]
+  if body.kind == nnkStmtList:
+    for child in body: stmts.add child
+  else:
+    stmts.add body
+
+  for stmt in stmts:
+    case stmt.kind
+    of nnkLetSection:
+      for idefs in stmt:
+        if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+          let vn = idefs[0].strVal
+          let val = idefs[2]
+          let lb = info.getLetBinding(vn)
+          case lb.kind
+          of lbkStencilFwd:
+            # For stencil neighbors: build VW-wide index array for gather
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _sl = 0; _sl < VW; _sl++) {\n"
+            src &= "      int _site = group * VW + _sl;\n"
+            src &= "      " & vn & "_indices[_sl] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & "];\n"
+            src &= "    }\n"
+          of lbkStencilBwd:
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _sl = 0; _sl < VW; _sl++) {\n"
+            src &= "      int _site = group * VW + _sl;\n"
+            src &= "      " & vn & "_indices[_sl] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & " + 1];\n"
+            src &= "    }\n"
+          of lbkStencilNeighbor:
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _sl = 0; _sl < VW; _sl++) {\n"
+            src &= "      int _site = group * VW + _sl;\n"
+            src &= "      " & vn & "_indices[_sl] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+            src &= "    }\n"
+          of lbkMatMul:
+            let elemsGuess = if ctx.isComplex: "2*NC*NC" else: "NC*NC"
+            src &= "    simd_v " & vn & "[" & elemsGuess & "];\n"
+            let matRes = emitMatExpr(vn, val, ctx, 2)
+            src &= matRes.code
+            src &= "    const int " & vn & "_elems = " & matRes.elems & ";\n"
+          of lbkOther:
+            let code = transpileScalar(val, ctx)
+            src &= "    " & ctx.scalarType & " " & vn & " = " & code & ";\n"
+    of nnkInfix:
+      if stmt.len >= 3 and stmt[0].kind == nnkSym and stmt[0].strVal == "+=":
+        let rhs = stmt[2]
+        src &= "    {\n"
+        src &= transpileReduceRhs(rhs, ctx, 3)
+        src &= "    }\n"
+    else:
+      discard
+
+  # Horizontal reduction: sum SIMD lanes to scalar, add to thread accum
+  src &= "    accum += simd_hadd(accum_vec);\n"
+  src &= "  }\n"    # end for group
+  src &= "  *result_ptr += accum;\n"
+  src &= "}\n"
+  return (src, funcName)
+
+#[ ============================================================================
+   Typed Reduce Implementation — C Codegen
+   ============================================================================ ]#
+
+macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
+  let loopVarSym = loopVar
+  let info = gatherInfo(body, loopVarSym)
+
+  let accumNode = findAccumTarget(body)
+  let accumSym = if accumNode != nil: unwrapSym(accumNode) else: nil
+
+  if accumNode == nil:
+    error("reduce loop body must contain a += to an accumulation variable")
+
+  # CPU fallback for echo/debugEcho
+  if hasEchoStatement(body):
+    result = quote do:
+      block:
+        let savedAccum = `accumSym`
+        for cpuIdx in `lo`..<`hi`:
+          `loopVarSym` = cpuIdx
+          `body`
+    if accumSym != nil:
+      let gaStmt = quote do:
+        if gaIsLive:
+          var deltaAccum = `accumSym` - savedAccum
+          GA_Dgop(addr deltaAccum, 1, "+")
+          `accumSym` = savedAccum + deltaAccum
+      result[1].add(gaStmt)
+    return result
+
+  let accumName = accumSym.strVal
+  let (funcSrc, funcName) = generateReduceFunction(body, info, accumName)
+
+  # Write the C function to a file at compile time, then -include it via passC
+  # This avoids the problem where {.emit.} inside a proc body places C code
+  # inside the generated C function body instead of at file scope.
+  let kernelDir = querySetting(SingleValueSetting.nimcacheDir) & "/omp_kernels"
+  discard staticExec("mkdir -p " & kernelDir)
+  let kernelFile = kernelDir & "/" & funcName & ".c"
+  writeFile(kernelFile, funcSrc)
+  let passCPragma = newNimNode(nnkPragma).add(
+    newNimNode(nnkExprColonExpr).add(ident"passC", newLit("-include " & kernelFile)))
+
+  # Find a view sym for NC computation
+  var shapeViewSym: NimNode = nil
+  for v in info.views:
+    shapeViewSym = v.nimSym; break
+  if shapeViewSym == nil and info.gaugeViews.len > 0:
+    shapeViewSym = info.gaugeViews[0].nimSym
+
+  var argSetupStmts = newStmtList()
+
+  let ncSym = genSym(nskLet, "nc")
+  let nsSym = genSym(nskLet, "ns")
+
+  if info.gaugeViews.len > 0 and info.views.len == 0:
+    let gSym = info.gaugeViews[0].nimSym
+    argSetupStmts.add quote do:
+      let `ncSym` = `gSym`.field[0].shape[0]
+      let `nsSym` = `gSym`.field[0].numSites()
+  else:
+    argSetupStmts.add quote do:
+      let `ncSym` = if `shapeViewSym`.shape.len >= 1: `shapeViewSym`.shape[0] else: 1
+      let `nsSym` = `shapeViewSym`.numSites()
+
+  # Build an {.importc, cdecl, nodecl.} proc declaration and normal Nim call
+  var params = newNimNode(nnkFormalParams)
+  params.add newEmptyNode()  # void return
+
+  var callArgs: seq[NimNode]
+  var paramIdx = 0
+
+  template addParam(argExpr: NimNode, argType: NimNode) =
+    let pname = ident("p" & $paramIdx)
+    params.add newIdentDefs(pname, argType)
+    callArgs.add argExpr
+    paramIdx += 1
+
+  # First arg: pointer to accumulation variable
+  let accumAddrExpr = quote do: cast[pointer](addr `accumSym`)
+  addParam(accumAddrExpr, ident"pointer")
+
+  # View data pointers
+  for v in info.views:
+    let dataSym = v.nimSym
+    let dataExpr = quote do: cast[pointer](`dataSym`.data.aosoaData)
+    addParam(dataExpr, ident"pointer")
+
+  # Gauge view data pointers
+  for gv in info.gaugeViews:
+    for d in 0..<gv.dim:
+      let gSym = gv.nimSym
+      let dLit = newLit(d)
+      let dataExpr = quote do: cast[pointer](`gSym`.field[`dLit`].data.aosoaData)
+      addParam(dataExpr, ident"pointer")
+
+  # Per-view elems — always use elementsPerSite (count of scalar elements)
+  for v in info.views:
+    let vSym = v.nimSym
+    let elemsExpr = quote do: `vSym`.data.elementsPerSite.cint
+    addParam(elemsExpr, ident"cint")
+
+  for gv in info.gaugeViews:
+    let gSym = gv.nimSym
+    let elemsExpr = quote do: `gSym`.field[0].data.elementsPerSite.cint
+    addParam(elemsExpr, ident"cint")
+
+  # numGroups = ceil(numSites / VectorWidth)
+  let vwLit = newLit(VectorWidth)
+  let ngExpr = quote do: ((`nsSym` + `vwLit` - 1) div `vwLit`).cint
+  addParam(ngExpr, ident"cint")
+
+  # NC
+  let ncExpr = quote do: `ncSym`.cint
+  addParam(ncExpr, ident"cint")
+
+  # Stencil args: offsets pointer + nPoints
+  for s in info.stencils:
+    let sSym = s.nimSym
+    let offsetExpr = quote do: cast[pointer](addr `sSym`.offsets[0])
+    addParam(offsetExpr, ident"pointer")
+    let npExpr = quote do: `sSym`.nPoints.cint
+    addParam(npExpr, ident"cint")
+
+  # Runtime int vars
+  let runtimeVars = findRuntimeIntVars(body, info)
+  for rv in runtimeVars:
+    let rvExpr = quote do: `rv.sym`.cint
+    addParam(rvExpr, ident"cint")
+
+  # Build the importc proc declaration
+  let wrapperName = genSym(nskProc, funcName)
+  let funcNameLit = newLit(funcName)
+  let procDecl = newNimNode(nnkProcDef).add(
+    wrapperName,
+    newEmptyNode(),
+    newEmptyNode(),
+    params,
+    newNimNode(nnkPragma).add(
+      newNimNode(nnkExprColonExpr).add(ident"importc", funcNameLit),
+      ident"cdecl",
+      ident"nodecl"
+    ),
+    newEmptyNode(),
+    newEmptyNode()
+  )
+
+  # Build the call
+  var callNode = newNimNode(nnkCall).add(wrapperName)
+  for arg in callArgs:
+    callNode.add arg
+
+  # GA_Dgop for MPI allreduce — must only allreduce the *delta* from this
+  # reduce call, not the entire accumulated value (which may include
+  # allreduced results from previous reduce calls in the same loop).
+  let savedSym = genSym(nskLet, "savedAccum")
+  let deltaSym = genSym(nskVar, "deltaAccum")
+  let saveStmt = quote do:
+    let `savedSym` = `accumSym`
+  let gaStmt = quote do:
+    if gaIsLive:
+      var `deltaSym` = `accumSym` - `savedSym`
+      GA_Dgop(addr `deltaSym`, 1, "+")
+      `accumSym` = `savedSym` + `deltaSym`
+
+  result = newStmtList(
+    passCPragma,
+    argSetupStmts,
+    procDecl,
+    saveStmt,
+    callNode,
+    gaStmt
+  )
+
+#[ ============================================================================
+   Public Reduce Macro (ForLoopStmt)
+   ============================================================================ ]#
+
+macro reduce*(forLoop: ForLoopStmt): untyped =
+  ## OpenMP parallel reduce loop for TensorFieldView.
+  ##
+  ## Transpiles the loop body to a complete C function with
+  ## ``#pragma omp parallel for reduction(+:accum)`` and emits it
+  ## at file scope. After the OpenMP reduction, ``GA_Dgop`` sums
+  ## across MPI ranks.
+  ##
+  ## Usage:
+  ##   var traceSum = 0.0
+  ##   for n in reduce view.all:
+  ##     traceSum += trace(view[n]).re
+  
+  let loopVar = forLoop[0]
+  let loopRangeNode = forLoop[1][1]  # Skip 'reduce' wrapper
+  let body = forLoop[2]
+
+  var isRange = false
+  var startExpr, endExpr: NimNode
+
+  if loopRangeNode.kind == nnkInfix:
+    let opNode = loopRangeNode[0]
+    let opStr = if opNode.kind in {nnkIdent, nnkSym, nnkOpenSymChoice, nnkClosedSymChoice}:
+                  (if opNode.kind in {nnkOpenSymChoice, nnkClosedSymChoice}: opNode[0].strVal else: opNode.strVal)
+                else: ""
+    if opStr == "..<" or opStr == "..":
+      isRange = true
+      startExpr = loopRangeNode[1]
+      endExpr = loopRangeNode[2]
+  elif loopRangeNode.kind == nnkDotExpr and loopRangeNode.len >= 2:
+    if loopRangeNode[1].eqIdent("all"):
+      isRange = true
+      startExpr = newLit(0)
+      endExpr = newCall(ident"numSites", loopRangeNode[0])
+
+  if isRange:
+    result = quote do:
+      block:
+        var `loopVar` {.inject.}: int = 0
+        reduceImpl(`loopVar`, `startExpr`, `endExpr`, `body`)
+  else:
+    result = quote do:
+      block:
+        for `loopVar` in `loopRangeNode`:
+          `body`

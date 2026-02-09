@@ -316,6 +316,13 @@ type
     proxy*: TensorSiteProxy[L, T]
     scalar*: T
 
+  AdjointResult*[L, T] = object
+    ## Result of adjoint (conjugate transpose) on a proxy or result type
+    when UseOpenMP:
+      computed*: seq[T]     # Computed adjoint buffer
+      shape*: seq[int]      # Shape of the result
+      elemsPerSite*: int    # Elements per site
+
   #[ LocalTensorField Site Proxy Types - for CPU-only "for all" loops ]#
   
   LocalSiteProxy*[D: static[int], R: static[int], L, T] = object
@@ -481,7 +488,7 @@ when UseOpenMP:
     m.computed = newSeq[T](elemsPerSite)
     for i in 0..<rows:
       for j in 0..<cols:
-        var sum: T = T(0)
+        var sum: T = default(T)
         for k in 0..<innerDim:
           let aElemIdx = i * innerDim + k
           let bElemIdx = k * cols + j
@@ -655,6 +662,154 @@ else:
   proc `*`*[L, T](res: MatAddResult[L, T], scalar: T): ScalarMulResult[L, T] =
     raise newException(Defect, "MatAddResult * scalar phantom operator")
 
+#[ ============================================================================
+   Adjoint, Trace, and Accumulate operators for proxy and result types
+   ============================================================================ ]#
+
+when UseOpenMP:
+  import std/complex as stdcomplex
+
+  # Helper: conjugate that works for both real and complex types
+  proc conjVal*[T](x: T): T {.inline.} =
+    when T is Complex32 or T is Complex64:
+      conjugate(x)
+    else:
+      x
+
+  # adjoint() on MatMulResult: conjugate transpose of A*B
+  proc adjoint*[L, T](m: MatMulResult[L, T]): AdjointResult[L, T] {.inline.} =
+    var src = m
+    if not src.hasComputed:
+      computeMatMul(src)
+    let rows = src.proxyA.shape[0]
+    let cols = if src.proxyA.shape.len > 1: src.proxyA.shape[1] else: 1
+    result.shape = src.proxyA.shape
+    result.elemsPerSite = rows * cols
+    result.computed = newSeq[T](rows * cols)
+    # Conjugate transpose: result[j,i] = conj(src[i,j])
+    for i in 0..<rows:
+      for j in 0..<cols:
+        result.computed[j * rows + i] = conjVal(src.computed[i * cols + j])
+
+  # adjoint() on TensorSiteProxy: conjugate transpose of a site tensor
+  proc adjoint*[L, T](proxy: TensorSiteProxy[L, T]): AdjointResult[L, T] {.inline.} =
+    let rows = proxy.shape[0]
+    let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
+    result.shape = proxy.shape
+    result.elemsPerSite = rows * cols
+    result.computed = newSeq[T](rows * cols)
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    for i in 0..<rows:
+      for j in 0..<cols:
+        let srcIdx = i * cols + j
+        result.computed[j * rows + i] = conjVal(hostData[proxy.proxyElemOffset(srcIdx)])
+
+  # MatMulResult * AdjointResult: (A*B) * adj(C*D)
+  proc `*`*[L, T](a: MatMulResult[L, T], b: AdjointResult[L, T]): MatMulResult[L, T] {.inline.} =
+    var src = a
+    if not src.hasComputed:
+      computeMatMul(src)
+    let rows = src.proxyA.shape[0]
+    let innerDim = if src.proxyA.shape.len > 1: src.proxyA.shape[1] else: 1
+    let cols = rows  # adjoint result has transposed shape
+    result.proxyA = a.proxyA
+    result.proxyB = a.proxyB
+    result.computed = newSeq[T](rows * cols)
+    for i in 0..<rows:
+      for j in 0..<cols:
+        var sum: T = default(T)
+        for k in 0..<innerDim:
+          sum = sum + src.computed[i * innerDim + k] * b.computed[k * cols + j]
+        result.computed[i * cols + j] = sum
+    result.hasComputed = true
+
+  # += on TensorSiteProxy: accumulate into view site
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: MatMulResult[L, T]) {.inline.} =
+    var src = rhs
+    if not src.hasComputed:
+      computeMatMul(src)
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    for i in 0..<proxy.elemsPerSite:
+      let offset = proxy.proxyElemOffset(i)
+      hostData[offset] = hostData[offset] + src.computed[i]
+
+else:
+  # OpenCL/SYCL backend: phantom operators for kernel codegen
+
+  proc adjoint*[L, T](m: MatMulResult[L, T]): AdjointResult[L, T] =
+    raise newException(Defect, "MatMulResult.adjoint() phantom operator")
+
+  proc adjoint*[L, T](proxy: TensorSiteProxy[L, T]): AdjointResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy.adjoint() phantom operator")
+
+  proc `*`*[L, T](a: MatMulResult[L, T], b: AdjointResult[L, T]): MatMulResult[L, T] =
+    raise newException(Defect, "MatMulResult * AdjointResult phantom operator")
+
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: MatMulResult[L, T]) =
+    raise newException(Defect, "TensorSiteProxy += MatMulResult phantom operator")
+
+# LocalSiteProxy element access helpers (must be before trace)
+# siteOffset is in storage-type units (float64 for Complex64, float32 for Complex32)
+# For complex types, tensor element e is at storage offset siteOffset + e*2
+import std/complex as localcomplex
+
+proc localProxyGet*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], elemIdx: int): T {.inline.} =
+  ## Read tensor element at given flat element index, handling complex storage
+  when T is Complex64:
+    let data = cast[ptr UncheckedArray[float64]](proxy.hostPtr)
+    let off = proxy.siteOffset + elemIdx * 2
+    localcomplex.complex64(data[off], data[off + 1])
+  elif T is Complex32:
+    let data = cast[ptr UncheckedArray[float32]](proxy.hostPtr)
+    let off = proxy.siteOffset + elemIdx * 2
+    localcomplex.complex32(data[off], data[off + 1])
+  else:
+    let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    data[proxy.siteOffset + elemIdx]
+
+proc localProxySet*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], elemIdx: int, value: T) {.inline.} =
+  ## Write tensor element at given flat element index, handling complex storage
+  when T is Complex64:
+    let data = cast[ptr UncheckedArray[float64]](proxy.hostPtr)
+    let off = proxy.siteOffset + elemIdx * 2
+    data[off] = value.re
+    data[off + 1] = value.im
+  elif T is Complex32:
+    let data = cast[ptr UncheckedArray[float32]](proxy.hostPtr)
+    let off = proxy.siteOffset + elemIdx * 2
+    data[off] = value.re
+    data[off + 1] = value.im
+  else:
+    let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    data[proxy.siteOffset + elemIdx] = value
+
+# trace() on LocalSiteProxy: sum of diagonal elements (CPU-side, works on all backends)
+proc trace*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T]): T {.inline.} =
+  let rows = proxy.shape[0]
+  let cols = when R >= 2: proxy.shape[1] else: 1
+  result = default(T)
+  for i in 0..<rows:
+    result = result + localProxyGet(proxy, i * cols + i)
+
+# trace() on TensorSiteProxy: sum of diagonal elements
+# Works on both OpenMP (direct memory) and OpenCL (runtimeData) backends.
+# Used by the ``reduce`` macro's CPU fallback path.
+proc trace*[L, T](proxy: TensorSiteProxy[L, T]): T {.inline.} =
+  when UseOpenMP:
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let rows = proxy.shape[0]
+    let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
+    result = default(T)
+    for i in 0..<rows:
+      result = result + hostData[proxy.proxyElemOffset(i * cols + i)]
+  else:
+    # OpenCL/SYCL: use runtimeData populated by readSiteData
+    let rows = proxy.runtimeData.shape[0]
+    let cols = if proxy.runtimeData.shape.len > 1: proxy.runtimeData.shape[1] else: 1
+    result = default(T)
+    for i in 0..<rows:
+      result = result + proxy.runtimeData.data[i * cols + i]
+
 # String conversion for debugging: $view[n]
 proc `$`*[L, T](proxy: TensorSiteProxy[L, T]): string =
   ## Convert site tensor to string for debugging.
@@ -813,42 +968,38 @@ when isMainModule:
    LocalSiteProxy Operators for CPU-only "for all" loops
    ============================================================================ ]#
 
-# LocalSiteProxy element access
+# LocalSiteProxy element access ([] and []=)
+# Delegates to localProxyGet/localProxySet defined above
+
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int): T {.inline.} =
   ## Vector element read: local[n][i]
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  data[proxy.siteOffset + i]
+  localProxyGet(proxy, i)
 
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int): T {.inline.} =
   ## Matrix element read: local[n][i, j]
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
   let cols = proxy.shape[1]
-  data[proxy.siteOffset + i * cols + j]
+  localProxyGet(proxy, i * cols + j)
 
 proc `[]`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int): T {.inline.} =
   ## 3D tensor element read: local[n][i, j, k]
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
   let dim1 = proxy.shape[1]
   let dim2 = proxy.shape[2]
-  data[proxy.siteOffset + i * dim1 * dim2 + j * dim2 + k]
+  localProxyGet(proxy, i * dim1 * dim2 + j * dim2 + k)
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i: int, value: T) {.inline.} =
   ## Vector element write: local[n][i] = value
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-  data[proxy.siteOffset + i] = value
+  localProxySet(proxy, i, value)
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j: int, value: T) {.inline.} =
   ## Matrix element write: local[n][i, j] = value
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
   let cols = proxy.shape[1]
-  data[proxy.siteOffset + i * cols + j] = value
+  localProxySet(proxy, i * cols + j, value)
 
 proc `[]=`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], i, j, k: int, value: T) {.inline.} =
   ## 3D tensor element write: local[n][i, j, k] = value
-  let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
   let dim1 = proxy.shape[1]
   let dim2 = proxy.shape[2]
-  data[proxy.siteOffset + i * dim1 * dim2 + j * dim2 + k] = value
+  localProxySet(proxy, i * dim1 * dim2 + j * dim2 + k, value)
 
 # LocalSiteProxy arithmetic operators
 proc `+`*[D: static[int], R: static[int], L, T](a, b: LocalSiteProxy[D, R, L, T]): LocalAddResult[D, R, L, T] {.inline.} =

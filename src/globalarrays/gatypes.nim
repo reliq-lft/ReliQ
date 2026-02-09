@@ -153,7 +153,7 @@ proc `=destroy`*[D: static[int], T](ga: GlobalArray[D, T]) =
   ##
   ## Parameters:
   ## - `ga`: The GlobalArray instance to be destroyed.
-  if ga.handle != 0: ga.handle.GA_Destroy()
+  if ga.handle != 0 and gaIsLive: ga.handle.GA_Destroy()
 
 proc `=copy`*[D: static[int], T](
   dest: var GlobalArray[D, T], 
