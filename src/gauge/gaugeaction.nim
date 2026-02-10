@@ -82,29 +82,35 @@ proc action*[D: static[int], L: Lattice[D], T](
 
           var id = siteIdentity(vu.TensorSiteProxy)
 
-          addFLOP(2*matMulFLOP(nc))
+          addFLOP 2*matMulFLOP(nc)
           
+          # plaqette
           if c.cp != 0.0: 
             vact[n] += cp * trace(id - ta * tb.adjoint())
 
-            addFLOP(matMulFLOP(nc) + matAddSubFLOP(nc))
-            addFLOP(adjointFLOP(nc) + traceFLOP(nc) + 1)
+            addFLOP matMulFLOP(nc) + matAddSubFLOP(nc)
+            addFLOP adjointFLOP(nc) + traceFLOP(nc) + 1
+
+          # rectangle
           if c.cr != 0.0:
             let bwdMu = stencil.bwd(n, mu)
             let bwdNu = stencil.bwd(n, nu)
             let bwdMuFwdNu = stencil.corner(n, -1, mu, +1, nu)
             let bwdNuFwdMu = stencil.corner(n, -1, nu, +1, mu)
             
-            let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[mu][bwdNuFwdMu]
+            let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[nu][bwdNuFwdMu]
             let td = tb * vu[nu][fwdNu].adjoint()
             vact[n] += cr * trace(id - tc * td.adjoint())
 
             let te = ta * vu[nu][fwdNu].adjoint()
-            let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[nu][bwdMuFwdNu]
+            let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[mu][bwdMuFwdNu]
             vact[n] += cr * trace(id - te * tf.adjoint())
 
-            addFLOP(6*matMulFLOP(nc) + 2*matAddSubFLOP(nc))
-            addFLOP(4*adjointFLOP(nc) + 2*traceFLOP(nc) + 2)
+            addFLOP 6*matMulFLOP(nc) + 2*matAddSubFLOP(nc)
+            addFLOP 4*adjointFLOP(nc) + 2*traceFLOP(nc) + 2
+          
+          # parallelogram
+          if c.cpg != 0.0: discard
     
     toc()
     tic("Reduction")
