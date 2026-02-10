@@ -93,9 +93,34 @@ proc isMatMulSym(n: NimNode): bool =
     return typeContains(n.getTypeInst(), "MatMulResult")
   except: return false
 
+proc isTensorSiteProxySym(n: NimNode): bool =
+  try:
+    return typeContains(n.getTypeInst(), "TensorSiteProxy")
+  except: return false
+
 proc isIntSym(n: NimNode): bool =
   try:
     return n.getTypeInst().repr == "int"
+  except: return false
+
+proc isFloatSym(n: NimNode): bool =
+  ## Check if a symbol has float/float64 type
+  try:
+    let r = n.getTypeInst().repr
+    return r == "float" or r == "float64"
+  except: return false
+
+proc isDotExprFloat(n: NimNode): bool =
+  ## Check if a dot expression evaluates to float/float64
+  try:
+    let r = n.getType().repr
+    return r == "float" or r == "float64"
+  except: return false
+
+proc isDotExprInt(n: NimNode): bool =
+  ## Check if a dot expression evaluates to int
+  try:
+    return n.getType().repr == "int"
   except: return false
 
 proc extractGaugeFieldDim(n: NimNode): int =
@@ -153,7 +178,7 @@ type
     nimSym*: NimNode
 
   LetBindingKind* = enum
-    lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkMatMul, lbkOther
+    lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner, lbkMatMul, lbkOther
 
   LetBinding* = object
     varName*: string
@@ -161,12 +186,23 @@ type
     stencilName*: string
     dirExpr*: string
     pointExpr*: string
+    # Corner-specific fields (for lbkStencilCorner)
+    signExprA*: string
+    dirExprA*: string
+    signExprB*: string
+    dirExprB*: string
+    nDim*: int  # lattice dimensionality D
+
+  VarBinding* = object
+    varName*: string
+    isProxy*: bool  # True if this is a TensorSiteProxy var
 
   KernelInfo* = object
     views*: seq[ViewEntry]
     gaugeViews*: seq[GaugeViewEntry]
     stencils*: seq[StencilEntry]
     letBindings*: seq[LetBinding]
+    varBindings*: seq[VarBinding]
     loopVar*: NimNode
     loopVarStr*: string
     isComplex*: bool
@@ -254,6 +290,10 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
           if n.len >= 4 and n[1].kind == nnkSym:
             addStencil(n[1], n[1].strVal)
           for i in 1..<n.len: walk(n[i])
+        of "corner":
+          if n.len >= 7 and n[1].kind == nnkSym:
+            addStencil(n[1], n[1].strVal)
+          for i in 1..<n.len: walk(n[i])
         of "neighbor":
           if n.len >= 4 and n[1].kind == nnkSym:
             addStencil(n[1], n[1].strVal)
@@ -288,6 +328,30 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 kind: if fn == "fwd": lbkStencilFwd else: lbkStencilBwd,
                 stencilName: val[1].strVal,
                 dirExpr: dirStr)
+            elif fn == "corner":
+              # corner(stencil, site, signA, dirA, signB, dirB)
+              addStencil(val[1], val[1].strVal)
+              proc extractIntExpr(node: NimNode): string =
+                if node.kind in {nnkIntLit..nnkInt64Lit}: $node.intVal
+                elif node.kind == nnkSym: node.strVal
+                elif node.kind == nnkPrefix and node[0].strVal == "-":
+                  "(-" & extractIntExpr(node[1]) & ")"
+                else: "0"
+              # Extract D from the stencil's type: LatticeStencil[D]
+              var nDimVal = 4  # default
+              let stencilType = val[1].getType()
+              if stencilType.kind == nnkBracketExpr and stencilType.len >= 2:
+                if stencilType[1].kind == nnkIntLit:
+                  nDimVal = stencilType[1].intVal.int
+              letBindingsLocal.add LetBinding(
+                varName: vsym.strVal,
+                kind: lbkStencilCorner,
+                stencilName: val[1].strVal,
+                signExprA: extractIntExpr(val[3]),
+                dirExprA: extractIntExpr(val[4]),
+                signExprB: extractIntExpr(val[5]),
+                dirExprB: extractIntExpr(val[6]),
+                nDim: nDimVal)
             elif fn == "neighbor":
               addStencil(val[1], val[1].strVal)
               var ptStr = "0"
@@ -316,6 +380,18 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
               varName: vsym.strVal,
               kind: if isMatmul: lbkMatMul else: lbkOther)
             walk(val)
+
+    of nnkVarSection:
+      for idefs in n:
+        if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+          let vsym = idefs[0]
+          let val = idefs[2]
+          walk(val)
+
+    of nnkAsgn:
+      # var assignment: varName = expr
+      if n.len >= 2:
+        walk(n[1])  # walk the RHS
 
     of nnkHiddenCallConv:
       if n.len >= 2: walk(n[1])
@@ -370,11 +446,182 @@ proc findRuntimeIntVars*(body: NimNode, info: KernelInfo): seq[tuple[name: strin
         if isIntSym(n):
           seen.incl name
           found.add (name, n)
+    of nnkDotExpr:
+      discard  # Skip dot expressions — handled by findRuntimeDotIntVars
     else:
       for child in n: scan(child)
 
   scan(body)
   return found
+
+proc findRuntimeFloatVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, sym: NimNode]] =
+  ## Find float-typed symbols that are not the loop var, views, stencils, or let bindings
+  var seen: HashSet[string]
+  var viewNames: HashSet[string]
+  var gaugeNames: HashSet[string]
+  var stencilNames: HashSet[string]
+  var letNames: HashSet[string]
+  var found: seq[tuple[name: string, sym: NimNode]]
+
+  for v in info.views: viewNames.incl v.name
+  for gv in info.gaugeViews: gaugeNames.incl gv.name
+  for s in info.stencils: stencilNames.incl s.name
+  for lb in info.letBindings: letNames.incl lb.varName
+
+  proc scan(n: NimNode) =
+    case n.kind
+    of nnkSym:
+      let name = n.strVal
+      if name != info.loopVarStr and name notin seen and
+         name notin viewNames and name notin gaugeNames and
+         name notin stencilNames and name notin letNames:
+        if isFloatSym(n):
+          seen.incl name
+          found.add (name, n)
+    of nnkDotExpr:
+      discard  # Skip dot expressions — handled by findRuntimeDotFloatVars
+    else:
+      for child in n: scan(child)
+
+  scan(body)
+  return found
+
+proc findRuntimeDotFloatVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, dotNode: NimNode]] =
+  ## Find dot-expression float accesses like c.cp that need to be passed as kernel params
+  var seen: HashSet[string]
+  var found: seq[tuple[name: string, dotNode: NimNode]]
+
+  proc scan(n: NimNode) =
+    case n.kind
+    of nnkDotExpr:
+      if n.len >= 2 and n[0].kind == nnkSym and n[1].kind == nnkSym:
+        if isDotExprFloat(n):
+          let name = n[0].strVal & "_" & n[1].strVal
+          if name notin seen:
+            seen.incl name
+            found.add (name, n)
+          return
+      for child in n: scan(child)
+    else:
+      for child in n: scan(child)
+
+  scan(body)
+  return found
+
+proc findRuntimeDotIntVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, dotNode: NimNode]] =
+  ## Find dot-expression int accesses like c.someInt that need to be passed as kernel params
+  var seen: HashSet[string]
+  var found: seq[tuple[name: string, dotNode: NimNode]]
+
+  proc scan(n: NimNode) =
+    case n.kind
+    of nnkDotExpr:
+      if n.len >= 2 and n[0].kind == nnkSym and n[1].kind == nnkSym:
+        if isDotExprInt(n):
+          let name = n[0].strVal & "_" & n[1].strVal
+          if name notin seen:
+            seen.incl name
+            found.add (name, n)
+          return
+      for child in n: scan(child)
+    else:
+      for child in n: scan(child)
+
+  scan(body)
+  return found
+
+proc isAddFlopCall*(n: NimNode): bool =
+  ## Check if a node is an addFLOPImpl(...) call
+  n.kind == nnkCall and n.len >= 3 and
+    n[0].kind == nnkSym and n[0].strVal == "addFLOPImpl"
+
+proc sanitizeFieldSyms*(n: NimNode): NimNode =
+  ## Deep-copy an AST subtree, replacing every nnkDotExpr whose second child
+  ## is a typed `skField` symbol with one that uses a plain `ident` instead.
+  ## This prevents Nim ICEs when splicing typed field symbols into `quote do`.
+  case n.kind
+  of nnkDotExpr:
+    let lhs = sanitizeFieldSyms(n[0])
+    let rhs = n[1]
+    if rhs.kind == nnkSym and rhs.symKind == nskField:
+      result = nnkDotExpr.newTree(lhs, ident(rhs.strVal))
+    else:
+      result = nnkDotExpr.newTree(lhs, sanitizeFieldSyms(rhs))
+  of nnkSym:
+    # Symbols other than fields are fine to keep as-is
+    result = n
+  of nnkLiterals:
+    result = n
+  else:
+    result = copyNimNode(n)
+    for child in n:
+      result.add sanitizeFieldSyms(child)
+
+proc untypeAst*(n: NimNode): NimNode =
+  ## Deep-copy an AST subtree, converting ALL symbols to plain idents.
+  ## This produces fully untyped AST suitable for splicing into untyped
+  ## macro output without risking Nim codegen ICEs from stale type info.
+  case n.kind
+  of nnkSym:
+    result = ident(n.strVal)
+  of nnkOpenSymChoice, nnkClosedSymChoice:
+    # Use the first symbol's name
+    result = ident(n[0].strVal)
+  of nnkLiterals:
+    result = n
+  of nnkDotExpr:
+    result = nnkDotExpr.newTree(untypeAst(n[0]), untypeAst(n[1]))
+  else:
+    result = copyNimNode(n)
+    for child in n:
+      result.add untypeAst(child)
+
+type
+  FlopCallEntry* = object
+    ## A collected addFLOP call from the kernel body
+    flopsExpr*: NimNode     ## The expression computing FLOP count
+    condExpr*: NimNode      ## nil if unconditional, otherwise the if-condition
+
+proc findFlopCalls*(body: NimNode): seq[FlopCallEntry] =
+  ## Walk the each-loop body and collect all addFLOPImpl calls with their
+  ## enclosing if-conditions (if any).  These are extracted so the transpiler
+  ## can skip them in kernel codegen and emit host-side accumulation.
+  var entries: seq[FlopCallEntry]
+
+  proc scan(n: NimNode, cond: NimNode) =
+    case n.kind
+    of nnkCall:
+      if isAddFlopCall(n):
+        # n[0] = addFLOPImpl sym, n[1] = profiler sym, n[2] = flops expr
+        entries.add FlopCallEntry(flopsExpr: n[2], condExpr: cond)
+        return
+      for child in n: scan(child, cond)
+    of nnkIfStmt:
+      for branch in n:
+        if branch.kind == nnkElifBranch:
+          let branchCond = branch[0]
+          let branchBody = branch[1]
+          # Combine with outer condition if nested
+          let effectiveCond = if cond == nil: branchCond
+                              else: nnkInfix.newTree(ident"and", cond, branchCond)
+          if branchBody.kind == nnkStmtList:
+            for child in branchBody: scan(child, effectiveCond)
+          else:
+            scan(branchBody, effectiveCond)
+        elif branch.kind == nnkElse:
+          if branch.len > 0:
+            let elseBody = branch[0]
+            if elseBody.kind == nnkStmtList:
+              for child in elseBody: scan(child, cond)
+            else:
+              scan(elseBody, cond)
+    of nnkStmtList:
+      for child in n: scan(child, cond)
+    else:
+      for child in n: scan(child, cond)
+
+  scan(body, nil)
+  return entries
 
 #[ ============================================================================
    OpenCL C Code Generation — General AST Transpiler
@@ -472,7 +719,7 @@ proc resolveSiteRef*(viewExpr, siteExpr: NimNode, ctx: var CodeCtx): SiteRef =
         laneVar = "lane"
         break resolveGL
       let lb = ctx.info.getLetBinding(nm)
-      if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor}:
+      if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner}:
         groupVar = nm & "_group"
         laneVar = nm & "_lane"
         break resolveGL
@@ -620,16 +867,62 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResu
         let adj = emitAdjoint(target, tmp, inner.elems, ctx, d)
         s &= adj.code
         return (s, adj.elems)
+
+      if fn == "trace" and n.len >= 2:
+        # trace(matexpr) — evaluate inner matrix, sum diagonal → scalar
+        let tmp = ctx.nextTmp()
+        let p = ind(d)
+        var s = p & ctx.elemType & " " & tmp & "[NC*NC];\n"
+        let inner = emitMatExpr(tmp, n[1], ctx, d)
+        s &= inner.code
+        # Sum diagonal: target[0] = sum of tmp[i*NC+i] for i in 0..NC-1
+        if ctx.isComplex:
+          s &= p & target & "[0] = (" & ctx.elemType & ")(0, 0);\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+          s &= p & "  " & target & "[0] += " & tmp & "[_i*NC+_i];\n"
+        else:
+          s &= p & target & "[0] = 0;\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+          s &= p & "  " & target & "[0] += " & tmp & "[_i*NC+_i];\n"
+        return (s, "1")
+
+      if fn == "identity" or fn == "siteIdentity":
+        # identity()/siteIdentity() — generate NC×NC identity matrix
+        let p = ind(d)
+        var s = ""
+        s &= p & "for (int _e = 0; _e < NC*NC; _e++) " & target & "[_e] = "
+        if ctx.isComplex:
+          s &= "(" & ctx.elemType & ")(0.0, 0.0);\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++) " & target & "[_i*NC+_i] = (" & ctx.elemType & ")(1.0, 0.0);\n"
+        else:
+          s &= "0.0;\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++) " & target & "[_i*NC+_i] = 1.0;\n"
+        return (s, "NC*NC")
     
     return (ind(d) & "// unhandled call: " & n[0].strVal & "\n", "NC*NC")
   
   of nnkSym:
-    # Reference to a let-bound matrix temp
     let name = n.strVal
     let p = ind(d)
-    let elemsName = name & "_elems"
-    return (p & "for (int _e = 0; _e < " & elemsName & "; _e++) " & target & "[_e] = " & name & "[_e];\n",
-            elemsName)
+    # Check if this is a matrix-typed let binding (has _elems companion)
+    var isMatrixSym = false
+    try: isMatrixSym = isMatMulSym(n)
+    except: discard
+    # Also check if it's a TensorSiteProxy var
+    var isProxySym = false
+    try: isProxySym = isTensorSiteProxySym(n)
+    except: discard
+    if isMatrixSym or isProxySym:
+      # Reference to a let-bound matrix temp or var proxy
+      let elemsName = name & "_elems"
+      return (p & "for (int _e = 0; _e < " & elemsName & "; _e++) " & target & "[_e] = " & name & "[_e];\n",
+              elemsName)
+    else:
+      # Scalar sym (float/int kernel parameter or local scalar) — broadcast
+      if ctx.isComplex:
+        return (p & target & "[0] = (" & ctx.elemType & ")(" & name & ", 0);\n", "1")
+      else:
+        return (p & target & "[0] = " & name & ";\n", "1")
   
   of nnkIntLit..nnkInt64Lit:
     # Scalar integer literal — broadcast to all elements
@@ -709,8 +1002,7 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResu
     if n.len > 0:
       return emitMatExpr(target, n[^1], ctx, d)
   
-  else:
-    discard
+  else: discard
   
   return (ind(d) & "// unhandled expr kind: " & $n.kind & "\n", "NC*NC")
 
@@ -721,12 +1013,29 @@ proc transpileScalar*(n: NimNode, ctx: var CodeCtx): string =
   case n.kind
   of nnkSym:
     return n.strVal
+  of nnkDotExpr:
+    # Dot expression like c.cp -> flattened to c_cp as a kernel parameter
+    if n.len >= 2 and n[0].kind == nnkSym and n[1].kind == nnkSym:
+      return n[0].strVal & "_" & n[1].strVal
+    return "0"
   of nnkIntLit..nnkInt64Lit:
     return $n.intVal
   of nnkFloatLit..nnkFloat64Lit:
     return $n.floatVal
   of nnkHiddenStdConv, nnkConv, nnkHiddenDeref, nnkHiddenAddr:
     if n.len > 0: return transpileScalar(n[^1], ctx)
+  of nnkStmtListExpr:
+    # Nim wraps some expressions in StmtListExpr — recurse into last child
+    for i in countdown(n.len - 1, 0):
+      if n[i].kind != nnkEmpty:
+        return transpileScalar(n[i], ctx)
+  of nnkPrefix:
+    if n.len >= 2 and n[0].kind == nnkSym:
+      let op = n[0].strVal
+      if op == "not":
+        return "!(" & transpileScalar(n[1], ctx) & ")"
+      else:
+        return op & "(" & transpileScalar(n[1], ctx) & ")"
   of nnkCall:
     if n[0].kind == nnkSym:
       var args: seq[string]
@@ -788,6 +1097,18 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
   let runtimeVars = findRuntimeIntVars(body, info)
   for rv in runtimeVars:
     params.add "const int " & rv.name
+  # Runtime float vars (scalar coefficients like cp, cr)
+  let runtimeFloatVars = findRuntimeFloatVars(body, info)
+  for rv in runtimeFloatVars:
+    params.add "const " & ctx.scalarType & " " & rv.name
+  # Runtime dot-accessed float vars (e.g. c.cp -> c_cp)
+  let runtimeDotFloatVars = findRuntimeDotFloatVars(body, info)
+  for rv in runtimeDotFloatVars:
+    params.add "const " & ctx.scalarType & " " & rv.name
+  # Runtime dot-accessed int vars (e.g. c.someInt -> c_someInt)
+  let runtimeDotIntVars = findRuntimeDotIntVars(body, info)
+  for rv in runtimeDotIntVars:
+    params.add "const int " & rv.name
 
   src &= "__kernel void " & kernelName & "(\n"
   src &= "    " & params.join(",\n    ")
@@ -835,6 +1156,25 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
                    ctx.loopVarStr & " * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
             src &= "  int " & vn & "_group = " & vn & "_idx / VW;\n"
             src &= "  int " & vn & "_lane = " & vn & "_idx % VW;\n\n"
+          of lbkStencilCorner:
+            # Emit inline corner point-index computation
+            let nd = $lb.nDim
+            let sA = lb.signExprA
+            let dA = lb.dirExprA
+            let sB = lb.signExprB
+            let dB = lb.dirExprB
+            let prefix = "_c_" & vn
+            src &= "  // corner neighbor: " & vn & " (" & sA & "*" & dA & ", " & sB & "*" & dB & ")\n"
+            src &= "  int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+            src &= "  int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+            src &= "  int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+            src &= "  int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+            src &= "  int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+            src &= "  int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+            src &= "  int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                   ctx.loopVarStr & " * " & lb.stencilName & "_npts + 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si];\n"
+            src &= "  int " & vn & "_group = " & vn & "_idx / VW;\n"
+            src &= "  int " & vn & "_lane = " & vn & "_idx % VW;\n\n"
           of lbkMatMul:
             # Matrix-valued let binding: let ta = expr
             src &= "  // matrix temp: " & vn & "\n"
@@ -846,6 +1186,48 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
           of lbkOther:
             let code = transpileScalar(val, ctx)
             src &= "  " & ctx.elemType & " " & vn & " = " & code & ";\n"
+
+    of nnkVarSection:
+      for idefs in stmt:
+        if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+          let vn = idefs[0].strVal
+          let val = idefs[2]
+          # Check if this is a TensorSiteProxy var (matrix-valued mutable local)
+          var isProxy = false
+          try: isProxy = isTensorSiteProxySym(idefs[0])
+          except: discard
+          if isProxy:
+            src &= "  // var matrix: " & vn & "\n"
+            src &= "  " & ctx.elemType & " " & vn & "[NC*NC];\n"
+            src &= "  const int " & vn & "_elems = NC*NC;\n"
+            # If there's an initializer, emit it
+            if val.kind != nnkEmpty:
+              let matRes = emitMatExpr(vn, val, ctx, 1)
+              src &= matRes.code
+            src &= "\n"
+          else:
+            # Scalar var
+            let code = transpileScalar(val, ctx)
+            src &= "  " & ctx.elemType & " " & vn & " = " & code & ";\n"
+
+    of nnkAsgn:
+      # Assignment: varName = expr
+      if stmt.len >= 2:
+        let lhs = stmt[0]
+        let rhs = stmt[1]
+        if lhs.kind == nnkSym:
+          let vn = lhs.strVal
+          var isProxy = false
+          try: isProxy = isTensorSiteProxySym(lhs)
+          except: discard
+          if isProxy:
+            src &= "  { // assign to var matrix: " & vn & "\n"
+            let matRes = emitMatExpr(vn, rhs, ctx, 2)
+            src &= matRes.code
+            src &= "  }\n"
+          else:
+            let code = transpileScalar(rhs, ctx)
+            src &= "  " & vn & " = " & code & ";\n"
 
     of nnkInfix:
       if stmt.len >= 3 and stmt[0].kind == nnkSym and stmt[0].strVal == "+=":
@@ -873,7 +1255,9 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
           src &= "  }\n"
 
     of nnkCall:
-      if stmt.len >= 2 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
+      if isAddFlopCall(stmt):
+        discard  # Skip addFLOPImpl — handled on host side by eachImpl
+      elif stmt.len >= 2 and stmt[0].kind == nnkSym and stmt[0].strVal == "[]=":
         # view[n] = expr
         if isElementLevelWrite(stmt):
           # Element-level write: view[n][i,j] = val
@@ -918,6 +1302,137 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
           else:
             src &= "    for (int _e = 0; _e < " & storeElems & "; _e++)\n"
             src &= "      " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, sr.elemsVar, "_e") & " = " & tmp & "[_e];\n"
+          src &= "  }\n"
+
+    of nnkIfStmt:
+      # if/elif/else chains inside the each loop
+      for branch in stmt:
+        if branch.kind == nnkElifBranch:
+          let cond = transpileScalar(branch[0], ctx)
+          let bodyStmt = branch[1]
+          src &= "  if (" & cond & ") {\n"
+          # Process nested statements
+          var innerStmts: seq[NimNode]
+          if bodyStmt.kind == nnkStmtList:
+            for child in bodyStmt: innerStmts.add child
+          else:
+            innerStmts.add bodyStmt
+          for inner in innerStmts:
+            # Recursively handle nested let/infix/call statements
+            case inner.kind
+            of nnkLetSection:
+              for idefs in inner:
+                if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+                  let vn = idefs[0].strVal
+                  let val = idefs[2]
+                  let lb = info.getLetBinding(vn)
+                  case lb.kind
+                  of lbkStencilFwd:
+                    src &= "    int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                           ctx.loopVarStr & " * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & "];\n"
+                    src &= "    int " & vn & "_group = " & vn & "_idx / VW;\n"
+                    src &= "    int " & vn & "_lane = " & vn & "_idx % VW;\n"
+                  of lbkStencilBwd:
+                    src &= "    int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                           ctx.loopVarStr & " * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & " + 1];\n"
+                    src &= "    int " & vn & "_group = " & vn & "_idx / VW;\n"
+                    src &= "    int " & vn & "_lane = " & vn & "_idx % VW;\n"
+                  of lbkStencilCorner:
+                    let nd = $lb.nDim
+                    let sA = lb.signExprA
+                    let dA = lb.dirExprA
+                    let sB = lb.signExprB
+                    let dB = lb.dirExprB
+                    let prefix = "_c_" & vn
+                    src &= "    int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+                    src &= "    int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+                    src &= "    int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+                    src &= "    int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+                    src &= "    int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+                    src &= "    int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+                    src &= "    int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                           ctx.loopVarStr & " * " & lb.stencilName & "_npts + 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si];\n"
+                    src &= "    int " & vn & "_group = " & vn & "_idx / VW;\n"
+                    src &= "    int " & vn & "_lane = " & vn & "_idx % VW;\n"
+                  of lbkStencilNeighbor:
+                    src &= "    int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                           ctx.loopVarStr & " * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+                    src &= "    int " & vn & "_group = " & vn & "_idx / VW;\n"
+                    src &= "    int " & vn & "_lane = " & vn & "_idx % VW;\n"
+                  of lbkMatMul:
+                    src &= "    " & ctx.elemType & " " & vn & "[NC*NC];\n"
+                    let matRes = emitMatExpr(vn, val, ctx, 2)
+                    src &= matRes.code
+                    src &= "    const int " & vn & "_elems = " & matRes.elems & ";\n"
+                  of lbkOther:
+                    let code = transpileScalar(val, ctx)
+                    src &= "    " & ctx.elemType & " " & vn & " = " & code & ";\n"
+            of nnkInfix:
+              if inner.len >= 3 and inner[0].kind == nnkSym and inner[0].strVal == "+=":
+                let lhs = inner[1]
+                let rhs = inner[2]
+                if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
+                  let sr = resolveSiteRef(lhs[1], lhs[2], ctx)
+                  let tmp = ctx.nextTmp()
+                  src &= "    { // +=\n"
+                  src &= "      " & ctx.elemType & " " & tmp & "[NC*NC];\n"
+                  let matRes = emitMatExpr(tmp, rhs, ctx, 3)
+                  src &= matRes.code
+                  let storeElems = sr.elemsVar
+                  if sr.isGauge:
+                    for di in 0..<sr.gaugeDim:
+                      let cond = if di == 0: "if" else: "else if"
+                      src &= "      " & cond & " (" & sr.dirExpr & " == " & $di & ") {\n"
+                      src &= "        for (int _e = 0; _e < " & storeElems & "; _e++)\n"
+                      src &= "          " & aosoaIdx(sr.gaugeName & "_" & $di & "_data", sr.groupVar, sr.laneVar, sr.elemsVar, "_e") & " += " & tmp & "[_e];\n"
+                      src &= "      }\n"
+                  else:
+                    src &= "      for (int _e = 0; _e < " & storeElems & "; _e++)\n"
+                    src &= "        " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, sr.elemsVar, "_e") & " += " & tmp & "[_e];\n"
+                  src &= "    }\n"
+            of nnkVarSection:
+              for idefs in inner:
+                if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+                  let vn = idefs[0].strVal
+                  let val = idefs[2]
+                  var isProxy = false
+                  try: isProxy = isTensorSiteProxySym(idefs[0])
+                  except: discard
+                  if isProxy:
+                    src &= "    " & ctx.elemType & " " & vn & "[NC*NC];\n"
+                    src &= "    const int " & vn & "_elems = NC*NC;\n"
+                    if val.kind != nnkEmpty:
+                      let matRes = emitMatExpr(vn, val, ctx, 2)
+                      src &= matRes.code
+                  else:
+                    let code = transpileScalar(val, ctx)
+                    src &= "    " & ctx.elemType & " " & vn & " = " & code & ";\n"
+            of nnkAsgn:
+              if inner.len >= 2:
+                let lhs = inner[0]
+                let rhs = inner[1]
+                if lhs.kind == nnkSym:
+                  let vn = lhs.strVal
+                  var isProxy = false
+                  try: isProxy = isTensorSiteProxySym(lhs)
+                  except: discard
+                  if isProxy:
+                    let matRes = emitMatExpr(vn, rhs, ctx, 2)
+                    src &= matRes.code
+                  else:
+                    let code = transpileScalar(rhs, ctx)
+                    src &= "    " & vn & " = " & code & ";\n"
+            of nnkCall:
+              if isAddFlopCall(inner):
+                discard  # Skip addFLOPImpl — handled on host side
+              else:
+                src &= "    // skipped nested call: " & (if inner[0].kind == nnkSym: inner[0].strVal else: "?") & "\n"
+            else:
+              src &= "    // skipped nested: " & $inner.kind & "\n"
+          src &= "  }\n"
+        elif branch.kind == nnkElse:
+          src &= "  else {\n"
+          src &= "    // else branch\n"
           src &= "  }\n"
 
     else:
@@ -986,7 +1501,6 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
     sitesExpr = shapeExpr
 
   let kernelSym = genSym(nskLet, "kernel")
-  let programSym = genSym(nskLet, "program")
   let devIdxSym = genSym(nskForVar, "devIdx")
 
   # --- Build setArg statements ---
@@ -1065,23 +1579,14 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
     argIndex += 2
 
     let sbuf = genSym(nskVar, "sbuf")
-    let scopy = genSym(nskVar, "scopy")
 
     stencilSetup.add quote do:
-      var `scopy` = newSeq[int32](`ssym`.offsets.len)
-      for i in 0..<`ssym`.offsets.len:
-        `scopy`[i] = `ssym`.offsets[i]
-      var `sbuf` = gpuBufferLike(clContext, `scopy`, MEM_READ_ONLY)
-      clQueues[0].write(`scopy`, `sbuf`)
-      check clwrap.finish(clQueues[0])
+      var `sbuf` = getOrUploadStencil(clContext, clQueues[0], `ssym`.offsets)
 
     stencilArgs.add quote do:
       `kernelSym`.setArg(`sbuf`, `offIdx`)
       var np = `ssym`.nPoints.int32
       `kernelSym`.setArg(np, `npIdx`)
-
-    stencilCleanup.add quote do:
-      release(`sbuf`)
 
   # Runtime int variable args
   let runtimeVars = findRuntimeIntVars(body, info)
@@ -1095,11 +1600,106 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
       `kernelSym`.setArg(`tmp`, `idx`)
     argIndex += 1
 
+  # Runtime float variable args (scalar coefficients like cp, cr)
+  let runtimeFloatVars = findRuntimeFloatVars(body, info)
+  var runtimeFloatArgStmts = newStmtList()
+  for rv in runtimeFloatVars:
+    let idx = newLit(argIndex)
+    let rvsym = rv.sym
+    let tmp = genSym(nskVar, "rfv")
+    runtimeFloatArgStmts.add quote do:
+      var `tmp` = `rvsym`.float64
+      `kernelSym`.setArg(`tmp`, `idx`)
+    argIndex += 1
+
+  # Runtime dot-accessed float variable args (e.g. c.cp -> c_cp)
+  let runtimeDotFloatVars = findRuntimeDotFloatVars(body, info)
+  var runtimeDotFloatArgStmts = newStmtList()
+  for rv in runtimeDotFloatVars:
+    let idx = newLit(argIndex)
+    let dotNode = rv.dotNode
+    let tmp = genSym(nskVar, "rdfv")
+    # Rebuild dot expr from scratch: objSym.fieldIdent (avoid skField symbol)
+    let freshDot = nnkDotExpr.newTree(dotNode[0], ident(dotNode[1].strVal))
+    let convExpr = newCall(ident"float64", freshDot)
+    let varSection = nnkVarSection.newTree(
+      nnkIdentDefs.newTree(tmp, newEmptyNode(), convExpr))
+    let setArgCall = newCall(
+      nnkDotExpr.newTree(kernelSym, ident"setArg"), tmp, idx)
+    runtimeDotFloatArgStmts.add varSection
+    runtimeDotFloatArgStmts.add setArgCall
+    argIndex += 1
+
+  # Runtime dot-accessed int variable args (e.g. c.someInt -> c_someInt)
+  let runtimeDotIntVars = findRuntimeDotIntVars(body, info)
+  var runtimeDotIntArgStmts = newStmtList()
+  for rv in runtimeDotIntVars:
+    let idx = newLit(argIndex)
+    let dotNode = rv.dotNode
+    let tmp = genSym(nskVar, "rdiv")
+    # Rebuild dot expr from scratch: objSym.fieldIdent (avoid skField symbol)
+    let freshDot = nnkDotExpr.newTree(dotNode[0], ident(dotNode[1].strVal))
+    let convExpr = newCall(ident"int32", freshDot)
+    let varSection = nnkVarSection.newTree(
+      nnkIdentDefs.newTree(tmp, newEmptyNode(), convExpr))
+    let setArgCall = newCall(
+      nnkDotExpr.newTree(kernelSym, ident"setArg"), tmp, idx)
+    runtimeDotIntArgStmts.add varSection
+    runtimeDotIntArgStmts.add setArgCall
+    argIndex += 1
+
+  # Build an expression to determine NC at runtime:
+  # Use the first gauge view's field shape if available, otherwise the output view
+  var ncShapeExpr: NimNode
+  if info.gaugeViews.len > 0:
+    ncShapeExpr = nnkBracketExpr.newTree(
+      nnkDotExpr.newTree(info.gaugeViews[0].nimSym, ident"field"), newLit(0))
+  elif outViewSym != nil:
+    ncShapeExpr = outViewSym
+  else:
+    ncShapeExpr = shapeExpr
+
+  # --- Host-side FLOP accumulation (built before quote do, spliced in) ---
+  var flopBlock = newStmtList()   # empty = no-op when spliced
+  let flopEntries = findFlopCalls(body)
+  if flopEntries.len > 0:
+    # Build the inner statements: compute total sites, then addFLOPImpl calls
+    var innerStmts = newStmtList()
+
+    # var flopTotalSites {.inject.} = 0
+    # for flopX {.inject.} in sitesExpr.data.sitesPerDevice: flopTotalSites += flopX
+    let sitesPerDevExpr = nnkDotExpr.newTree(
+      nnkDotExpr.newTree(sitesExpr, ident"data"), ident"sitesPerDevice")
+    innerStmts.add quote do:
+      var flopTotalSites {.inject.} = 0
+      for flopX {.inject.} in `sitesPerDevExpr`:
+        flopTotalSites += flopX
+
+    # Emit addFLOPImpl calls for each entry
+    for entry in flopEntries:
+      let flopsRepr = repr(entry.flopsExpr)
+      let flops = parseExpr(flopsRepr)
+      if entry.condExpr == nil:
+        innerStmts.add quote do:
+          addFLOPImpl(profiler, `flops` * flopTotalSites)
+      else:
+        let condRepr = repr(entry.condExpr)
+        let cond = parseExpr(condRepr)
+        innerStmts.add quote do:
+          if `cond`:
+            addFLOPImpl(profiler, `flops` * flopTotalSites)
+
+    # Wrap everything in when ProfileMode == 1:
+    flopBlock = nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkInfix.newTree(ident"==", ident"ProfileMode", newLit(1)),
+        innerStmts))
+
   result = quote do:
     block:
-      let outShape = `shapeExpr`.shape
-      let outRank = outShape.len
-      let ncDim = if outRank >= 1: outShape[0] else: 1
+      # NC must be the gauge field matrix dimension, not the output scalar field
+      let ncShape = `ncShapeExpr`.shape
+      let ncDim = if ncShape.len >= 1: ncShape[0] else: 1
       let finalKernelSource = `kernelSourceLit`.replace("{NC_VALUE}", $ncDim)
 
       when DebugKernels:
@@ -1107,8 +1707,7 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
         echo finalKernelSource
         echo "================================"
 
-      let `programSym` = createAndBuild(clContext, finalKernelSource, clDevices)
-      let `kernelSym` = `programSym`.createKernel(`kernelNameLit`)
+      let `kernelSym` = getOrCompile(clContext, finalKernelSource, clDevices, `kernelNameLit`)
 
       let numDevices = clQueues.len
       let sitesPerDev = `sitesExpr`.data.sitesPerDevice
@@ -1126,19 +1725,19 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
 
           `stencilArgs`
           `runtimeArgStmts`
+          `runtimeFloatArgStmts`
+          `runtimeDotFloatArgStmts`
+          `runtimeDotIntArgStmts`
 
           when UseWorkGroups:
             clQueues[`devIdxSym`].run(`kernelSym`, devSites, VectorWidth)
           else:
             clQueues[`devIdxSym`].run(`kernelSym`, devSites)
 
-      for devIdx in 0..<numDevices:
-        check clwrap.finish(clQueues[devIdx])
+      for `devIdxSym` in 0..<numDevices:
+        check clwrap.flush(clQueues[`devIdxSym`])
 
-      release(`kernelSym`)
-      release(`programSym`)
-
-      `stencilCleanup`
+      `flopBlock`
 
 macro each*(x: ForLoopStmt): untyped =
   expectLen(x, 3)

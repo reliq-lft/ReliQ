@@ -168,7 +168,7 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
 proc newLocalScalarField*[D: static[int], L, T](
   tensor: TensorField[D, 1, L, T];
   padded: bool = false
-): LocalTensorField[D, 0, L, T] =
+): LocalTensorField[D, 1, L, T] =
   ## Create a new local scalar field from a global scalar field
   return tensor.newLocalTensorField(padded)
 

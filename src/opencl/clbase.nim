@@ -73,7 +73,7 @@
     - Add multi-platform initialization
 ]#
 
-import std/[macros]
+import std/[macros, tables, hashes, os]
 
 import clwrap
 export clwrap
@@ -208,7 +208,14 @@ proc createProgramBinary*(context: PContext, device: PDeviceId, body: string): P
 
 proc buildOn*(program: PProgram, devices: seq[PDeviceId]) =
   var devs = devices
-  check buildProgram(program, devs.len.uint32, cast[ptr PDeviceId](addr devs[0]), nil, nil, nil)
+  let err = buildProgram(program, devs.len.uint32, cast[ptr PDeviceId](addr devs[0]), nil, nil, nil)
+  if err != TClResult.Success:
+    var logSize: int
+    discard getProgramBuildInfo(program, devs[0], Tprogram_build_info(PROGRAM_BUILD_LOG), 0, nil, addr logSize)
+    var buildLog = newString(logSize)
+    discard getProgramBuildInfo(program, devs[0], Tprogram_build_info(PROGRAM_BUILD_LOG), logSize, addr buildLog[0], nil)
+    echo "OpenCL Build Log:\n", buildLog
+    check err
 
 proc buildOn*(program: PProgram, device: PDeviceId) = program.buildOn(@[device])
 
@@ -372,18 +379,179 @@ template release*(program: PProgram) = check releaseProgram(program)
 template release*(buffer: PMem) = check releaseMemObject(buffer)
 template release*(context: PContext) = check releaseContext(context)
 
+#[ ============================================================================
+   OpenCL Kernel and Buffer Caches
+   ============================================================================
+   Three-tier caching system:
+   1. In-memory cache: Table[string, CachedKernel] for same-run reuse
+   2. Disk binary cache: compiled OpenCL binaries saved to cache/cl_kernels/
+      so subsequent program runs skip JIT compilation entirely (~100x faster)
+   3. Buffer caches: stencil and partials GPU buffers reused across calls
+]#
+
+const KernelCacheDir* {.strdefine.} = "cache/cl_kernels"
+
+type
+  CachedKernel* = object
+    ## A compiled OpenCL program and its extracted kernel.
+    ## Owned by the cache — never released by callers.
+    program*: PProgram
+    kernel*: PKernel
+
+var clKernelCache*: Table[Hash, CachedKernel]
+  ## Global kernel cache keyed by the hash of the **final** kernel source
+  ## string (after NC substitution). Populated on first use; never evicted
+  ## during a run.
+
+var clStencilBufCache*: Table[Hash, GpuBuffer[int32]]
+  ## GPU buffer cache for stencil offset arrays, keyed on a
+  ## content hash of the offsets.  Stencil offsets are never
+  ## mutated, so the hash is a stable key.
+
+var clPartialsBufCache*: Table[int, GpuBuffer[float64]]
+  ## Partials GPU buffer cache for reduce kernels, keyed by the
+  ## total number of lattice sites.
+
+var clPartialsHostCache*: Table[int, seq[float64]]
+  ## Host-side partials buffer cache to avoid per-reduce heap allocation.
+
+proc getProgramBinary*(program: PProgram): string =
+  ## Extract the compiled binary from an OpenCL program object.
+  var binarySize: int
+  check getProgramInfo(program, PROGRAM_BINARY_SIZES, sizeof(int), addr binarySize, nil)
+  result = newString(binarySize)
+  var dataPtr = addr result[0]
+  check getProgramInfo(program, PROGRAM_BINARIES, sizeof(pointer), addr dataPtr, nil)
+
+proc saveProgramBinary*(program: PProgram, path: string) =
+  ## Save a compiled program binary to disk.
+  let binary = getProgramBinary(program)
+  createDir(parentDir(path))
+  writeFile(path, binary)
+
+proc loadProgramBinary*(context: PContext, device: PDeviceId, path: string): PProgram =
+  ## Load a compiled program binary from disk and create a program object.
+  let binary = readFile(path)
+  var status: TClResult
+  var binaryStatus: int32
+  var dev = device
+  var L = binary.len
+  var dataPtr = unsafeAddr binary[0]
+  result = createProgramWithBinary(context, 1, addr dev, addr L,
+    cast[ptr ptr uint8](addr dataPtr), addr binaryStatus, addr status)
+  check status
+  result.buildOn(dev)
+
+proc kernelCachePath(sourceHash: string): string =
+  ## Return the disk path for a cached kernel binary.
+  KernelCacheDir / (sourceHash & ".bin")
+
+proc getOrCompile*(context: PContext, source: string, devices: seq[PDeviceId],
+                   kernelName: string): PKernel =
+  ## Return a compiled kernel for the given source.
+  ## Lookup order: in-memory cache → disk binary cache → JIT compile from source.
+  let sourceHash = hash(source)
+  if sourceHash in clKernelCache:
+    return clKernelCache[sourceHash].kernel
+
+  let hashStr = $sourceHash
+  let cachePath = kernelCachePath(hashStr)
+
+  var program: PProgram
+  if fileExists(cachePath):
+    # Load pre-compiled binary from disk (~1.5ms vs ~150ms JIT)
+    try:
+      program = loadProgramBinary(context, devices[0], cachePath)
+    except CatchableError:
+      # Binary invalid (driver update, etc.) — fall back to source compile
+      program = createAndBuild(context, source, devices)
+      try: saveProgramBinary(program, cachePath) except CatchableError: discard
+  else:
+    # First-ever compile — build from source and save binary to disk
+    program = createAndBuild(context, source, devices)
+    try: saveProgramBinary(program, cachePath) except CatchableError: discard
+
+  let kernel = program.createKernel(kernelName)
+  clKernelCache[sourceHash] = CachedKernel(program: program, kernel: kernel)
+  return kernel
+
+proc getOrUploadStencil*(context: PContext, queue: PCommandQueue,
+                         offsets: seq[int32]): GpuBuffer[int32] =
+  ## Return a GPU buffer containing the stencil offsets, uploading only once.
+  ## Uses a content hash so the cache is stable across calls.
+  let key = hash(offsets)
+  if key notin clStencilBufCache:
+    var buf = gpuBufferLike(context, offsets, MEM_READ_ONLY)
+    var tmp = offsets  # gpuBufferLike / write need a var
+    queue.write(tmp, buf)
+    check clwrap.finish(queue)
+    clStencilBufCache[key] = buf
+  return clStencilBufCache[key]
+
+proc getOrAllocPartials*(context: PContext, totalSites: int): GpuBuffer[float64] =
+  ## Return a partials GPU buffer of the given size, allocating only once.
+  if totalSites notin clPartialsBufCache:
+    clPartialsBufCache[totalSites] = gpuBuffer[float64](context, totalSites)
+  return clPartialsBufCache[totalSites]
+
+proc getOrAllocPartialsHost*(totalSites: int): ptr seq[float64] =
+  ## Return a reusable host-side partials buffer, allocating only once.
+  if totalSites notin clPartialsHostCache:
+    clPartialsHostCache[totalSites] = newSeq[float64](totalSites)
+  return addr clPartialsHostCache[totalSites]
+
+proc releaseAllCaches*() =
+  ## Release all cached resources. Call during finalization.
+  for key, cached in clKernelCache:
+    release(cached.kernel)
+    release(cached.program)
+  clKernelCache.clear()
+  for key, buf in clStencilBufCache:
+    release(buf)
+  clStencilBufCache.clear()
+  for key, buf in clPartialsBufCache:
+    release(buf)
+  clPartialsBufCache.clear()
+  clPartialsHostCache.clear()
+
 # OpenCL initialization and finalization
+#
+# Lazy singleton: the context, devices and queues are created on first use
+# and live for the lifetime of the process.  An atexit handler releases
+# them (together with the kernel/buffer caches) so callers never need to
+# call a "finalize" proc.
 
-template initCL*: untyped =
-  let (
-    clDevices {.inject.}, 
-    clContext {.inject.}, 
-    clQueues  {.inject.}
-  ) = multipleDeviceDefaults()
+var clInitialized {.global.}: bool = false
+var clDevices* {.global.}: seq[PDeviceId]
+var clContext* {.global.}: PContext
+var clQueues*  {.global.}: seq[PCommandQueue]
 
-template finalizeCL*: untyped =
+proc finalizeCLImpl() {.noconv.} =
+  ## Release all OpenCL resources. Registered with addQuitProc on first init.
+  if not clInitialized: return
+  releaseAllCaches()
   for queue in clQueues: release(queue)
   release(clContext)
+  clInitialized = false
+
+proc ensureCL*() =
+  ## Initialize the OpenCL context, devices, and command queues.
+  ## Safe to call multiple times — only the first call does real work.
+  if not clInitialized:
+    let (devs, ctx, qs) = multipleDeviceDefaults()
+    clDevices = devs
+    clContext = ctx
+    clQueues  = qs
+    addQuitProc(finalizeCLImpl)
+    clInitialized = true
+
+template initCL*: untyped =
+  ## Legacy compatibility — just calls ensureCL().
+  ensureCL()
+
+template finalizeCL*: untyped =
+  ## No-op — cleanup is handled by the atexit handler.
+  discard
 
 when isMainModule:
   # OpenCL initialization: assuming single platform (TODO: handle multiple platforms),

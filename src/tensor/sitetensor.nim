@@ -35,6 +35,17 @@
 
 import std/strformat
 import std/strutils  # for join
+import std/complex
+
+# Real-to-complex promotion helper
+template toComplex*[F: SomeFloat](x: F, T: typedesc): untyped =
+  ## Promote a real scalar to complex when T is Complex, otherwise pass through
+  when T is Complex[F]:
+    complex[F](x, F(0))
+  elif T is F:
+    x
+  else:
+    {.error: "Incompatible scalar type".}
 
 # Backend selection - same as tensorview.nim
 const UseSycl* {.booldefine.} = false
@@ -239,6 +250,31 @@ type
 # They are phantoms - never executed at runtime, the `each` macro rewrites them.
 # Parameterized by L (lattice type) and T (element type) for integration with TensorFieldView.
 
+const MaxSiteTensorElems* = 50
+  ## Maximum number of elements per site tensor for stack-allocated buffers.
+  ## Supports up to SU(5) complex matrices: 5×5 = 25 elements.
+  ## For complex types stored as separate re/im, this covers 25 complex values.
+
+type
+  StackBuf*[T] = object
+    ## Fixed-size stack buffer to avoid heap allocation in tight loops.
+    ## Used in MatMulResult, AdjointResult, etc. instead of seq[T].
+    data*: array[MaxSiteTensorElems, T]
+    len*: int
+
+proc initStackBuf*[T](n: int): StackBuf[T] {.inline.} =
+  result.len = n
+  # data is zero-initialized by default in Nim
+
+proc `[]`*[T](b: StackBuf[T], i: int): T {.inline.} =
+  b.data[i]
+
+proc `[]`*[T](b: var StackBuf[T], i: int): var T {.inline.} =
+  b.data[i]
+
+proc `[]=`*[T](b: var StackBuf[T], i: int, val: T) {.inline.} =
+  b.data[i] = val
+
 type
   TensorSiteProxy*[L, T] = object
     ## Proxy type returned by TensorFieldView[] - represents site tensor at index
@@ -282,8 +318,8 @@ type
     ## Result of matrix-matrix multiplication: mat1[n] * mat2[n]
     proxyA*, proxyB*: TensorSiteProxy[L, T]
     when UseOpenMP:
-      computed*: seq[T]     # Computed result for chained operations
-      hasComputed*: bool    # Whether computed buffer is populated
+      computed*: StackBuf[T]  # Computed result (stack-allocated)
+      hasComputed*: bool      # Whether computed buffer is populated
 
   MatAddResult*[L, T] = object
     ## Result of matrix addition/subtraction: mat1[n] +/- mat2[n]
@@ -291,7 +327,7 @@ type
     isSubtraction*: bool  # true for subtraction, false for addition
     when UseOpenMP:
       # For chained expressions, one or both operands may be from computed results
-      computedA*, computedB*: seq[T]
+      computedA*, computedB*: StackBuf[T]
       hasComputedA*, hasComputedB*: bool
 
   VecAddResult*[L, T] = object
@@ -299,7 +335,7 @@ type
     proxyA*, proxyB*: TensorSiteProxy[L, T]
     isSubtraction*: bool  # true for subtraction, false for addition
     when UseOpenMP:
-      computedA*, computedB*: seq[T]
+      computedA*, computedB*: StackBuf[T]
       hasComputedA*, hasComputedB*: bool
 
   MatVecResult*[L, T] = object
@@ -319,9 +355,9 @@ type
   AdjointResult*[L, T] = object
     ## Result of adjoint (conjugate transpose) on a proxy or result type
     when UseOpenMP:
-      computed*: seq[T]     # Computed adjoint buffer
-      shape*: seq[int]      # Shape of the result
-      elemsPerSite*: int    # Elements per site
+      computed*: StackBuf[T]  # Computed adjoint buffer (stack-allocated)
+      shape*: seq[int]        # Shape of the result
+      elemsPerSite*: int      # Elements per site
 
   #[ LocalTensorField Site Proxy Types - for CPU-only "for all" loops ]#
   
@@ -353,6 +389,10 @@ type
     scalar*: T
 
 #[ TensorSiteProxy operators for element access ]#
+
+proc siteIdentity*[L, T](tp: typedesc[TensorSiteProxy[L, T]]): TensorSiteProxy[L, T] {.inline.} =
+  ## Identity matrix stub for TensorSiteProxy (transpiler generates actual kernel code)
+  discard
 
 when UseOpenMP:
   # OpenMP backend: real implementations that access host memory directly
@@ -468,6 +508,15 @@ when UseOpenMP:
     result.proxy = proxy
     result.scalar = scalar
   
+  # Real scalar * proxy (promotes float to T when T is Complex)
+  proc `*`*[L, T](scalar: float, proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = toComplex(scalar, T)
+
+  proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: float): ScalarMulResult[L, T] {.inline.} =
+    result.proxy = proxy
+    result.scalar = toComplex(scalar, T)
+
   proc `+`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T] {.inline.} =
     result.proxy = proxy
     result.scalar = scalar
@@ -485,7 +534,7 @@ when UseOpenMP:
     let cols = if m.proxyB.shape.len > 1: m.proxyB.shape[1] else: 1
     let innerDim = if m.proxyA.shape.len > 1: m.proxyA.shape[1] else: 1
     
-    m.computed = newSeq[T](elemsPerSite)
+    m.computed = initStackBuf[T](elemsPerSite)
     for i in 0..<rows:
       for j in 0..<cols:
         var sum: T = default(T)
@@ -537,7 +586,7 @@ when UseOpenMP:
     # If both sides of previous result were computed, combine them first
     if a.hasComputedA and a.hasComputedB:
       let n = a.computedA.len
-      result.computedA = newSeq[T](n)
+      result.computedA = initStackBuf[T](n)
       if a.isSubtraction:
         for i in 0..<n:
           result.computedA[i] = a.computedA[i] - a.computedB[i]
@@ -573,6 +622,14 @@ else:
   # Tensor * scalar: mat[n] * 2.0
   proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: T): ScalarMulResult[L, T] =
     raise newException(Defect, "TensorSiteProxy * scalar phantom operator")
+
+  # Real scalar * tensor: 1.5 * mat[n] (promotes float to T)
+  proc `*`*[L, T](scalar: float, proxy: TensorSiteProxy[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "float * TensorSiteProxy phantom operator")
+
+  # Tensor * real scalar: mat[n] * 1.5 (promotes float to T)
+  proc `*`*[L, T](proxy: TensorSiteProxy[L, T], scalar: float): ScalarMulResult[L, T] =
+    raise newException(Defect, "TensorSiteProxy * float phantom operator")
 
   # Scalar + tensor: 2.0 + mat[n]
   proc `+`*[L, T](scalar: T, proxy: TensorSiteProxy[L, T]): ScalarAddResult[L, T] =
@@ -662,6 +719,19 @@ else:
   proc `*`*[L, T](res: MatAddResult[L, T], scalar: T): ScalarMulResult[L, T] =
     raise newException(Defect, "MatAddResult * scalar phantom operator")
 
+  # Real scalar * result types (promotes float to T)
+  proc `*`*[L, T](scalar: float, res: MatMulResult[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "float * MatMulResult phantom operator")
+
+  proc `*`*[L, T](scalar: float, res: MatAddResult[L, T]): ScalarMulResult[L, T] =
+    raise newException(Defect, "float * MatAddResult phantom operator")
+
+  proc `*`*[L, T](res: MatMulResult[L, T], scalar: float): ScalarMulResult[L, T] =
+    raise newException(Defect, "MatMulResult * float phantom operator")
+
+  proc `*`*[L, T](res: MatAddResult[L, T], scalar: float): ScalarMulResult[L, T] =
+    raise newException(Defect, "MatAddResult * float phantom operator")
+
 #[ ============================================================================
    Adjoint, Trace, and Accumulate operators for proxy and result types
    ============================================================================ ]#
@@ -685,7 +755,7 @@ when UseOpenMP:
     let cols = if src.proxyA.shape.len > 1: src.proxyA.shape[1] else: 1
     result.shape = src.proxyA.shape
     result.elemsPerSite = rows * cols
-    result.computed = newSeq[T](rows * cols)
+    result.computed = initStackBuf[T](rows * cols)
     # Conjugate transpose: result[j,i] = conj(src[i,j])
     for i in 0..<rows:
       for j in 0..<cols:
@@ -697,7 +767,7 @@ when UseOpenMP:
     let cols = if proxy.shape.len > 1: proxy.shape[1] else: 1
     result.shape = proxy.shape
     result.elemsPerSite = rows * cols
-    result.computed = newSeq[T](rows * cols)
+    result.computed = initStackBuf[T](rows * cols)
     let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
     for i in 0..<rows:
       for j in 0..<cols:
@@ -714,7 +784,7 @@ when UseOpenMP:
     let cols = rows  # adjoint result has transposed shape
     result.proxyA = a.proxyA
     result.proxyB = a.proxyB
-    result.computed = newSeq[T](rows * cols)
+    result.computed = initStackBuf[T](rows * cols)
     for i in 0..<rows:
       for j in 0..<cols:
         var sum: T = default(T)
@@ -723,7 +793,59 @@ when UseOpenMP:
         result.computed[i * cols + j] = sum
     result.hasComputed = true
 
-  # += on TensorSiteProxy: accumulate into view site
+  # AdjointResult * TensorSiteProxy: adj(A) * B
+  proc `*`*[L, T](a: AdjointResult[L, T], b: TensorSiteProxy[L, T]): MatMulResult[L, T] {.inline.} =
+    let rows = a.shape[0]
+    let innerDim = if a.shape.len > 1: a.shape[1] else: 1
+    let cols = if b.shape.len > 1: b.shape[1] else: 1
+    result.proxyA = b  # placeholder, not used since hasComputed=true
+    result.proxyB = b
+    result.computed = initStackBuf[T](rows * cols)
+    let hostDataB = cast[ptr UncheckedArray[T]](b.hostPtr)
+    for i in 0..<rows:
+      for j in 0..<cols:
+        var sum: T = default(T)
+        for k in 0..<innerDim:
+          sum = sum + a.computed[i * innerDim + k] * hostDataB[b.proxyElemOffset(k * cols + j)]
+        result.computed[i * cols + j] = sum
+    result.hasComputed = true
+
+  # MatMulResult * TensorSiteProxy: (A*B) * C
+  proc `*`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatMulResult[L, T] {.inline.} =
+    var src = a
+    if not src.hasComputed:
+      computeMatMul(src)
+    let rows = src.proxyA.shape[0]
+    let innerDim = if src.proxyA.shape.len > 1: src.proxyA.shape[1] else: 1
+    let cols = if b.shape.len > 1: b.shape[1] else: 1
+    result.proxyA = a.proxyA
+    result.proxyB = b
+    result.computed = initStackBuf[T](rows * cols)
+    let hostDataB = cast[ptr UncheckedArray[T]](b.hostPtr)
+    for i in 0..<rows:
+      for j in 0..<cols:
+        var sum: T = default(T)
+        for k in 0..<innerDim:
+          sum = sum + src.computed[i * innerDim + k] * hostDataB[b.proxyElemOffset(k * cols + j)]
+        result.computed[i * cols + j] = sum
+    result.hasComputed = true
+
+  # trace() on MatMulResult: sum of diagonal elements of A*B
+  proc trace*[L, T](m: MatMulResult[L, T]): T {.inline.} =
+    var src = m
+    if not src.hasComputed:
+      computeMatMul(src)
+    let rows = src.proxyA.shape[0]
+    let cols = if src.proxyA.shape.len > 1: src.proxyA.shape[1] else: 1
+    result = default(T)
+    for i in 0..<min(rows, cols):
+      result = result + src.computed[i * cols + i]
+
+  # trace() on MatAddResult: phantom for OpenMP (transpiler handles codegen)
+  proc trace*[L, T](m: MatAddResult[L, T]): T {.inline.} =
+    discard  # stub — real implementation not needed for OpenMP path yet
+
+  # += on TensorSiteProxy: accumulate matrix result into view site
   proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: MatMulResult[L, T]) {.inline.} =
     var src = rhs
     if not src.hasComputed:
@@ -732,6 +854,29 @@ when UseOpenMP:
     for i in 0..<proxy.elemsPerSite:
       let offset = proxy.proxyElemOffset(i)
       hostData[offset] = hostData[offset] + src.computed[i]
+
+  # += on TensorSiteProxy: accumulate scalar value into view site
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: T) {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let offset = proxy.proxyElemOffset(0)
+    hostData[offset] = hostData[offset] + rhs
+
+  # += on TensorSiteProxy: accumulate float into complex view site
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: float) {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let offset = proxy.proxyElemOffset(0)
+    hostData[offset] = hostData[offset] + T(rhs)
+
+  # re accessor on TensorSiteProxy: real part of element 0 (scalar field)
+  proc re*[L, T](proxy: TensorSiteProxy[L, T]): float64 {.inline.} =
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    let offset = proxy.proxyElemOffset(0)
+    when T is Complex64:
+      return hostData[offset].re
+    elif T is Complex32:
+      return float64(hostData[offset].re)
+    else:
+      return float64(hostData[offset])
 
 else:
   # OpenCL/SYCL backend: phantom operators for kernel codegen
@@ -745,8 +890,34 @@ else:
   proc `*`*[L, T](a: MatMulResult[L, T], b: AdjointResult[L, T]): MatMulResult[L, T] =
     raise newException(Defect, "MatMulResult * AdjointResult phantom operator")
 
+  proc `*`*[L, T](a: AdjointResult[L, T], b: TensorSiteProxy[L, T]): MatMulResult[L, T] =
+    raise newException(Defect, "AdjointResult * TensorSiteProxy phantom operator")
+
+  proc `*`*[L, T](a: MatMulResult[L, T], b: TensorSiteProxy[L, T]): MatMulResult[L, T] =
+    raise newException(Defect, "MatMulResult * TensorSiteProxy phantom operator")
+
+  # trace() on MatMulResult: phantom for kernel codegen
+  proc trace*[L, T](m: MatMulResult[L, T]): T =
+    raise newException(Defect, "trace(MatMulResult) phantom operator")
+
+  # trace() on MatAddResult: phantom for kernel codegen
+  proc trace*[L, T](m: MatAddResult[L, T]): T =
+    raise newException(Defect, "trace(MatAddResult) phantom operator")
+
   proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: MatMulResult[L, T]) =
     raise newException(Defect, "TensorSiteProxy += MatMulResult phantom operator")
+
+  # += scalar value into view site (phantom for kernel codegen)
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: T) =
+    raise newException(Defect, "TensorSiteProxy += T phantom operator")
+
+  # += float into view site (phantom for kernel codegen)
+  proc `+=`*[L, T](proxy: TensorSiteProxy[L, T], rhs: float) =
+    raise newException(Defect, "TensorSiteProxy += float phantom operator")
+
+  # re accessor on TensorSiteProxy: phantom for reduce codegen
+  proc re*[L, T](proxy: TensorSiteProxy[L, T]): float64 =
+    raise newException(Defect, "TensorSiteProxy.re phantom operator")
 
 # LocalSiteProxy element access helpers (must be before trace)
 # siteOffset is in storage-type units (float64 for Complex64, float32 for Complex32)
@@ -814,7 +985,19 @@ proc trace*[L, T](proxy: TensorSiteProxy[L, T]): T {.inline.} =
 proc `$`*[L, T](proxy: TensorSiteProxy[L, T]): string =
   ## Convert site tensor to string for debugging.
   ## Works both in OpenCL kernels (via macro) and at runtime (via stored data).
-  return $proxy.runtimeData
+  ## For OpenMP: reads directly from hostPtr (avoids requiring pre-populated runtimeData).
+  when UseOpenMP:
+    var data: RuntimeSiteData[T]
+    data.shape = proxy.shape
+    data.rank = proxy.shape.len
+    let elemsPerSite = proxy.elemsPerSite
+    data.data = newSeq[T](elemsPerSite)
+    let hostData = cast[ptr UncheckedArray[T]](proxy.hostPtr)
+    for e in 0..<elemsPerSite:
+      data.data[e] = hostData[proxy.proxyElemOffset(e)]
+    return $data
+  else:
+    return $proxy.runtimeData
 
 # Runtime formatting for CPU fallback
 proc `$`*[T](data: RuntimeSiteData[T]): string =
@@ -1023,6 +1206,14 @@ proc `*`*[D: static[int], R: static[int], L, T](scalar: T, proxy: LocalSiteProxy
 proc `*`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], scalar: T): LocalScalarMulResult[D, R, L, T] {.inline.} =
   result.proxy = proxy
   result.scalar = scalar
+
+proc `*`*[D: static[int], R: static[int], L, T](scalar: float, proxy: LocalSiteProxy[D, R, L, T]): LocalScalarMulResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = toComplex(scalar, T)
+
+proc `*`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], scalar: float): LocalScalarMulResult[D, R, L, T] {.inline.} =
+  result.proxy = proxy
+  result.scalar = toComplex(scalar, T)
 
 proc `+`*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], scalar: T): LocalScalarAddResult[D, R, L, T] {.inline.} =
   result.proxy = proxy

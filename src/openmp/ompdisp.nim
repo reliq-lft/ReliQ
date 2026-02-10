@@ -117,6 +117,12 @@ proc isIntSym(n: NimNode): bool =
     return n.getTypeInst().repr == "int"
   except: return false
 
+proc isFloatSym(n: NimNode): bool =
+  try:
+    let r = n.getTypeInst().repr
+    return r == "float64" or r == "float"
+  except: return false
+
 proc extractGaugeFieldDim(n: NimNode): int =
   try:
     let ti = n.getTypeInst()
@@ -171,7 +177,7 @@ type
     nimSym*: NimNode
 
   LetBindingKind* = enum
-    lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkMatMul, lbkOther
+    lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner, lbkMatMul, lbkOther
 
   LetBinding* = object
     varName*: string
@@ -179,6 +185,12 @@ type
     stencilName*: string
     dirExpr*: string
     pointExpr*: string
+    # Corner-specific fields (for lbkStencilCorner)
+    signExprA*: string
+    dirExprA*: string
+    signExprB*: string
+    dirExprB*: string
+    nDim*: int  # lattice dimensionality D
 
   KernelInfo* = object
     views*: seq[ViewEntry]
@@ -271,6 +283,10 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
           if n.len >= 4 and n[1].kind == nnkSym:
             addStencil(n[1], n[1].strVal)
           for i in 1..<n.len: walk(n[i])
+        of "corner":
+          if n.len >= 7 and n[1].kind == nnkSym:
+            addStencil(n[1], n[1].strVal)
+          for i in 1..<n.len: walk(n[i])
         of "neighbor":
           if n.len >= 4 and n[1].kind == nnkSym:
             addStencil(n[1], n[1].strVal)
@@ -306,6 +322,29 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 kind: if fn == "fwd": lbkStencilFwd else: lbkStencilBwd,
                 stencilName: val[1].strVal,
                 dirExpr: dirStr)
+            elif fn == "corner":
+              # corner(stencil, site, signA, dirA, signB, dirB)
+              addStencil(val[1], val[1].strVal)
+              proc extractIntExpr(node: NimNode): string =
+                if node.kind in {nnkIntLit..nnkInt64Lit}: $node.intVal
+                elif node.kind == nnkSym: node.strVal
+                elif node.kind == nnkPrefix and node[0].strVal == "-":
+                  "(-" & extractIntExpr(node[1]) & ")"
+                else: "0"
+              var nDimVal = 4
+              let stencilType = val[1].getType()
+              if stencilType.kind == nnkBracketExpr and stencilType.len >= 2:
+                if stencilType[1].kind == nnkIntLit:
+                  nDimVal = stencilType[1].intVal.int
+              letBindingsLocal.add LetBinding(
+                varName: vsym.strVal,
+                kind: lbkStencilCorner,
+                stencilName: val[1].strVal,
+                signExprA: extractIntExpr(val[3]),
+                dirExprA: extractIntExpr(val[4]),
+                signExprB: extractIntExpr(val[5]),
+                dirExprB: extractIntExpr(val[6]),
+                nDim: nDimVal)
             elif fn == "neighbor":
               addStencil(val[1], val[1].strVal)
               var ptStr = "0"
@@ -386,6 +425,32 @@ proc findRuntimeIntVars*(body: NimNode, info: KernelInfo): seq[tuple[name: strin
       for child in n: scan(child)
 
   scan(body)
+  return found
+
+proc findRuntimeFloatVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, sym: NimNode]] =
+  var seen: HashSet[string]
+  var viewNames, gaugeNames, stencilNames, letNames: HashSet[string]
+  var found: seq[tuple[name: string, sym: NimNode]]
+
+  for v in info.views: viewNames.incl v.name
+  for gv in info.gaugeViews: gaugeNames.incl gv.name
+  for s in info.stencils: stencilNames.incl s.name
+  for lb in info.letBindings: letNames.incl lb.varName
+
+  proc scanFloat(n: NimNode) =
+    case n.kind
+    of nnkSym:
+      let name = n.strVal
+      if name != info.loopVarStr and name notin seen and
+         name notin viewNames and name notin gaugeNames and
+         name notin stencilNames and name notin letNames:
+        if isFloatSym(n):
+          seen.incl name
+          found.add (name, n)
+    else:
+      for child in n: scanFloat(child)
+
+  scanFloat(body)
   return found
 
 #[ ============================================================================
@@ -504,7 +569,7 @@ proc resolveSiteRef*(viewExpr, siteExpr: NimNode, ctx: var CodeCtx): SiteRef =
         laneVar = "lane"
         break resolveGL
       let lb = ctx.info.getLetBinding(nm)
-      if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor}:
+      if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner}:
         groupVar = nm & "_group"
         laneVar = nm & "_lane"
         break resolveGL
@@ -686,6 +751,27 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResu
         let adj = emitAdjoint(target, tmp, inner.elems, ctx, d)
         s &= adj.code
         return (s, adj.elems)
+      if fn == "trace" and n.len >= 2:
+        # trace(matexpr): sum diagonal elements → scalar result
+        let tmp = ctx.nextTmp()
+        let p = ind(d)
+        var elemsGuess = "NC*NC"
+        if ctx.isComplex: elemsGuess = "2*NC*NC"
+        var s = p & "simd_v " & tmp & "[" & elemsGuess & "];\n"
+        let inner = emitMatExpr(tmp, n[1], ctx, d)
+        s &= inner.code
+        if ctx.isComplex:
+          s &= p & target & "[0] = simd_setzero(); " & target & "[1] = simd_setzero();\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++) {\n"
+          s &= p & "  " & target & "[0] = simd_add(" & target & "[0], " & tmp & "[2*(_i*NC+_i)]);\n"
+          s &= p & "  " & target & "[1] = simd_add(" & target & "[1], " & tmp & "[2*(_i*NC+_i)+1]);\n"
+          s &= p & "}\n"
+          return (s, "2")
+        else:
+          s &= p & target & "[0] = simd_setzero();\n"
+          s &= p & "for (int _i = 0; _i < NC; _i++)\n"
+          s &= p & "  " & target & "[0] = simd_add(" & target & "[0], " & tmp & "[_i*NC+_i]);\n"
+          return (s, "1")
 
     let defaultElems = if ctx.isComplex: "2*NC*NC" else: "NC*NC"
     return (ind(d) & "// unhandled call: " & n[0].strVal & "\n", defaultElems)
@@ -693,6 +779,16 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResu
   of nnkSym:
     let name = n.strVal
     let p = ind(d)
+    # Check if this is a float scalar (not a matrix array)
+    var isFloat = false
+    try: isFloat = isFloatSym(n)
+    except: discard
+    if isFloat:
+      # Scalar float: broadcast to single element
+      if ctx.isComplex:
+        return (p & target & "[0] = simd_set1(" & name & "); " & target & "[1] = simd_setzero();\n", "2")
+      else:
+        return (p & target & "[0] = simd_set1(" & name & ");\n", "1")
     let lb = ctx.info.getLetBinding(name)
     if lb.kind == lbkMatMul or lb.kind == lbkOther:
       let elemsName = name & "_elems"
@@ -755,10 +851,24 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var CodeCtx, d: int): MatResu
           s &= lRes.code
           let rRes = emitMatExpr(tmpR, n[2], ctx, d)
           s &= rRes.code
-          let outElems = lRes.elems
-          if ctx.isComplex:
+          # Determine output elems — use the max of both sides
+          # A real scalar has elems="1", complex scalar has elems="2",
+          # a full matrix has elems="NC*NC" or "2*NC*NC".
+          let outElems = if lRes.elems == "1" and rRes.elems != "1": rRes.elems
+                         elif rRes.elems == "1" and lRes.elems != "1": lRes.elems
+                         else: lRes.elems
+          # Check if one side is a real scalar (elems="1") — broadcast multiply
+          let lIsRealScalar = lRes.elems == "1"
+          let rIsRealScalar = rRes.elems == "1"
+          if lIsRealScalar or rIsRealScalar:
+            # Real scalar × anything: just multiply all elements by the scalar
+            let scalarTmp = if lIsRealScalar: tmpL else: tmpR
+            let otherTmp = if lIsRealScalar: tmpR else: tmpL
+            let otherElems = if lIsRealScalar: rRes.elems else: lRes.elems
+            s &= p & "for (int _e = 0; _e < " & otherElems & "; _e++)\n"
+            s &= p & "  " & target & "[_e] = simd_mul(" & scalarTmp & "[0], " & otherTmp & "[_e]);\n"
+          elif ctx.isComplex:
             # Complex element-wise multiply: (are,aim) * (bre,bim)
-            # outElems = elementsPerSite = 2*tensor_elems; loop over tensor_elems
             s &= p & "for (int _e = 0; _e < " & outElems & " / 2; _e++) {\n"
             s &= p & "  simd_v _tre, _tim;\n"
             s &= p & "  simd_cmul(&_tre, &_tim, " & tmpL & "[2*_e], " & tmpL & "[2*_e+1], " & tmpR & "[2*_e], " & tmpR & "[2*_e+1]);\n"
@@ -821,6 +931,17 @@ proc transpileScalar*(n: NimNode, ctx: var CodeCtx): string =
     return $n.floatVal
   of nnkHiddenStdConv, nnkConv, nnkHiddenDeref, nnkHiddenAddr, nnkHiddenSubConv:
     if n.len > 0: return transpileScalar(n[^1], ctx)
+  of nnkStmtListExpr:
+    for i in countdown(n.len - 1, 0):
+      if n[i].kind != nnkEmpty:
+        return transpileScalar(n[i], ctx)
+  of nnkPrefix:
+    if n.len >= 2 and n[0].kind == nnkSym:
+      let op = n[0].strVal
+      if op == "not":
+        return "!(" & transpileScalar(n[1], ctx) & ")"
+      else:
+        return op & "(" & transpileScalar(n[1], ctx) & ")"
   of nnkCall:
     if n[0].kind == nnkSym:
       var args: seq[string]
@@ -886,11 +1007,14 @@ proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string
   let runtimeVars = findRuntimeIntVars(body, info)
   for rv in runtimeVars:
     params.add "const int " & rv.name
+  let runtimeFloatVars = findRuntimeFloatVars(body, info)
+  for rv in runtimeFloatVars:
+    params.add "const double " & rv.name
 
   src &= "static void " & funcName & "(\n"
   src &= "    " & params.join(",\n    ")
   src &= "\n) {\n"
-  src &= "  #pragma omp parallel for\n"
+  src &= "  #pragma omp parallel for schedule(static)\n"
   src &= "  for (int group = 0; group < numGroups; ++group) {\n"
 
   # Process each statement
@@ -932,6 +1056,26 @@ proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string
             src &= "    for (int _lane = 0; _lane < VW; _lane++) {\n"
             src &= "      int _site = group * VW + _lane;\n"
             src &= "      " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+            src &= "    }\n\n"
+          of lbkStencilCorner:
+            let nd = $lb.nDim
+            let sA = lb.signExprA
+            let dA = lb.dirExprA
+            let sB = lb.signExprB
+            let dB = lb.dirExprB
+            let prefix = "_c_" & vn
+            src &= "    // corner neighbor: " & vn & " (" & sA & "*" & dA & ", " & sB & "*" & dB & ")\n"
+            src &= "    int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+            src &= "    int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+            src &= "    int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+            src &= "    int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+            src &= "    int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+            src &= "    int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+            src &= "    int " & prefix & "_ptIdx = 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si;\n"
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _lane = 0; _lane < VW; _lane++) {\n"
+            src &= "      int _site = group * VW + _lane;\n"
+            src &= "      " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & prefix & "_ptIdx];\n"
             src &= "    }\n\n"
           of lbkMatMul:
             src &= "    // matrix temp: " & vn & "\n"
@@ -990,7 +1134,7 @@ proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string
             let sn = siteNode.strVal
             if sn != ctx.loopVarStr:
               let lb = ctx.info.getLetBinding(sn)
-              if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor}:
+              if lb.kind in {lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner}:
                 elGroupVar = sn & "_group"
 
           if stmt.len == 4:
@@ -1045,26 +1189,87 @@ proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string
           else:
             innerStmts.add branchBody
           for innerStmt in innerStmts:
-            if innerStmt.kind == nnkInfix and innerStmt.len >= 3 and
-               innerStmt[0].kind == nnkSym and innerStmt[0].strVal == "+=":
-              let lhs = innerStmt[1]
-              let rhs = innerStmt[2]
-              if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
-                let sr = resolveSiteRef(lhs[1], lhs[2], ctx)
-                let tmp = ctx.nextTmp()
-                src &= "      { // += inside if\n"
-                var elemsGuess = "NC*NC"
-                if ctx.isComplex: elemsGuess = "2*NC*NC"
-                src &= "        simd_v " & tmp & "[" & elemsGuess & "];\n"
-                let matRes = emitMatExpr(tmp, rhs, ctx, 4)
-                src &= matRes.code
-                let storeElems = sr.elemsVar
-                # storeElems = elementsPerSite — already correct for both real and complex
-                src &= "        for (int _e = 0; _e < " & storeElems & "; _e++) {\n"
-                src &= "          simd_v _cur = simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ");\n"
-                src &= "          simd_store(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ", simd_add(_cur, " & tmp & "[_e]));\n"
-                src &= "        }\n"
-                src &= "      }\n"
+            case innerStmt.kind
+            of nnkLetSection:
+              for idefs in innerStmt:
+                if idefs.kind == nnkIdentDefs and idefs.len >= 3:
+                  let vn = idefs[0].strVal
+                  let val = idefs[2]
+                  let lb = info.getLetBinding(vn)
+                  case lb.kind
+                  of lbkStencilFwd:
+                    src &= "      // fwd neighbor (if): " & vn & "\n"
+                    src &= "      int " & vn & "_indices[VW];\n"
+                    src &= "      for (int _lane = 0; _lane < VW; _lane++) {\n"
+                    src &= "        int _site = group * VW + _lane;\n"
+                    src &= "        " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & "];\n"
+                    src &= "      }\n"
+                  of lbkStencilBwd:
+                    src &= "      // bwd neighbor (if): " & vn & "\n"
+                    src &= "      int " & vn & "_indices[VW];\n"
+                    src &= "      for (int _lane = 0; _lane < VW; _lane++) {\n"
+                    src &= "        int _site = group * VW + _lane;\n"
+                    src &= "        " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & " + 1];\n"
+                    src &= "      }\n"
+                  of lbkStencilCorner:
+                    let nd = $lb.nDim
+                    let sA = lb.signExprA
+                    let dA = lb.dirExprA
+                    let sB = lb.signExprB
+                    let dB = lb.dirExprB
+                    let prefix = "_c_" & vn
+                    src &= "      // corner neighbor (if): " & vn & " (" & sA & "*" & dA & ", " & sB & "*" & dB & ")\n"
+                    src &= "      int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+                    src &= "      int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+                    src &= "      int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+                    src &= "      int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+                    src &= "      int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+                    src &= "      int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+                    src &= "      int " & prefix & "_ptIdx = 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si;\n"
+                    src &= "      int " & vn & "_indices[VW];\n"
+                    src &= "      for (int _lane = 0; _lane < VW; _lane++) {\n"
+                    src &= "        int _site = group * VW + _lane;\n"
+                    src &= "        " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & prefix & "_ptIdx];\n"
+                    src &= "      }\n"
+                  of lbkStencilNeighbor:
+                    src &= "      // stencil neighbor (if): " & vn & "\n"
+                    src &= "      int " & vn & "_indices[VW];\n"
+                    src &= "      for (int _lane = 0; _lane < VW; _lane++) {\n"
+                    src &= "        int _site = group * VW + _lane;\n"
+                    src &= "        " & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+                    src &= "      }\n"
+                  of lbkMatMul:
+                    var elemsGuess = "NC*NC"
+                    if ctx.isComplex: elemsGuess = "2*NC*NC"
+                    src &= "      simd_v " & vn & "[" & elemsGuess & "];\n"
+                    let matRes = emitMatExpr(vn, val, ctx, 3)
+                    src &= matRes.code
+                    src &= "      const int " & vn & "_elems = " & matRes.elems & ";\n"
+                  of lbkOther:
+                    let code = transpileScalar(val, ctx)
+                    src &= "      " & ctx.scalarType & " " & vn & " = " & code & ";\n"
+            of nnkInfix:
+              if innerStmt.len >= 3 and
+                 innerStmt[0].kind == nnkSym and innerStmt[0].strVal == "+=":
+                let lhs = innerStmt[1]
+                let rhs = innerStmt[2]
+                if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
+                  let sr = resolveSiteRef(lhs[1], lhs[2], ctx)
+                  let tmp = ctx.nextTmp()
+                  src &= "      { // += inside if\n"
+                  var elemsGuess = "NC*NC"
+                  if ctx.isComplex: elemsGuess = "2*NC*NC"
+                  src &= "        simd_v " & tmp & "[" & elemsGuess & "];\n"
+                  let matRes = emitMatExpr(tmp, rhs, ctx, 4)
+                  src &= matRes.code
+                  let storeElems = sr.elemsVar
+                  src &= "        for (int _e = 0; _e < " & storeElems & "; _e++) {\n"
+                  src &= "          simd_v _cur = simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ");\n"
+                  src &= "          simd_store(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, "_e") & ", simd_add(_cur, " & tmp & "[_e]));\n"
+                  src &= "        }\n"
+                  src &= "      }\n"
+            else:
+              src &= "      // skipped inner: " & $innerStmt.kind & "\n"
           src &= "    }\n"
 
     else:
@@ -1119,11 +1324,17 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
   let ncSym = genSym(nskLet, "nc")
   let nsSym = genSym(nskLet, "ns")
 
-  if info.gaugeViews.len > 0 and info.views.len == 0:
+  if info.gaugeViews.len > 0:
+    # NC always comes from the gauge view (matrix dimension)
     let gSym = info.gaugeViews[0].nimSym
-    argSetupStmts.add quote do:
-      let `ncSym` = `gSym`.field[0].shape[0]
-      let `nsSym` = `gSym`.field[0].numSites()
+    if info.views.len == 0:
+      argSetupStmts.add quote do:
+        let `ncSym` = `gSym`.field[0].shape[0]
+        let `nsSym` = `gSym`.field[0].numSites()
+    else:
+      argSetupStmts.add quote do:
+        let `ncSym` = `gSym`.field[0].shape[0]
+        let `nsSym` = `shapeViewSym`.numSites()
   else:
     argSetupStmts.add quote do:
       let `ncSym` = if `shapeViewSym`.shape.len >= 1: `shapeViewSym`.shape[0] else: 1
@@ -1192,6 +1403,13 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
     let rvSym = rv.sym
     let rvExpr = quote do: `rvSym`.cint
     addParam(rvExpr, ident"cint")
+
+  # Runtime float vars
+  let runtimeFloatVars = findRuntimeFloatVars(body, info)
+  for rv in runtimeFloatVars:
+    let rvSym = rv.sym
+    let rvExpr = quote do: `rvSym`.cdouble
+    addParam(rvExpr, ident"cdouble")
 
   # Build the importc proc declaration
   let wrapperName = genSym(nskProc, funcName)

@@ -91,6 +91,21 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
   ## Fully general — delegates to ``emitMatExpr`` for any matrix expression.
   let p = ind(d)
 
+  # --- Pattern: re(view[n]) or im(view[n]) — proc-style accessor on scalar field ---
+  if rhs.kind == nnkCall and rhs[0].kind == nnkSym and rhs[0].strVal in ["re", "im"]:
+    let inner = rhs[1]
+    let accessor = if rhs[0].strVal == "re": ".x" else: ".y"
+    # re(view[n]) — load element 0 of scalar field
+    if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "[]":
+      let sr = resolveSiteRef(inner[1], inner[2], ctx)
+      var s = ""
+      let elems = sr.elemsVar
+      if ctx.isComplex:
+        s &= p & "accum += " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, elems, "0") & accessor & ";\n"
+      else:
+        s &= p & "accum += " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, elems, "0") & ";\n"
+      return s
+
   # --- Pattern: expr.re or expr.im ---
   if rhs.kind == nnkDotExpr and rhs.len >= 2 and rhs[1].kind == nnkSym:
     let field = rhs[1].strVal
@@ -138,6 +153,17 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
           else:
             s &= p & "  accum += " & tmp & "[_i*NC+_i];\n"
           return s
+
+      # view[n].re/.im — direct access to scalar field element 0
+      if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "[]":
+        let sr = resolveSiteRef(inner[1], inner[2], ctx)
+        var s = ""
+        let elems = sr.elemsVar
+        if ctx.isComplex:
+          s &= p & "accum += " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, elems, "0") & accessor & ";\n"
+        else:
+          s &= p & "accum += " & aosoaIdx(sr.dataVar, sr.groupVar, sr.laneVar, elems, "0") & ";\n"
+        return s
 
   # --- Pattern: trace(something) without .re/.im ---
   if rhs.kind == nnkCall and rhs[0].kind == nnkSym and rhs[0].strVal == "trace":
@@ -211,8 +237,10 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
    ============================================================================ ]#
 
 proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): string =
-  ## Generate an OpenCL kernel that writes per-work-item scalar contributions
-  ## to a ``__global double* partials`` buffer.
+  ## Generate an OpenCL kernel with work-group-level reduction.
+  ## Each work-group reduces its elements into a single partial sum
+  ## using ``__local`` memory, so the host reads back only
+  ## ``numWorkGroups`` values instead of ``numSites``.
   var ctx = newCodeCtx(info)
   let vw = $VectorWidth
 
@@ -221,7 +249,8 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
   # FP64 extension (needed for double precision)
   if info.scalarType in {etFloat64, etInt64}:
     src &= "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n"
-  src &= "#define NC {NC_VALUE}\n\n"
+  src &= "#define NC {NC_VALUE}\n"
+  src &= "#define WG_SIZE 256\n\n"
 
   # Complex helpers for OpenCL
   if info.isComplex:
@@ -259,11 +288,13 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
 
   # Work-item setup
   src &= "  const int " & ctx.loopVarStr & " = get_global_id(0);\n"
-  src &= "  if (" & ctx.loopVarStr & " >= numSites) return;\n\n"
   src &= "  const int VW = " & vw & ";\n"
   src &= "  const int group = " & ctx.loopVarStr & " / VW;\n"
   src &= "  const int lane = " & ctx.loopVarStr & " % VW;\n\n"
   src &= "  " & ctx.scalarType & " accum = 0;\n\n"
+
+  # Guard: only compute for valid sites
+  src &= "  if (" & ctx.loopVarStr & " < numSites) {\n"
 
   # Process each statement in the reduce body
   var stmts: seq[NimNode]
@@ -296,6 +327,23 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
                    ctx.loopVarStr & " * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
             src &= "  int " & vn & "_group = " & vn & "_idx / VW;\n"
             src &= "  int " & vn & "_lane = " & vn & "_idx % VW;\n"
+          of lbkStencilCorner:
+            let nd = $lb.nDim
+            let sA = lb.signExprA
+            let dA = lb.dirExprA
+            let sB = lb.signExprB
+            let dB = lb.dirExprB
+            let prefix = "_c_" & vn
+            src &= "  int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+            src &= "  int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+            src &= "  int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+            src &= "  int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+            src &= "  int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+            src &= "  int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+            src &= "  int " & vn & "_idx = " & lb.stencilName & "_offsets[" &
+                   ctx.loopVarStr & " * " & lb.stencilName & "_npts + 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si];\n"
+            src &= "  int " & vn & "_group = " & vn & "_idx / VW;\n"
+            src &= "  int " & vn & "_lane = " & vn & "_idx % VW;\n"
           of lbkMatMul:
             src &= "  " & ctx.elemType & " " & vn & "[NC*NC];\n"
             let matRes = emitMatExpr(vn, val, ctx, 1)
@@ -304,6 +352,12 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
           of lbkOther:
             let code = transpileScalar(val, ctx)
             src &= "  " & ctx.scalarType & " " & vn & " = " & code & ";\n"
+    of nnkCall:
+      # Skip addFLOPImpl calls — handled on the host side
+      if isAddFlopCall(stmt):
+        discard
+      else:
+        discard  # other calls not yet handled in reduce kernel
     of nnkInfix:
       if stmt.len >= 3 and stmt[0].kind == nnkSym and stmt[0].strVal == "+=":
         let rhs = stmt[2]
@@ -313,7 +367,19 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
     else:
       discard
 
-  src &= "  partials[" & ctx.loopVarStr & "] = accum;\n"
+  src &= "  } // end if (n < numSites)\n\n"
+
+  # Work-group reduction using __local memory
+  src &= "  // Work-group reduction\n"
+  src &= "  __local " & ctx.scalarType & " scratch[WG_SIZE];\n"
+  src &= "  const int lid = get_local_id(0);\n"
+  src &= "  scratch[lid] = accum;\n"
+  src &= "  barrier(CLK_LOCAL_MEM_FENCE);\n\n"
+  src &= "  for (int stride = get_local_size(0) / 2; stride > 0; stride >>= 1) {\n"
+  src &= "    if (lid < stride) scratch[lid] += scratch[lid + stride];\n"
+  src &= "    barrier(CLK_LOCAL_MEM_FENCE);\n"
+  src &= "  }\n\n"
+  src &= "  if (lid == 0) partials[get_group_id(0)] = scratch[0];\n"
   src &= "}\n"
   return src
 
@@ -362,12 +428,11 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
   let kernelNameLit = newLit(kernelName)
   let kernelSourceLit = newLit(kernelSource)
 
-  # Find a view sym for shape/sites info
+  # Find a TensorFieldView sym for shape/sites info.
+  # Only use regular views here; GaugeFieldView doesn't have .shape/.numSites.
   var shapeViewSym: NimNode = nil
   for v in info.views:
     shapeViewSym = v.nimSym; break
-  if shapeViewSym == nil and info.gaugeViews.len > 0:
-    shapeViewSym = info.gaugeViews[0].nimSym
 
   var sitesExpr: NimNode
   if shapeViewSym != nil:
@@ -377,7 +442,6 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
       nnkDotExpr.newTree(info.gaugeViews[0].nimSym, ident"field"), newLit(0))
   else:
     error("No view found for sites info")
-    return
 
   var shapeExpr: NimNode
   if shapeViewSym != nil:
@@ -388,8 +452,17 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
   else:
     shapeExpr = sitesExpr
 
+  # NC shape: use gauge field matrix dimension if available
+  var ncShapeExpr: NimNode
+  if info.gaugeViews.len > 0:
+    ncShapeExpr = nnkBracketExpr.newTree(
+      nnkDotExpr.newTree(info.gaugeViews[0].nimSym, ident"field"), newLit(0))
+  elif shapeViewSym != nil:
+    ncShapeExpr = shapeViewSym
+  else:
+    ncShapeExpr = shapeExpr
+
   let kernelSym = genSym(nskLet, "kernel")
-  let programSym = genSym(nskLet, "program")
   let devIdxSym = genSym(nskForVar, "devIdx")
 
   # --- Build setArg statements ---
@@ -472,23 +545,14 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
     argIndex += 2
 
     let sbuf = genSym(nskVar, "sbuf")
-    let scopy = genSym(nskVar, "scopy")
 
     stencilSetup.add quote do:
-      var `scopy` = newSeq[int32](`ssym`.offsets.len)
-      for i in 0..<`ssym`.offsets.len:
-        `scopy`[i] = `ssym`.offsets[i]
-      var `sbuf` = gpuBufferLike(clContext, `scopy`, MEM_READ_ONLY)
-      clQueues[0].write(`scopy`, `sbuf`)
-      check clwrap.finish(clQueues[0])
+      var `sbuf` = getOrUploadStencil(clContext, clQueues[0], `ssym`.offsets)
 
     stencilArgs.add quote do:
       `kernelSym`.setArg(`sbuf`, `offIdx`)
       var np = `ssym`.nPoints.int32
       `kernelSym`.setArg(np, `npIdx`)
-
-    stencilCleanup.add quote do:
-      release(`sbuf`)
 
   # Runtime int variable args
   let runtimeVars = findRuntimeIntVars(body, info)
@@ -502,12 +566,43 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
       `kernelSym`.setArg(`tmp`, `idx`)
     argIndex += 1
 
+  # --- Host-side FLOP accumulation (built before quote do, spliced in) ---
+  var flopBlock = newStmtList()   # empty = no-op when spliced
+  let flopEntries = findFlopCalls(body)
+  if flopEntries.len > 0:
+    var innerStmts = newStmtList()
+
+    # Compute total sites from sitesPerDevice
+    let sitesPerDevExpr = nnkDotExpr.newTree(
+      nnkDotExpr.newTree(sitesExpr, ident"data"), ident"sitesPerDevice")
+    innerStmts.add quote do:
+      var flopTotalSites {.inject.} = 0
+      for flopX {.inject.} in `sitesPerDevExpr`:
+        flopTotalSites += flopX
+
+    # Emit addFLOPImpl calls for each entry
+    for entry in flopEntries:
+      let flops = untypeAst(entry.flopsExpr)
+      if entry.condExpr == nil:
+        innerStmts.add quote do:
+          addFLOPImpl(profiler, `flops` * flopTotalSites)
+      else:
+        let cond = untypeAst(entry.condExpr)
+        innerStmts.add quote do:
+          if `cond`:
+            addFLOPImpl(profiler, `flops` * flopTotalSites)
+
+    # Wrap in when ProfileMode == 1:
+    flopBlock = nnkWhenStmt.newTree(
+      nnkElifBranch.newTree(
+        nnkInfix.newTree(ident"==", ident"ProfileMode", newLit(1)),
+        innerStmts))
+
   result = quote do:
     block:
       let savedAccum = `accumSym`
-      let outShape = `shapeExpr`.shape
-      let outRank = outShape.len
-      let ncDim = if outRank >= 1: outShape[0] else: 1
+      let ncShape = `ncShapeExpr`.shape
+      let ncDim = if ncShape.len >= 1: ncShape[0] else: 1
       let finalKernelSource = `kernelSourceLit`.replace("{NC_VALUE}", $ncDim)
 
       when DebugKernels:
@@ -515,16 +610,20 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
         echo finalKernelSource
         echo "======================================="
 
-      let `programSym` = createAndBuild(clContext, finalKernelSource, clDevices)
-      let `kernelSym` = `programSym`.createKernel(`kernelNameLit`)
+      let `kernelSym` = getOrCompile(clContext, finalKernelSource, clDevices, `kernelNameLit`)
 
       let numDevices = clQueues.len
       let sitesPerDev = `sitesExpr`.data.sitesPerDevice
       let totalSites = `sitesExpr`.numSites()
 
-      # Allocate partials buffer
-      var partialsBuf = gpuBuffer[float64](clContext, totalSites)
-      var partialsHost = newSeq[float64](totalSites)
+      # Work-group reduction: each work-group of 256 produces one partial sum
+      const reduceWgSize = 256
+      let numWorkGroups = (totalSites + reduceWgSize - 1) div reduceWgSize
+      let globalWorkSize = numWorkGroups * reduceWgSize  # rounded up
+
+      # Cached partials buffer — sized for numWorkGroups, not totalSites
+      var partialsBuf = getOrAllocPartials(clContext, numWorkGroups)
+      var partialsHostPtr = getOrAllocPartialsHost(numWorkGroups)
 
       `stencilSetup`
 
@@ -541,26 +640,18 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
           `stencilArgs`
           `runtimeArgStmts`
 
-          when UseWorkGroups:
-            clQueues[`devIdxSym`].run(`kernelSym`, devSites, VectorWidth)
-          else:
-            clQueues[`devIdxSym`].run(`kernelSym`, devSites)
+          clQueues[`devIdxSym`].run(`kernelSym`, globalWorkSize, reduceWgSize)
 
       for devIdx in 0..<numDevices:
         check clwrap.finish(clQueues[devIdx])
 
-      # Read back partials and sum
-      clQueues[0].read(partialsHost, partialsBuf)
-      check clwrap.finish(clQueues[0])
+      # Read back only numWorkGroups partials (not totalSites)
+      clQueues[0].read(partialsHostPtr[], partialsBuf)
 
       var localSum = 0.0
-      for i in 0..<totalSites:
-        localSum += partialsHost[i]
+      for i in 0..<numWorkGroups:
+        localSum += partialsHostPtr[][i]
       `accumSym` += localSum
-
-      release(partialsBuf)
-      release(`kernelSym`)
-      release(`programSym`)
 
       `stencilCleanup`
 
@@ -569,6 +660,8 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
         var deltaAccum = `accumSym` - savedAccum
         GA_Dgop(addr deltaAccum, 1, "+")
         `accumSym` = savedAccum + deltaAccum
+
+      `flopBlock`
 
 #[ ============================================================================
    Public Reduce Macro (ForLoopStmt)

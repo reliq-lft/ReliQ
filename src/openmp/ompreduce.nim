@@ -373,6 +373,22 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
   # --- Pattern: norm2 / normsq ---
   if rhs.kind == nnkCall and rhs[0].kind == nnkSym:
     let fn = rhs[0].strVal
+
+    # re(view[n]) or im(view[n]) — accessor on scalar field element
+    if fn in ["re", "im"] and rhs.len >= 2:
+      let arg = rhs[1]
+      if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
+        let sr = resolveSiteRef(arg[1], arg[2], ctx)
+        let elemExpr = if ctx.isComplex:
+                         (if fn == "re": "0" else: "1")
+                       else: "0"
+        let isStencilAccess = sr.groupVar != "group"
+        if isStencilAccess:
+          let idxArray = sr.groupVar.replace("_group", "_indices")
+          return p & "accum_vec = simd_add(accum_vec, simd_gather(" & sr.dataVar & ", " & idxArray & ", " & elemExpr & ", " & sr.elemsVar & "));\n"
+        else:
+          return p & "accum_vec = simd_add(accum_vec, simd_load(" & aosoaBase(sr.dataVar, sr.groupVar, sr.elemsVar, elemExpr) & "));\n"
+
     if fn in ["norm2", "normsq"] and rhs.len >= 2:
       let arg = rhs[1]
       if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
@@ -473,7 +489,7 @@ proc generateReduceFunction(body: NimNode, info: KernelInfo, accumName: string):
     of "long long": "0LL"
     else: "0.0"
   src &= "  " & cType & " accum = " & cZero & ";\n"
-  src &= "  #pragma omp parallel for reduction(+:accum)\n"
+  src &= "  #pragma omp parallel for schedule(static) reduction(+:accum)\n"
   src &= "  for (int group = 0; group < numGroups; ++group) {\n"
   src &= "    simd_v accum_vec = simd_setzero();\n"
 
@@ -510,6 +526,25 @@ proc generateReduceFunction(body: NimNode, info: KernelInfo, accumName: string):
             src &= "    for (int _sl = 0; _sl < VW; _sl++) {\n"
             src &= "      int _site = group * VW + _sl;\n"
             src &= "      " & vn & "_indices[_sl] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+            src &= "    }\n"
+          of lbkStencilCorner:
+            let nd = $lb.nDim
+            let sA = lb.signExprA
+            let dA = lb.dirExprA
+            let sB = lb.signExprB
+            let dB = lb.dirExprB
+            let prefix = "_c_" & vn
+            src &= "    int " & prefix & "_a = (" & dA & " < " & dB & ") ? (" & dA & ") : (" & dB & ");\n"
+            src &= "    int " & prefix & "_b = (" & dA & " < " & dB & ") ? (" & dB & ") : (" & dA & ");\n"
+            src &= "    int " & prefix & "_pair = " & prefix & "_a * (2*" & nd & " - 1 - " & prefix & "_a) / 2 + " & prefix & "_b - " & prefix & "_a - 1;\n"
+            src &= "    int " & prefix & "_sA = (" & dA & " <= " & dB & ") ? (" & sA & ") : (" & sB & ");\n"
+            src &= "    int " & prefix & "_sB = (" & dA & " <= " & dB & ") ? (" & sB & ") : (" & sA & ");\n"
+            src &= "    int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
+            src &= "    int " & prefix & "_ptIdx = 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si;\n"
+            src &= "    int " & vn & "_indices[VW];\n"
+            src &= "    for (int _sl = 0; _sl < VW; _sl++) {\n"
+            src &= "      int _site = group * VW + _sl;\n"
+            src &= "      " & vn & "_indices[_sl] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & prefix & "_ptIdx];\n"
             src &= "    }\n"
           of lbkMatMul:
             let elemsGuess = if ctx.isComplex: "2*NC*NC" else: "NC*NC"
@@ -592,11 +627,17 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
   let ncSym = genSym(nskLet, "nc")
   let nsSym = genSym(nskLet, "ns")
 
-  if info.gaugeViews.len > 0 and info.views.len == 0:
+  if info.gaugeViews.len > 0:
+    # NC always comes from the gauge view (matrix dimension)
     let gSym = info.gaugeViews[0].nimSym
-    argSetupStmts.add quote do:
-      let `ncSym` = `gSym`.field[0].shape[0]
-      let `nsSym` = `gSym`.field[0].numSites()
+    if info.views.len == 0:
+      argSetupStmts.add quote do:
+        let `ncSym` = `gSym`.field[0].shape[0]
+        let `nsSym` = `gSym`.field[0].numSites()
+    else:
+      argSetupStmts.add quote do:
+        let `ncSym` = `gSym`.field[0].shape[0]
+        let `nsSym` = `shapeViewSym`.numSites()
   else:
     argSetupStmts.add quote do:
       let `ncSym` = if `shapeViewSym`.shape.len >= 1: `shapeViewSym`.shape[0] else: 1
@@ -664,7 +705,8 @@ macro reduceImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped 
   # Runtime int vars
   let runtimeVars = findRuntimeIntVars(body, info)
   for rv in runtimeVars:
-    let rvExpr = quote do: `rv.sym`.cint
+    let rvSym = rv.sym
+    let rvExpr = quote do: `rvSym`.cint
     addParam(rvExpr, ident"cint")
 
   # Build the importc proc declaration

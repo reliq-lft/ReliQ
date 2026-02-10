@@ -297,26 +297,8 @@ proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsP
         result[aosoaIdx] = srcData[srcBase + e]
 
 when not UseOpenMP:
-  # For non-OpenMP backends, provide local AoSoA↔AoS transform.
-  # OpenMP gets this from ompsimd (imported above).
-  proc transformAoSoAtoAoSSimd[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int): seq[T] =
-    ## Transform data from AoSoA back to flat contiguous AoS layout using SIMD layout.
-    ##
-    ## This is used by ``updateGlobalTensorField`` for manual write-back.
-    ## Inverse of transformAoStoAoSoASimd.
-    let totalElements = layout.nSites * elemsPerSite
-    result = newSeq[T](totalElements)
-    
-    let srcData = cast[ptr UncheckedArray[T]](src)
-    let vw = VectorWidth
-    
-    for outerIdx in 0..<layout.nSitesOuter:
-      for lane in 0..<layout.nSitesInner:
-        let localSite = outerInnerToLocal(outerIdx, lane, layout)
-        for e in 0..<elemsPerSite:
-          let aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane
-          let aosIdx = localSite * elemsPerSite + e
-          result[aosIdx] = srcData[aosoaIdx]
+  # OpenMP gets AoSoA↔AoS helpers from ompsimd (imported above).
+  discard  # placeholder for non-OpenMP backend helpers
 
 proc defaultSimdGrid*[D: static[int]](localGrid: array[D, int]): seq[int] =
   ## Generate default SIMD grid that distributes VectorWidth lanes across dimensions.
@@ -568,7 +550,6 @@ else:
       var siteStart = 0
       for deviceIdx in 0..<numDevices:
         let numSites = sitesPerDevice[deviceIdx]
-        let numTensorElements = numSites * tensorElementsPerSite
         
         # For AoSoA, allocate padded buffer (rounded up to VectorWidth)
         let numGroups = numVectorGroups(numSites)
@@ -857,7 +838,7 @@ when UseOpenMP:
     ## For OpenMP, the proxy stores view/site info for direct memory access
     result.view = cast[pointer](unsafeAddr view)
     result.site = site
-    result.runtimeData = readSiteData(view, site)
+    # runtimeData is populated lazily by $proxy when needed (avoids seq alloc per site access)
     # OpenMP-specific: store info needed for direct element access
     # For SIMD layout, we store the AoSoA pointer so TensorSiteProxy knows to use SIMD indexing
     if view.simdGrid.len > 0:
@@ -1104,7 +1085,8 @@ when UseOpenMP:
     if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
       case view.ioKind:
         of iokWrite, iokReadWrite:
-          # Transform AoSoA back to flat contiguous AoS
+          # Scatter AoSoA data directly into padded GA memory, avoiding
+          # an intermediate AoS seq allocation.
           # For complex types the AoSoA buffer uses the storage scalar type
           # (float64 for Complex64, float32 for Complex32) with elementsPerSite
           # counting individual re/im scalars.
@@ -1116,20 +1098,18 @@ when UseOpenMP:
           else:
             type StorageScalar = T
           let elemsPerSite = view.data.elementsPerSite
-          let aosData = transformAoSoAtoAoSSimd[StorageScalar](
-            view.data.aosoaData, layout, elemsPerSite
-          )
-          
-          # Scatter flat AoS into padded GA memory using siteOffsets
-          # siteOffsets are in storage-scalar units, and the GA memory
-          # also stores data as storage scalars, so this is a direct copy.
+          let vw = VectorWidth
           let destPtr = cast[ptr UncheckedArray[StorageScalar]](view.data.hostPtr)
-          let nSites = view.data.totalSites
-          for site in 0..<nSites:
-            let dstBase = view.data.siteOffsets[site]
-            let srcBase = site * elemsPerSite
-            for e in 0..<elemsPerSite:
-              destPtr[dstBase + e] = aosData[srcBase + e]
+          let srcData = cast[ptr UncheckedArray[StorageScalar]](view.data.aosoaData)
+          
+          # Walk AoSoA groups and scatter each element directly to GA memory
+          for outerIdx in 0..<layout.nSitesOuter:
+            for lane in 0..<layout.nSitesInner:
+              let localSite = outerInnerToLocal(outerIdx, lane, layout)
+              let dstBase = view.data.siteOffsets[localSite]
+              for e in 0..<elemsPerSite:
+                let aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane
+                destPtr[dstBase + e] = srcData[aosoaIdx]
         of iokRead:
           discard
     

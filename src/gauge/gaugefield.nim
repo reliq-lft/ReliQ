@@ -74,10 +74,10 @@ type
 
 type
   GaugeActionContext* = object
-    beta: float64
-    cp: float64
-    cr: float64
-    cpg: float64
+    beta*: float64
+    cp*: float64
+    cr*: float64
+    cpg*: float64
 
 #[ context constructor and accessors ]#
 
@@ -93,7 +93,7 @@ template newGaugeFieldContext*[T](
     else:
       GaugeFieldContext[Complex64](group: grp, representation: rep, precision: pkDouble)
 
-func nc(group: GroupKind, representation: RepresentationKind): int =
+func nc*(group: GroupKind, representation: RepresentationKind): int =
   ## Get number of colors from the gauge group
   case group
   of gkSU2: 2
@@ -101,7 +101,7 @@ func nc(group: GroupKind, representation: RepresentationKind): int =
   of gkSU4: 4
   of gkSU5: 5
 
-func nc[T](ctx: GaugeFieldContext[T]): int =
+func nc*[T](ctx: GaugeFieldContext[T]): int =
   ## Get number of colors from the gauge field context
   nc(ctx.group, ctx.representation)
 
@@ -162,7 +162,11 @@ proc `[]`*[D: static[int], L: Lattice[D], T](gaugeFieldView: var GaugeFieldView[
   ## Get a mutable view of the gauge field tensor for a given direction
   gaugeFieldView.field[mu]
 
-proc nc(gaugeField: GaugeField): int =
+template TensorSiteProxy*[D: static[int], L: Lattice[D], T](gfv: GaugeFieldView[D, L, T]): typedesc =
+  ## Return the TensorSiteProxy type matching this gauge field view
+  sitetensor.TensorSiteProxy[L, T]
+
+proc nc*(gaugeField: GaugeField): int =
   ## Get number of colors from the gauge field
   nc(gaugeField.ctx)
 
@@ -190,10 +194,10 @@ proc linkTrace*[D: static[int], L: Lattice[D], T](u: GaugeField[D, L, T]): float
   var traceSum = 0.0
 
   accelerator:
+    var vu = u.newGaugeFieldView(iokRead)
     for mu in 0..<D:
-      var lmu = u.field[mu].newTensorFieldView(iokRead)
-      for n in reduce lmu.all:
-        traceSum += trace(lmu[n]).re
+      for n in reduce vu[mu].all:
+        traceSum += trace(vu[mu][n]).re
   
   traceSum /= float64(D * nc * lattice.globalVolume)
   return traceSum

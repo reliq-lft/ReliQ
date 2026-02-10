@@ -35,12 +35,15 @@ export cldisp
 export clreduce
 
 template clParallel*(body: untyped): untyped =
-  initCL()
+  ensureCL()
   block:
     body
-    # Views declared in body are destroyed here (end of block),
-    # while OpenCL queues and context are still alive.
-  finalizeCL()
+    # Drain all pending kernels before views are destroyed and
+    # results are read on the host.  Individual `each` dispatches
+    # use clFlush (non-blocking) for pipelining, so we synchronise
+    # once here at the end of the accelerator block.
+    for q in clQueues:
+      check clwrap.finish(q)
 
 when isMainModule:
   import std/[unittest, random, math, times]

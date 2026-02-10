@@ -29,32 +29,99 @@
 
 import gaugefield
 
-proc action*(c: GaugeActionContext; u: GaugeField): float =
+import lattice
+import parallel
+import tensor/[tensor]
+import utils/[complex]
+import globalarrays/[gabase, gawrap]
+import profile/[profile]
+
+proc action*[D: static[int], L: Lattice[D], T](c: GaugeActionContext; u: GaugeField[D, L, T]): float =
+  startProfiler("GaugeAction")
+  
+  tic("Setup")
+  
   let nd = u.nd
   let nc = u.nc
   var traceSum = 0.0
   
   let lattice = u.lattice
-  let nnStencil = lattice.newNearestNeighborLatticeStencil()
-  #let stStencil = lattice.newStapleLatticeStencil()
+  let stencil = lattice.newStapleLatticeStencil()
 
   var action = lattice.newScalarField: T
 
   let nrm = float64(nc*nd*(nd-1)*lattice.globalVolume)
-  let cp = c.cp/nrm
-  let cr = c.cr/nrm
-  let cr = c.cr/nrm
+  let cp = c.beta*c.cp/nrm
+  let cr = c.beta*c.cr/nrm
+  let cpg = c.beta*c.cpg/nrm
+
+  var actionSum = 0.0
+
+  toc()
 
   accelerator:
-    var vact = action.newTensorFieldView(iokWrite)
+    tic("ViewCreation")
+
+    var vact = action.newScalarFieldView(iokWrite)
     var vu = u.newGaugeFieldView(iokRead)
+
+    toc()
+    tic("ActionLoop")
 
     for mu in 1..<nd:
       for nu in 0..<mu:
         for n in each vact.all:
-          let fwdMu = nnStencil.fwd(n, mu)
-          let fwdNu = nnStencil.fwd(n, nu)
+          let fwdMu = stencil.fwd(n, mu)
+          let fwdNu = stencil.fwd(n, nu)
+
           let ta = vu[mu][n] * vu[nu][fwdMu]
           let tb = vu[nu][n] * vu[mu][fwdNu]
+
+          var id = siteIdentity(vu.TensorSiteProxy)
+
+          addFLOP(2*matMulFLOP(nc))
           
-          if c.cr != 0.0: vact[n] += cr * ta * tb.adjoint()
+          if c.cp != 0.0: 
+            vact[n] += cp * trace(id - ta * tb.adjoint())
+
+            addFLOP(matMulFLOP(nc) + matAddSubFLOP(nc))
+            addFLOP(adjointFLOP(nc) + traceFLOP(nc) + 1)
+          if c.cr != 0.0:
+            let bwdMu = stencil.bwd(n, mu)
+            let bwdNu = stencil.bwd(n, nu)
+            let bwdMuFwdNu = stencil.corner(n, -1, mu, +1, nu)
+            let bwdNuFwdMu = stencil.corner(n, -1, nu, +1, mu)
+            
+            let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[mu][bwdNuFwdMu]
+            let td = tb * vu[nu][fwdNu].adjoint()
+            vact[n] += cr * trace(id - tc * td.adjoint())
+
+            let te = ta * vu[nu][fwdNu].adjoint()
+            let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[nu][bwdMuFwdNu]
+            vact[n] += cr * trace(id - te * tf.adjoint())
+
+            addFLOP(6*matMulFLOP(nc) + 2*matAddSubFLOP(nc))
+            addFLOP(4*adjointFLOP(nc) + 2*traceFLOP(nc) + 2)
+    
+    toc()
+    tic("Reduction")
+    
+    for n in reduce vact.all:
+      actionSum += vact[n].re
+      addFLOP(1)
+    
+    toc()
+  
+  return nrm*actionSum
+  
+when isMainModule:
+  parallel:
+    let dim: array[4, int] = [8, 8, 8, 16]
+    let lat = newSimpleCubicLattice(dim)
+    let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
+    let act = GaugeActionContext(beta: 6.0, cp: 1.0, cr: 1.0, cpg: 0.0)
+    var ua = lat.newGaugeField(ctx)
+  
+    ua.setToIdentity()
+
+    echo act.action(ua)

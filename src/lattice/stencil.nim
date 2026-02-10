@@ -183,8 +183,28 @@ proc backwardStencil*[D: static int](): StencilPattern[D] =
     result.addPoint(-1, d)
 
 proc stapleStencil*[D: static[int]](): StencilPattern[D] =
+  ## Staple stencil: nearest-neighbor + corner (diagonal) offsets.
+  ##
+  ## Layout:
+  ##   Points 0 ..< 2*D       : nearest-neighbor (same as nearestNeighborStencil)
+  ##   Points 2*D ..< 2*D + 4*C(D,2) : corners for all direction pairs
+  ##
+  ## Corner points are ordered by direction pairs (a < b), then by sign combo:
+  ##   (+a, +b), (+a, -b), (-a, +b), (-a, -b)
+  ##
+  ## For D=4 this gives 8 + 24 = 32 total points.
   result = nearestNeighborStencil[D]()
   result.name = "staple"
+  # Add corner (diagonal) offsets for all direction pairs
+  for a in 0..<D:
+    for b in (a+1)..<D:
+      for sA in [+1, -1]:
+        for sB in [+1, -1]:
+          var offset: array[D, int]
+          for i in 0..<D: offset[i] = 0
+          offset[a] = sA
+          offset[b] = sB
+          result.addPoint(offset)
 
 #[ ============================================================================
    Path-based Stencil Construction (for Wilson loops, etc.)
@@ -544,6 +564,26 @@ proc backwardStencil*[D: static int, L: Lattice[D]](lat: L): StencilPattern[D] =
   ## Create a backward-only stencil, inferring D from the lattice
   backwardStencil[D]()
 
+proc stapleStencil*[D: static int, L: Lattice[D]](lat: L): StencilPattern[D] =
+  ## Create a staple stencil (nearest-neighbor + corners), inferring D from the lattice
+  stapleStencil[D]()
+
+proc newStapleLatticeStencil*[D: static int, L: Lattice[D]](
+  lat: L
+): LatticeStencil[D] =
+  ## Create a staple stencil from a Lattice (includes corner offsets).
+  ##
+  ## The returned stencil supports ``fwd``/``bwd`` for nearest-neighbor access
+  ## and ``corner`` for diagonal (two-axis) neighbor access.
+  ##
+  ## Example:
+  ## ```nim
+  ## let stencil = lattice.newStapleLatticeStencil()
+  ## # Inside each loop:
+  ## let fwdMuBwdNu = stencil.corner(n, +1, mu, -1, nu)  # x + mu - nu
+  ## ```
+  newLatticeStencil(stapleStencil[D](), lat)
+
 proc newStencilPattern*[D: static int, L: Lattice[D]](lat: L, name: string = ""): StencilPattern[D] =
   ## Create an empty stencil pattern, inferring D from the lattice
   ##
@@ -695,6 +735,40 @@ proc fwd*[D: static int](s: LatticeStencil[D], site: int, dir: int): StencilShif
 proc bwd*[D: static int](s: LatticeStencil[D], site: int, dir: int): StencilShift[D] {.inline.} =
   ## Shorthand for backward shift
   s.shift(site, -1, dir)
+
+proc cornerPointIndex*(D: static int, dirA, dirB: int, signA, signB: int): int {.inline.} =
+  ## Compute the point index for a corner (diagonal) offset in a staple stencil.
+  ##
+  ## The corner points start after the 2*D nearest-neighbor points.
+  ## Within each direction pair (a < b), the 4 sign combos are ordered:
+  ##   0: (+a, +b),  1: (+a, -b),  2: (-a, +b),  3: (-a, -b)
+  let a = min(dirA, dirB)
+  let b = max(dirA, dirB)
+  # Number of pairs before (a, b): sum_{i<a} (D-1-i) + (b - a - 1)
+  var pairIdx = 0
+  for i in 0..<a:
+    pairIdx += D - 1 - i
+  pairIdx += b - a - 1
+  # Sign combo index: map (signA, signB) relative to the canonical (a, b) order
+  let sA = if dirA <= dirB: signA else: signB
+  let sB = if dirA <= dirB: signB else: signA
+  let signIdx = (if sA > 0: 0 else: 2) + (if sB > 0: 0 else: 1)
+  result = 2 * D + pairIdx * 4 + signIdx
+
+proc corner*[D: static int](s: LatticeStencil[D], site: int,
+    signA, dirA: int, signB, dirB: int): StencilShift[D] {.inline.} =
+  ## Look up a corner (diagonal) neighbor in a staple stencil.
+  ##
+  ## Returns the pre-computed neighbor at offset (signA*dirA + signB*dirB).
+  ## Requires the stencil to have been built with ``stapleStencil``.
+  ##
+  ## Example:
+  ##   let fwdMuBwdNu = stencil.corner(n, +1, mu, -1, nu)  # site at x + mu - nu
+  let point = cornerPointIndex(D, dirA, dirB, signA, signB)
+  result.stencil = unsafeAddr s
+  result.site = site
+  result.point = point
+  result.neighborIdx = s.neighbor(site, point)
 
 # Get the neighbor index from a shift (for direct use)
 proc idx*(sh: StencilShift): int {.inline.} = sh.neighborIdx
@@ -1074,3 +1148,62 @@ when isMainModule:
       for site in 0..<16:
         for p in 0..<4:
           check sv.neighborOffset(site, p) == stencil.neighbor(site, p)
+
+  suite "Staple Stencil":
+    test "stapleStencil has correct point count":
+      # D=4: 2*D=8 nearest-neighbor + 4*C(4,2)=24 corners = 32
+      let s = stapleStencil[4]()
+      check s.nPoints == 32
+
+    test "stapleStencil 2D has correct point count":
+      # D=2: 2*D=4 nearest-neighbor + 4*C(2,1)=4 corners = 8
+      let s = stapleStencil[2]()
+      check s.nPoints == 8
+
+    test "corner matches chained fwd/bwd":
+      # Build both nearest-neighbor and staple stencils on same lattice
+      let nnStencil = newLatticeStencil(nearestNeighborStencil[4](), [4, 4, 4, 4])
+      let stStencil = newLatticeStencil(stapleStencil[4](), [4, 4, 4, 4])
+
+      # fwd/bwd on staple stencil should match nearest-neighbor
+      for site in 0..<nnStencil.nLocalSites:
+        for d in 0..<4:
+          check stStencil.fwd(site, d).idx == nnStencil.fwd(site, d).idx
+          check stStencil.bwd(site, d).idx == nnStencil.bwd(site, d).idx
+
+      # corner(+1,mu,-1,nu) should match fwd(bwd(n,nu),mu) via chaining
+      for site in 0..<nnStencil.nLocalSites:
+        for mu in 0..<4:
+          for nu in 0..<4:
+            if mu == nu: continue
+            # +mu +nu
+            let chainPP = nnStencil.fwd(nnStencil.fwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, +1, mu, +1, nu).idx == chainPP
+            # +mu -nu
+            let chainPN = nnStencil.fwd(nnStencil.bwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, +1, mu, -1, nu).idx == chainPN
+            # -mu +nu
+            let chainNP = nnStencil.bwd(nnStencil.fwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, -1, mu, +1, nu).idx == chainNP
+            # -mu -nu
+            let chainNN = nnStencil.bwd(nnStencil.bwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, -1, mu, -1, nu).idx == chainNN
+
+    test "corner matches chained fwd/bwd (2D)":
+      let nnStencil = newLatticeStencil(nearestNeighborStencil[2](), [6, 6])
+      let stStencil = newLatticeStencil(stapleStencil[2](), [6, 6])
+
+      for site in 0..<nnStencil.nLocalSites:
+        for mu in 0..<2:
+          for nu in 0..<2:
+            if mu == nu: continue
+            let chainPP = nnStencil.fwd(nnStencil.fwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, +1, mu, +1, nu).idx == chainPP
+            let chainPN = nnStencil.fwd(nnStencil.bwd(site, nu).idx, mu).idx
+            check stStencil.corner(site, +1, mu, -1, nu).idx == chainPN
+
+    test "newStapleLatticeStencil from lattice":
+      let lat = newSimpleCubicLattice([8, 8, 8, 16], [1, 1, 1, 1])
+      let stencil = lat.newStapleLatticeStencil()
+      check stencil.nPoints == 32  # 8 NN + 24 corners
+      check stencil.nSites > 0
