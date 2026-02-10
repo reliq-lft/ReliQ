@@ -36,7 +36,10 @@ import utils/[complex]
 import globalarrays/[gabase, gawrap]
 import profile/[profile]
 
-proc action*[D: static[int], L: Lattice[D], T](c: GaugeActionContext; u: GaugeField[D, L, T]): float =
+proc action*[D: static[int], L: Lattice[D], T](
+  c: GaugeActionContext; 
+  u: GaugeField[D, L, T]
+): float =
   startProfiler("GaugeAction")
   
   tic("Setup")

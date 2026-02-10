@@ -55,6 +55,19 @@ ifdef USE_WORKGROUPS
 FLAGS += -d:UseWorkGroups:true
 endif
 
+# Release mode: disable all Nim runtime checks (bounds, overflow, nil)
+# and enable --opt:speed for maximum performance
+# Usage: make tensorview RELEASE=1
+ifdef RELEASE
+FLAGS += -d:danger
+endif
+
+# Profile mode: enable FLOP counting and timing instrumentation
+# Usage: make gaugeaction PROFILE=1
+ifdef PROFILE
+FLAGS += -d:ProfileMode:1
+endif
+
 # Backend selection: opencl (default), sycl, or openmp
 # Usage: make tensorview BACKEND=sycl
 ifeq ($(BACKEND),sycl)
