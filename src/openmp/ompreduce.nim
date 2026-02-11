@@ -86,7 +86,7 @@ proc unwrapSym(n: NimNode): NimNode =
    Reduce Expression Transpilation
    ============================================================================ ]#
 
-proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var CodeCtx): string =
+proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var OmpCodeCtx): string =
   ## Transpile a reduce body expression to C code.
   ## For example: ``trace(view[n]).re`` becomes a sum of diagonal .re fields.
   case n.kind
@@ -112,7 +112,7 @@ proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var CodeCtx): string
         #       + ...
         let arg = n[1]
         if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
-          let sr = resolveSiteRef(arg[1], arg[2], ctx)
+          let sr = ompResolveSiteRef(arg[1], arg[2], ctx)
           if ctx.isComplex:
             # Return a complex trace: { sum_re, sum_im }
             return "_trace_" & sr.dataVar.replace("_data", "")
@@ -120,7 +120,7 @@ proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var CodeCtx): string
             return "_trace_" & sr.dataVar.replace("_data", "")
 
       if fn == "[]" and n.len >= 3:
-        let sr = resolveSiteRef(n[1], n[2], ctx)
+        let sr = ompResolveSiteRef(n[1], n[2], ctx)
         return sr.dataVar & "_site"
 
       # General function call
@@ -160,7 +160,7 @@ proc transpileReduceExpr(n: NimNode, info: KernelInfo, ctx: var CodeCtx): string
    Reduce RHS Transpilation
    ============================================================================ ]#
 
-proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
+proc transpileReduceRhs(rhs: NimNode, ctx: var OmpCodeCtx, d: int): string =
   ## Generate C code that computes a SIMD vector contribution and adds it
   ## to accum_vec (a simd_v accumulator).
   ##
@@ -190,7 +190,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
         let traceArg = inner[1]
         # trace(view[n]).re — direct SIMD load from AoSoA diagonal
         if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
-          let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+          let sr = ompResolveSiteRef(traceArg[1], traceArg[2], ctx)
           var s = ""
           let isStencilAccess = sr.groupVar != "group"
           if sr.isGauge:
@@ -248,9 +248,9 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
           # 2D element access: view[n][i,j].re
           let viewCall = inner[1]
           if viewCall.kind == nnkCall and viewCall[0].kind == nnkSym and viewCall[0].strVal == "[]":
-            let sr = resolveSiteRef(viewCall[1], viewCall[2], ctx)
-            let row = transpileScalar(inner[2], ctx)
-            let col = transpileScalar(inner[3], ctx)
+            let sr = ompResolveSiteRef(viewCall[1], viewCall[2], ctx)
+            let row = ompTranspileScalar(inner[2], ctx)
+            let col = ompTranspileScalar(inner[3], ctx)
             let flatIdx = if ctx.isComplex:
               (if field == "re": "2*((" & row & ")*NC+(" & col & "))" else: "2*((" & row & ")*NC+(" & col & "))+1")
             else: "(" & row & ")*NC+(" & col & ")"
@@ -264,8 +264,8 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
           # 1D element access: view[n][i].re
           let viewCall = inner[1]
           if viewCall.kind == nnkCall and viewCall[0].kind == nnkSym and viewCall[0].strVal == "[]":
-            let sr = resolveSiteRef(viewCall[1], viewCall[2], ctx)
-            let idx = transpileScalar(inner[2], ctx)
+            let sr = ompResolveSiteRef(viewCall[1], viewCall[2], ctx)
+            let idx = ompTranspileScalar(inner[2], ctx)
             let flatIdx = if ctx.isComplex:
               (if field == "re": "2*(" & idx & ")" else: "2*(" & idx & ")+1")
             else: idx
@@ -296,7 +296,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
     let traceArg = rhs[1]
     # trace(view[n]) — direct SIMD load from diagonal
     if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
-      let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+      let sr = ompResolveSiteRef(traceArg[1], traceArg[2], ctx)
       var s = ""
       let isStencilAccess = sr.groupVar != "group"
       if sr.isGauge:
@@ -378,7 +378,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
     if fn in ["re", "im"] and rhs.len >= 2:
       let arg = rhs[1]
       if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
-        let sr = resolveSiteRef(arg[1], arg[2], ctx)
+        let sr = ompResolveSiteRef(arg[1], arg[2], ctx)
         let elemExpr = if ctx.isComplex:
                          (if fn == "re": "0" else: "1")
                        else: "0"
@@ -392,7 +392,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
     if fn in ["norm2", "normsq"] and rhs.len >= 2:
       let arg = rhs[1]
       if arg.kind == nnkCall and arg[0].kind == nnkSym and arg[0].strVal == "[]":
-        let sr = resolveSiteRef(arg[1], arg[2], ctx)
+        let sr = ompResolveSiteRef(arg[1], arg[2], ctx)
         var s = ""
         let elems = sr.elemsVar
         let isStencilAccess = sr.groupVar != "group"
@@ -445,7 +445,7 @@ var ompReduceCounter {.compileTime.} = 0
 
 proc generateReduceFunction(body: NimNode, info: KernelInfo, accumName: string):
     tuple[funcSrc: string, funcName: string] =
-  var ctx = newCodeCtx(info)
+  var ctx = newOmpCodeCtx(info)
   let vw = $VectorWidth
 
   ompReduceCounter += 1
@@ -553,7 +553,7 @@ proc generateReduceFunction(body: NimNode, info: KernelInfo, accumName: string):
             src &= matRes.code
             src &= "    const int " & vn & "_elems = " & matRes.elems & ";\n"
           of lbkOther:
-            let code = transpileScalar(val, ctx)
+            let code = ompTranspileScalar(val, ctx)
             src &= "    " & ctx.scalarType & " " & vn & " = " & code & ";\n"
     of nnkInfix:
       if stmt.len >= 3 and stmt[0].kind == nnkSym and stmt[0].strVal == "+=":

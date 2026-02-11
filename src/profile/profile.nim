@@ -41,7 +41,7 @@ type
     totalEventName*: string
     localEventName*: string
 
-template startProfiler*(name: string): untyped =
+template initProfiler*(name: string): untyped =
   assert gaIsLive, "GlobalArrays must be initialized before creating a PerformanceProfiler"
   when ProfileMode == 1:
     var profiler {.inject.}: Profiler
@@ -52,6 +52,7 @@ template startProfiler*(name: string): untyped =
           totalFlops: 0,
           localFlops: 0
         )
+        echo name & ": "
 
 template tic*(eventName: string): untyped =
   when ProfileMode == 1:
@@ -66,10 +67,10 @@ template toc*(): untyped =
       let dt {.inject.} = times.cpuTime() - profiler.localStartTime
       profiler.totalFlops += profiler.localFlops
       if profiler.localFlops == 0:
-        echo fmt"{profiler.totalEventName}: {profiler.localEventName}: {dt:.6f}s"
+        echo fmt"  {profiler.localEventName}: {dt:.6f}s"
       else:
         let gflops {.inject.} = float64(profiler.localFlops) / 1e9
-        echo fmt"{profiler.totalEventName}: {profiler.localEventName}: {dt:.6f}s GFLOP: {gflops:.4f} GFLOP/s: {gflops/dt:.4f}"
+        echo fmt"  {profiler.localEventName}: {dt:.6f}s GFLOP: {gflops:.4f} GFLOP/s: {gflops/dt:.4f}"
 
 proc matMulFLOP*(nc: int): int =
   nc*nc*(8*nc - 2)
@@ -95,9 +96,9 @@ template addFLOP*(flops: int): untyped =
   when ProfileMode == 1:
     addFLOPImpl(profiler, flops)
 
-template stopProfiler*(): untyped =
+template finalizeProfiler*(): untyped =
   when ProfileMode == 1:
     if GA_Nodeid() == 0:
       let dt {.inject.} = times.cpuTime() - profiler.epochTime
-      let gflops {.inject.} = float64(profiler.totalFlops) / dt / 1e9
-      echo fmt"{profiler.totalEventName}: Total: {dt:.6f}s  {gflops:.2f} GFLOP/s  ({profiler.totalFlops} FLOPs)"
+      let gflops {.inject.} = float64(profiler.totalFlops) / 1e9
+      echo fmt"  Total: {dt:.6f}s GLOP: {gflops:.4f} GFLOP/s: {gflops/dt:.4f}"

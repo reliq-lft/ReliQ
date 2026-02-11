@@ -94,12 +94,25 @@ template newGaugeFieldContext*[T](
       GaugeFieldContext[Complex64](group: grp, representation: rep, precision: pkDouble)
 
 func nc*(group: GroupKind, representation: RepresentationKind): int =
-  ## Get number of colors from the gauge group
+  ## Get number of colors from the gauge group and representation
+  ## Note that adjoint represented as matrices, so this does not correspond to dimension of the representation
   case group
-  of gkSU2: 2
-  of gkSU3: 3
-  of gkSU4: 4
-  of gkSU5: 5
+  of gkSU2:
+    case representation
+    of rkFundamental: 2
+    of rkAdjoint: 2
+  of gkSU3:
+    case representation
+    of rkFundamental: 3
+    of rkAdjoint: 3
+  of gkSU4:
+    case representation
+    of rkFundamental: 4
+    of rkAdjoint: 4
+  of gkSU5: 
+    case representation
+    of rkFundamental: 5
+    of rkAdjoint: 5
 
 func nc*[T](ctx: GaugeFieldContext[T]): int =
   ## Get number of colors from the gauge field context

@@ -40,7 +40,7 @@ proc action*[D: static[int], L: Lattice[D], T](
   c: GaugeActionContext; 
   u: GaugeField[D, L, T]
 ): float =
-  startProfiler("GaugeAction")
+  initProfiler("GaugeAction")
   
   tic("Setup")
   
@@ -84,12 +84,11 @@ proc action*[D: static[int], L: Lattice[D], T](
 
           addFLOP 2*matMulFLOP(nc)
           
-          # plaqette
+          # plaquette
           if c.cp != 0.0: 
             vact[n] += cp * trace(id - ta * tb.adjoint())
 
-            addFLOP matMulFLOP(nc) + matAddSubFLOP(nc)
-            addFLOP adjointFLOP(nc) + traceFLOP(nc) + 1
+            addFLOP matMulFLOP(nc) + matAddSubFLOP(nc) + traceFLOP(nc) + 1
 
           # rectangle
           if c.cr != 0.0:
@@ -100,14 +99,13 @@ proc action*[D: static[int], L: Lattice[D], T](
             
             let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[nu][bwdNuFwdMu]
             let td = tb * vu[nu][fwdNu].adjoint()
-            vact[n] += cr * trace(id - tc * td.adjoint())
 
             let te = ta * vu[nu][fwdNu].adjoint()
             let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[mu][bwdMuFwdNu]
-            vact[n] += cr * trace(id - te * tf.adjoint())
+            
+            vact[n] += cr * trace(2.0*id - te * tf.adjoint() - tc * td.adjoint())
 
-            addFLOP 6*matMulFLOP(nc) + 2*matAddSubFLOP(nc)
-            addFLOP 4*adjointFLOP(nc) + 2*traceFLOP(nc) + 2
+            addFLOP 6*matMulFLOP(nc) + 2*matAddSubFLOP(nc) + 2*traceFLOP(nc) + 2
           
           # parallelogram
           if c.cpg != 0.0: discard
@@ -121,9 +119,15 @@ proc action*[D: static[int], L: Lattice[D], T](
     
     toc()
   
-  return nrm*actionSum
+  result = nrm*actionSum
   
+  finalizeProfiler()
+
 when isMainModule:
+  import io/[gaugeio]
+
+  const SampleILDGFile = "src/io/sample/ildg.lat"
+
   parallel:
     let dim: array[4, int] = [8, 8, 8, 16]
     let lat = newSimpleCubicLattice(dim)
@@ -131,6 +135,6 @@ when isMainModule:
     let act = GaugeActionContext(beta: 6.0, cp: 1.0, cr: 1.0, cpg: 0.0)
     var ua = lat.newGaugeField(ctx)
   
-    ua.setToIdentity()
+    ua.readGaugeField(SampleILDGFile)
 
     echo act.action(ua)

@@ -838,7 +838,8 @@ when UseOpenMP:
     ## For OpenMP, the proxy stores view/site info for direct memory access
     result.view = cast[pointer](unsafeAddr view)
     result.site = site
-    # runtimeData is populated lazily by $proxy when needed (avoids seq alloc per site access)
+    # Populate runtimeData for backend-agnostic trace/$/print support
+    result.runtimeData = readSiteData(view, site)
     # OpenMP-specific: store info needed for direct element access
     # For SIMD layout, we store the AoSoA pointer so TensorSiteProxy knows to use SIMD indexing
     if view.simdGrid.len > 0:
@@ -894,122 +895,15 @@ when UseOpenMP:
       let hostData = cast[ptr UncheckedArray[T]](view.data.hostPtr)
       hostData[site] = value
   
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) {.inline.} =
-    ## Matrix/vector addition: C[n] = A[n] + B[n] or C[n] = A[n] - B[n]
-    ## Handles both direct proxy access and computed intermediate results
-    let elemsPerSite = view.data.tensorElementsPerSite
-    
-    # Handle computed buffers vs direct memory access
-    if value.hasComputedA and value.hasComputedB:
-      # Both operands are from computed results (e.g., A*B + C*D)
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] - value.computedB[e])
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] + value.computedB[e])
-    elif value.hasComputedA and not value.hasComputedB:
-      # A is computed, B is from proxy (e.g., (A*B + C*D) - E[n])
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] - value.proxyB.readProxyElem(e))
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] + value.proxyB.readProxyElem(e))
-    elif not value.hasComputedA and value.hasComputedB:
-      # A is from proxy, B is computed
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.computedB[e])
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.computedB[e])
-    else:
-      # Both from proxies (simple case: A[n] + B[n])
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.proxyB.readProxyElem(e))
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.proxyB.readProxyElem(e))
-  
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) {.inline.} =
-    ## Vector addition: same as MatAddResult
-    let elemsPerSite = view.data.tensorElementsPerSite
-    
-    if value.hasComputedA and value.hasComputedB:
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] - value.computedB[e])
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] + value.computedB[e])
-    elif value.hasComputedA and not value.hasComputedB:
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] - value.proxyB.readProxyElem(e))
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.computedA[e] + value.proxyB.readProxyElem(e))
-    elif not value.hasComputedA and value.hasComputedB:
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.computedB[e])
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.computedB[e])
-    else:
-      if value.isSubtraction:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) - value.proxyB.readProxyElem(e))
-      else:
-        for e in 0..<elemsPerSite:
-          view.writeViewElem(site, e, value.proxyA.readProxyElem(e) + value.proxyB.readProxyElem(e))
-  
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) {.inline.} =
-    ## Matrix multiplication: C[n] = A[n] * B[n]
-    ## C[i,j] = sum_k(A[i,k] * B[k,j])
-    let elemsPerSite = view.data.tensorElementsPerSite
-    
-    # Get matrix dimensions from shape
-    let rows = view.shape[0]
-    let cols = if view.shape.len > 1: view.shape[1] else: 1
-    let innerDim = if value.proxyA.shape.len > 1: value.proxyA.shape[1] else: 1
-    
-    for i in 0..<rows:
-      for j in 0..<cols:
-        var sum: T = T(0)
-        for k in 0..<innerDim:
-          let aElemIdx = i * innerDim + k
-          let bElemIdx = k * cols + j
-          sum += value.proxyA.readProxyElem(aElemIdx) * value.proxyB.readProxyElem(bElemIdx)
-        let dstElemIdx = i * cols + j
-        view.writeViewElem(site, dstElemIdx, sum)
-  
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) {.inline.} =
-    ## Matrix-vector multiplication: v_out[n] = M[n] * v[n]
-    ## v_out[i] = sum_j(M[i,j] * v[j])
-    let rows = value.proxyMat.shape[0]
-    let cols = if value.proxyMat.shape.len > 1: value.proxyMat.shape[1] else: 1
-    
-    for i in 0..<rows:
-      var sum: T = T(0)
-      for j in 0..<cols:
-        let mElemIdx = i * cols + j
-        sum += value.proxyMat.readProxyElem(mElemIdx) * value.proxyVec.readProxyElem(j)
-      view.writeViewElem(site, i, sum)
-  
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) {.inline.} =
-    ## Scalar multiplication: C[n] = scalar * A[n]
-    let elemsPerSite = view.data.tensorElementsPerSite
-    for e in 0..<elemsPerSite:
-      view.writeViewElem(site, e, value.scalar * value.proxy.readProxyElem(e))
-  
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) {.inline.} =
-    ## Scalar addition: C[n] = A[n] + scalar
-    let elemsPerSite = view.data.tensorElementsPerSite
-    for e in 0..<elemsPerSite:
-      view.writeViewElem(site, e, value.proxy.readProxyElem(e) + value.scalar)
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatrixSiteProxy[L, T]) {.inline.} =
+    ## Phantom — the ``each`` macro transpiles the assignment to C code.
+    raise newException(Defect, "TensorFieldView[]= MatrixSiteProxy phantom")
+
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VectorSiteProxy[L, T]) {.inline.} =
+    raise newException(Defect, "TensorFieldView[]= VectorSiteProxy phantom")
+
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarSiteProxy[L, T]) {.inline.} =
+    raise newException(Defect, "TensorFieldView[]= ScalarSiteProxy phantom")
 
 else:
   # OpenCL/SYCL backend: phantom operators for kernel codegen
@@ -1029,23 +923,14 @@ else:
   proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: T) = 
     raise newException(Defect, "TensorFieldView[]= scalar phantom operator")
 
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatMulResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= MatMulResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatrixSiteProxy[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= MatrixSiteProxy phantom operator")
 
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatAddResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= MatAddResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VectorSiteProxy[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= VectorSiteProxy phantom operator")
 
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: VecAddResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= VecAddResult phantom operator")
-
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: MatVecResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= MatVecResult phantom operator")
-
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarMulResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= ScalarMulResult phantom operator")
-
-  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarAddResult[L, T]) = 
-    raise newException(Defect, "TensorFieldView[]= ScalarAddResult phantom operator")
+  proc `[]=`*[L, T](view: TensorFieldView[L, T], site: int, value: ScalarSiteProxy[L, T]) = 
+    raise newException(Defect, "TensorFieldView[]= ScalarSiteProxy phantom operator")
 
 #[ Legacy marker functions - still supported ]#
 

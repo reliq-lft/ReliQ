@@ -86,7 +86,7 @@ proc unwrapSym(n: NimNode): NimNode =
    Reduce RHS → OpenCL C Transpiler
    ============================================================================ ]#
 
-proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
+proc transpileReduceRhs(rhs: NimNode, ctx: var ClCodeCtx, d: int): string =
   ## Generate OpenCL C code that computes a scalar and adds it to ``accum``.
   ## Fully general — delegates to ``emitMatExpr`` for any matrix expression.
   let p = ind(d)
@@ -97,7 +97,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
     let accessor = if rhs[0].strVal == "re": ".x" else: ".y"
     # re(view[n]) — load element 0 of scalar field
     if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "[]":
-      let sr = resolveSiteRef(inner[1], inner[2], ctx)
+      let sr = clResolveSiteRef(inner[1], inner[2], ctx)
       var s = ""
       let elems = sr.elemsVar
       if ctx.isComplex:
@@ -118,7 +118,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
         let traceArg = inner[1]
         # trace(view[n]).re — direct AoSoA load of diagonal
         if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
-          let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+          let sr = clResolveSiteRef(traceArg[1], traceArg[2], ctx)
           var s = ""
           if sr.isGauge:
             let elems = sr.elemsVar
@@ -156,7 +156,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
 
       # view[n].re/.im — direct access to scalar field element 0
       if inner.kind == nnkCall and inner[0].kind == nnkSym and inner[0].strVal == "[]":
-        let sr = resolveSiteRef(inner[1], inner[2], ctx)
+        let sr = clResolveSiteRef(inner[1], inner[2], ctx)
         var s = ""
         let elems = sr.elemsVar
         if ctx.isComplex:
@@ -169,7 +169,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
   if rhs.kind == nnkCall and rhs[0].kind == nnkSym and rhs[0].strVal == "trace":
     let traceArg = rhs[1]
     if traceArg.kind == nnkCall and traceArg[0].kind == nnkSym and traceArg[0].strVal == "[]":
-      let sr = resolveSiteRef(traceArg[1], traceArg[2], ctx)
+      let sr = clResolveSiteRef(traceArg[1], traceArg[2], ctx)
       var s = ""
       if sr.isGauge:
         let elems = sr.elemsVar
@@ -215,8 +215,8 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
   if rhs.kind == nnkInfix and rhs.len >= 3 and rhs[0].kind == nnkSym:
     let op = rhs[0].strVal
     if op in ["*", "+", "-", "/"]:
-      let lCode = transpileScalar(rhs[1], ctx)
-      let rCode = transpileScalar(rhs[2], ctx)
+      let lCode = clTranspileScalar(rhs[1], ctx)
+      let rCode = clTranspileScalar(rhs[2], ctx)
       return p & "accum += (" & lCode & " " & op & " " & rCode & ");\n"
 
   # --- Unwrap hidden conversions ---
@@ -229,7 +229,7 @@ proc transpileReduceRhs(rhs: NimNode, ctx: var CodeCtx, d: int): string =
       return transpileReduceRhs(rhs[1], ctx, d)
 
   # --- Fallback: transpile as scalar expression ---
-  let code = transpileScalar(rhs, ctx)
+  let code = clTranspileScalar(rhs, ctx)
   return p & "accum += " & code & ";\n"
 
 #[ ============================================================================
@@ -241,7 +241,7 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
   ## Each work-group reduces its elements into a single partial sum
   ## using ``__local`` memory, so the host reads back only
   ## ``numWorkGroups`` values instead of ``numSites``.
-  var ctx = newCodeCtx(info)
+  var ctx = newClCodeCtx(info)
   let vw = $VectorWidth
 
   var src = ""
@@ -350,7 +350,7 @@ proc generateReduceKernel(body: NimNode, info: KernelInfo, kernelName: string): 
             src &= matRes.code
             src &= "  const int " & vn & "_elems = " & matRes.elems & ";\n"
           of lbkOther:
-            let code = transpileScalar(val, ctx)
+            let code = clTranspileScalar(val, ctx)
             src &= "  " & ctx.scalarType & " " & vn & " = " & code & ";\n"
     of nnkCall:
       # Skip addFLOPImpl calls — handled on the host side
