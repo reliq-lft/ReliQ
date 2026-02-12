@@ -54,9 +54,9 @@ proc action*[D: static[int], L: Lattice[D], T](
   var action = lattice.newScalarField: T
 
   let nrm = float64(nc*nd*(nd-1)*lattice.globalVolume)
-  let cp = c.beta*c.cp/nrm
-  let cr = c.beta*c.cr/nrm
-  let cpg = c.beta*c.cpg/nrm
+  let cp = c.beta*c.cp/nrm/float64(nc)
+  let cr = c.beta*c.cr/nrm/float64(nc)
+  let cpg = c.beta*c.cpg/nrm/float64(nc)
 
   var actionSum = 0.0
 
@@ -67,6 +67,8 @@ proc action*[D: static[int], L: Lattice[D], T](
 
     var vact = action.newScalarFieldView(iokWrite)
     var vu = u.newGaugeFieldView(iokRead)
+
+    vact := 0.0
 
     toc()
     tic("ActionLoop")
@@ -87,7 +89,6 @@ proc action*[D: static[int], L: Lattice[D], T](
           # plaquette
           if c.cp != 0.0: 
             vact[n] += cp * trace(id - ta * tb.adjoint())
-
             addFLOP matMulFLOP(nc) + matAddSubFLOP(nc) + traceFLOP(nc) + 1
 
           # rectangle
@@ -98,12 +99,12 @@ proc action*[D: static[int], L: Lattice[D], T](
             let bwdNuFwdMu = stencil.corner(n, -1, nu, +1, mu)
             
             let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[nu][bwdNuFwdMu]
-            let td = tb * vu[nu][fwdNu].adjoint()
+            let td = tb * vu[nu][fwdMu].adjoint()
 
-            let te = ta * vu[nu][fwdNu].adjoint()
+            let te = ta * vu[mu][fwdNu].adjoint()
             let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[mu][bwdMuFwdNu]
             
-            vact[n] += cr * trace(2.0*id - te * tf.adjoint() - tc * td.adjoint())
+            vact[n] += cr * trace(2.0*id - tc * td.adjoint() - te * tf.adjoint())
 
             addFLOP 6*matMulFLOP(nc) + 2*matAddSubFLOP(nc) + 2*traceFLOP(nc) + 2
           
@@ -124,17 +125,26 @@ proc action*[D: static[int], L: Lattice[D], T](
   finalizeProfiler()
 
 when isMainModule:
+  import std/[unittest, strformat]
   import io/[gaugeio]
 
   const SampleILDGFile = "src/io/sample/ildg.lat"
 
   parallel:
-    let dim: array[4, int] = [8, 8, 8, 16]
-    let lat = newSimpleCubicLattice(dim)
-    let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
-    let act = GaugeActionContext(beta: 6.0, cp: 1.0, cr: 1.0, cpg: 0.0)
-    var ua = lat.newGaugeField(ctx)
-  
-    ua.readGaugeField(SampleILDGFile)
+    suite "Reference gauge action":
+      test "Rectangle":
+        const refAction = 15275.754544798303 # generated from QEX
 
-    echo act.action(ua)
+        let dim: array[4, int] = [8, 8, 8, 16]
+        let lat = newSimpleCubicLattice(dim)
+        let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
+        let act = GaugeActionContext(beta: 7.5, cp: 1.0, cr: -1.0/20.0, cpg: 0.0)
+        var ua = lat.newGaugeField(ctx)
+      
+        ua.readGaugeField(SampleILDGFile)
+
+        let thisAction = act.action(ua)
+
+        echo thisAction
+        echo refAction
+        check abs(thisAction - refAction) < 1e-6

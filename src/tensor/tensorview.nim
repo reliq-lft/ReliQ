@@ -145,6 +145,7 @@ type DeviceStorage* = object
   simdLayout*: SimdLatticeLayout  ## SIMD layout for vectorized AoSoA access
   aosoaData*: pointer       ## Pointer to AoSoA transformed data (OpenMP)
   aosoaSeqRef*: RootRef     ## Reference to keep AoSoA seq alive (OpenMP)
+  zeroCopy*: bool           ## True when view points directly at GA memory (no AoSoA copy)
 
 type TensorFieldView*[L, T] = object
   ## Tensor field view on device memory
@@ -206,16 +207,7 @@ proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int, siteOffs
   # For complex types, siteOffsets are in storage-type units (float64 for Complex64,
   # float32 for Complex32), but T is Complex64/Complex32 which is 2x the storage size.
   # We must read using the storage type and assemble complex values.
-  when T is Complex64:
-    let srcData = cast[ptr UncheckedArray[float64]](src)
-    for site in 0..<numSites:
-      let g = site div VectorWidth
-      let lane = site mod VectorWidth
-      let srcBase = siteOffsets[site]
-      for e in 0..<elemsPerSite:
-        let aosoaIdx = g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
-        result[aosoaIdx] = complex64(srcData[srcBase + e * 2], srcData[srcBase + e * 2 + 1])
-  elif T is Complex32:
+  when T is Complex32:
     let srcData = cast[ptr UncheckedArray[float32]](src)
     for site in 0..<numSites:
       let g = site div VectorWidth
@@ -224,6 +216,15 @@ proc transformAoStoAoSoA*[T](src: pointer, numSites, elemsPerSite: int, siteOffs
       for e in 0..<elemsPerSite:
         let aosoaIdx = g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
         result[aosoaIdx] = complex32(srcData[srcBase + e * 2], srcData[srcBase + e * 2 + 1])
+  elif T is Complex64:
+    let srcData = cast[ptr UncheckedArray[float64]](src)
+    for site in 0..<numSites:
+      let g = site div VectorWidth
+      let lane = site mod VectorWidth
+      let srcBase = siteOffsets[site]
+      for e in 0..<elemsPerSite:
+        let aosoaIdx = g * (VectorWidth * elemsPerSite) + e * VectorWidth + lane
+        result[aosoaIdx] = complex64(srcData[srcBase + e * 2], srcData[srcBase + e * 2 + 1])
   else:
     let srcData = cast[ptr UncheckedArray[T]](src)
     for site in 0..<numSites:
@@ -256,6 +257,119 @@ proc transformAoSoAtoAoS*[T](src: pointer, numSites, elemsPerSite: int): seq[T] 
 
 #[ SIMD-aware AoSoA layout transformation functions ]#
 
+when UseOpenMP:
+  # Emit C helpers that use #pragma omp parallel for to parallelise
+  # the AoS↔AoSoA memory layout transformations.  The Nim for-loop
+  # compiles to a block-scoped C for, which prevents #pragma from
+  # binding directly, so we do the hot loop in emitted C instead.
+  {.emit: """
+/*  reliq_transform_aos_to_aosoa_par  –  AoS → AoSoA (parallel)
+ *  reliq_scatter_aosoa_to_aos_par   –  AoSoA → AoS (parallel)
+ *
+ *  Both functions walk the SimdLatticeLayout outer/inner structure
+ *  and copy one storage-scalar element at a time (via memcpy with
+ *  constant size → single load/store on modern compilers).
+ */
+#include <string.h>
+
+static void reliq_transform_aos_to_aosoa_par(
+  void* __restrict__ dst, 
+  const void* __restrict__ src,
+  const NI* siteOffsets,
+  const NI* outerStrides, 
+  const NI* innerStrides,
+  const NI* localStrides, 
+  const NI* innerGeom,
+  NI nDim, 
+  NI nSitesOuter, 
+  NI nSitesInner,
+  NI elemsPerSite, 
+  NI vw, 
+  NI elemSize
+) {
+  char* __restrict__ dstB = (char*)dst;
+  const char* __restrict__ srcB = (const char*)src;
+
+  #pragma omp parallel for schedule(static)
+  for (NI outerIdx = 0; outerIdx < nSitesOuter; outerIdx++) {
+    for (NI lane = 0; lane < nSitesInner; lane++) {
+      /* inline outerInnerToLocal */
+      NI localIdx = 0;
+      NI outerRem = outerIdx;
+      NI innerRem = lane;
+      for (NI d = nDim - 1; d >= 0; d--) {
+        NI oc = outerRem / outerStrides[d];
+        outerRem = outerRem % outerStrides[d];
+        NI ic = innerRem / innerStrides[d];
+        innerRem = innerRem % innerStrides[d];
+        localIdx += (oc * innerGeom[d] + ic) * localStrides[d];
+      }
+      NI srcBase = siteOffsets[localIdx];
+      for (NI e = 0; e < elemsPerSite; e++) {
+        NI aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane;
+        memcpy(
+          dstB + aosoaIdx * elemSize,
+          srcB + (srcBase + e) * elemSize,
+          (size_t)elemSize
+        );
+  } } }
+}
+
+static void reliq_scatter_aosoa_to_aos_par(
+  void* __restrict__ dst, 
+  const void* __restrict__ src,
+  const NI* siteOffsets,
+  const NI* outerStrides, 
+  const NI* innerStrides,
+  const NI* localStrides, 
+  const NI* innerGeom,
+  NI nDim, 
+  NI nSitesOuter, 
+  NI nSitesInner,
+  NI elemsPerSite, 
+  NI vw, 
+  NI elemSize
+) {
+  char* __restrict__ dstB = (char*)dst;
+  const char* __restrict__ srcB = (const char*)src;
+
+  #pragma omp parallel for schedule(static)
+  for (NI outerIdx = 0; outerIdx < nSitesOuter; outerIdx++) {
+    for (NI lane = 0; lane < nSitesInner; lane++) {
+      NI localIdx = 0;
+      NI outerRem = outerIdx;
+      NI innerRem = lane;
+      for (NI d = nDim - 1; d >= 0; d--) {
+        NI oc = outerRem / outerStrides[d];
+        outerRem = outerRem % outerStrides[d];
+        NI ic = innerRem / innerStrides[d];
+        innerRem = innerRem % innerStrides[d];
+        localIdx += (oc * innerGeom[d] + ic) * localStrides[d];
+      }
+      NI dstBase = siteOffsets[localIdx];
+      for (NI e = 0; e < elemsPerSite; e++) {
+        NI aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane;
+        memcpy(
+          dstB + (dstBase + e) * elemSize,
+          srcB + aosoaIdx * elemSize,
+          (size_t)elemSize
+        );
+  } } }
+}
+""".}
+
+  proc reliqTransformAosToAosoaPar(
+    dst, src: pointer;
+    siteOffsets, outerStrides, innerStrides, localStrides, innerGeom: ptr int;
+    nDim, nSitesOuter, nSitesInner, elemsPerSite, vw, elemSize: int
+  ) {.importc: "reliq_transform_aos_to_aosoa_par", nodecl.}
+
+  proc reliqScatterAosoaToAosPar(
+    dst, src: pointer;
+    siteOffsets, outerStrides, innerStrides, localStrides, innerGeom: ptr int;
+    nDim, nSitesOuter, nSitesInner, elemsPerSite, vw, elemSize: int
+  ) {.importc: "reliq_scatter_aosoa_to_aos_par", nodecl.}
+
 proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsPerSite: int, siteOffsets: seq[int]): seq[T] =
   ## Transform data from AoS to AoSoA layout using SIMD layout with configurable lane grid.
   ## 
@@ -284,17 +398,31 @@ proc transformAoStoAoSoASimd*[T](src: pointer, layout: SimdLatticeLayout, elemsP
   let padElements = (64 + sizeof(T) - 1) div sizeof(T)
   result = newSeq[T](totalElements + padElements)
   
-  # Fill only the valid lanes (0..<nSitesInner) — extra lanes stay zero.
-  let srcData = cast[ptr UncheckedArray[T]](src)
-  for outerIdx in 0..<layout.nSitesOuter:
-    for lane in 0..<layout.nSitesInner:
-      let localSite = outerInnerToLocal(outerIdx, lane, layout)
-      let srcBase = siteOffsets[localSite]
-      for e in 0..<elemsPerSite:
-        # Use VW (not nSitesInner) as the lane stride so the kernel's
-        # simd_load/simd_store accesses contiguous VW-wide blocks.
-        let aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane
-        result[aosoaIdx] = srcData[srcBase + e]
+  when UseOpenMP:
+    # Parallel AoS→AoSoA transform using emitted C with #pragma omp parallel for.
+    # Each outerIdx group writes to a disjoint region of the output buffer.
+    reliqTransformAosToAosoaPar(
+      cast[pointer](addr result[0]), src,
+      unsafeAddr siteOffsets[0],
+      unsafeAddr layout.outerStrides[0],
+      unsafeAddr layout.innerStrides[0],
+      unsafeAddr layout.localStrides[0],
+      unsafeAddr layout.innerGeom[0],
+      layout.nDim, layout.nSitesOuter, layout.nSitesInner,
+      elemsPerSite, vw, sizeof(T)
+    )
+  else:
+    # Sequential fallback for non-OpenMP backends
+    let srcData = cast[ptr UncheckedArray[T]](src)
+    for outerIdx in 0..<layout.nSitesOuter:
+      for lane in 0..<layout.nSitesInner:
+        let localSite = outerInnerToLocal(outerIdx, lane, layout)
+        let srcBase = siteOffsets[localSite]
+        for e in 0..<elemsPerSite:
+          # Use VW (not nSitesInner) as the lane stride so the kernel's
+          # simd_load/simd_store accesses contiguous VW-wide blocks.
+          let aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane
+          result[aosoaIdx] = srcData[srcBase + e]
 
 when not UseOpenMP:
   # OpenMP gets AoSoA↔AoS helpers from ompsimd (imported above).
@@ -345,7 +473,7 @@ when UseOpenMP:
   # OpenMP backend: works directly on host memory with SIMD-aware AoSoA layout
   
   template newTensorFieldView*[D: static[int], R: static[int], L, T](
-    tensor: LocalTensorField[D, R, L, T];
+    tensorExpr: LocalTensorField[D, R, L, T];
     io: IOKind;
     simdGrid: openArray[int]
   ): TensorFieldView[L, T] =
@@ -362,6 +490,7 @@ when UseOpenMP:
     ## Example:
     ##   var view = localField.newTensorFieldView(iokRead, [1, 2, 2, 2])
     block:
+      let tensor = tensorExpr  # Evaluate once: template params are textually substituted
       let totalSites = computeTotalLatticeSites(tensor.localGrid)
       let isComplex = isComplex32(T) or isComplex64(T)
       let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
@@ -427,12 +556,13 @@ when UseOpenMP:
       move(view)
   
   template newTensorFieldView*[D: static[int], R: static[int], L, T](
-    tensor: LocalTensorField[D, R, L, T];
+    tensorExpr: LocalTensorField[D, R, L, T];
     io: IOKind
   ): TensorFieldView[L, T] =
     ## Create tensor field view from local tensor field (OpenMP backend)
     ## Uses default SIMD grid based on VectorWidth for AoSoA vectorized layout.
     block:
+      let tensor = tensorExpr  # Evaluate once: template params are textually substituted
       let totalSites = computeTotalLatticeSites(tensor.localGrid)
       let isComplex = isComplex32(T) or isComplex64(T)
       let elementsPerSite = computeElementsPerSite(tensor.shape, isComplex)
@@ -501,12 +631,13 @@ when UseOpenMP:
 else:
   # OpenCL/SYCL backend: uses device memory with AoSoA layout
   template newTensorFieldView*[D: static[int], R: static[int], L, T](
-    tensor: LocalTensorField[D, R, L, T];
+    tensorExpr: LocalTensorField[D, R, L, T];
     io: IOKind
   ): TensorFieldView[L, T] =
     ## Create tensor field view from local tensor field
     ## Uses AoSoA layout on device for SIMD-friendly access patterns.
     block:
+      let tensor = tensorExpr  # Evaluate once: template params are textually substituted
       let numDevices = clQueues.len
       let totalSites = computeTotalLatticeSites(tensor.localGrid)
       let isComplex = isComplex32(T) or isComplex64(T)
@@ -963,6 +1094,7 @@ when UseOpenMP:
     ## into the padded GA memory via siteOffsets.  Because the host pointer
     ## points directly into GA memory, this write-back immediately updates
     ## the Global Array — no separate flush is needed.
+    ## The scatter is parallelised with #pragma omp parallel for.
     if view.data.destroyed:
       return  # Already destroyed, skip
     
@@ -970,11 +1102,6 @@ when UseOpenMP:
     if view.simdGrid.len > 0 and not view.data.aosoaData.isNil:
       case view.ioKind:
         of iokWrite, iokReadWrite:
-          # Scatter AoSoA data directly into padded GA memory, avoiding
-          # an intermediate AoS seq allocation.
-          # For complex types the AoSoA buffer uses the storage scalar type
-          # (float64 for Complex64, float32 for Complex32) with elementsPerSite
-          # counting individual re/im scalars.
           let layout = view.data.simdLayout
           when T is Complex64:
             type StorageScalar = float64
@@ -984,17 +1111,19 @@ when UseOpenMP:
             type StorageScalar = T
           let elemsPerSite = view.data.elementsPerSite
           let vw = VectorWidth
-          let destPtr = cast[ptr UncheckedArray[StorageScalar]](view.data.hostPtr)
-          let srcData = cast[ptr UncheckedArray[StorageScalar]](view.data.aosoaData)
           
-          # Walk AoSoA groups and scatter each element directly to GA memory
-          for outerIdx in 0..<layout.nSitesOuter:
-            for lane in 0..<layout.nSitesInner:
-              let localSite = outerInnerToLocal(outerIdx, lane, layout)
-              let dstBase = view.data.siteOffsets[localSite]
-              for e in 0..<elemsPerSite:
-                let aosoaIdx = outerIdx * (elemsPerSite * vw) + e * vw + lane
-                destPtr[dstBase + e] = srcData[aosoaIdx]
+          # Parallel AoSoA→AoS scatter via emitted C helper
+          reliqScatterAosoaToAosPar(
+            view.data.hostPtr,           # dst: GA memory (AoS)
+            view.data.aosoaData,         # src: AoSoA buffer
+            unsafeAddr view.data.siteOffsets[0],
+            unsafeAddr layout.outerStrides[0],
+            unsafeAddr layout.innerStrides[0],
+            unsafeAddr layout.localStrides[0],
+            unsafeAddr layout.innerGeom[0],
+            layout.nDim, layout.nSitesOuter, layout.nSitesInner,
+            elemsPerSite, vw, sizeof(StorageScalar)
+          )
         of iokRead:
           discard
     
@@ -1091,6 +1220,24 @@ proc numGlobalSites*[L, T](view: TensorFieldView[L, T]): int {.inline.} =
   result = 1
   for d in 0..<view.dims:
     result *= view.lattice.globalGrid[d]
+
+# helpful procedures
+
+proc `:=`*[L, T, U](view: var TensorFieldView[L, T]; value: U) =
+  ## Set all elements in the tensor field view to zero
+  let el = cast[T](value)
+  let elementsPerSite = view.data.elementsPerSite
+  for n in each view.all:
+    for e in 0..<elementsPerSite:
+      view[n][e] = el
+
+proc `:=`*[L, T](this: var TensorFieldView[L, T]; other: TensorFieldView[L, T]) =
+  ## Set all elements in the tensor field view to zero
+  assert this.shape == other.shape, "TensorFieldView assignment requires matching shapes"
+  let elementsPerSite = this.data.elementsPerSite
+  for n in each this.all:
+    for e in 0..<elementsPerSite:
+      this[n][e] = other[n][e]
 
 when isMainModule:
   parallel:

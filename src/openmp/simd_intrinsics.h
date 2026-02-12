@@ -250,6 +250,19 @@ static inline void simd_scatter_d(double *base, const int *indices, int elem, in
   simd_store_d(buf, val);
   for (int l = 0; l < VW; l++) { int g = indices[l]/VW, ln = indices[l]%VW; base[g*(VW*elems)+elem*VW+ln] = buf[l]; }
 }
+/* AoS (Array-of-Structures) gather/scatter — zero-copy GA memory access.
+ * offsets[l] is the base offset into the flat GA array for lane l's site.
+ * Element `elem` of lane l is at base[offsets[l] + elem]. */
+static inline simd_vd simd_gather_aos_d(const double *base, const int *offsets, int elem) {
+  double __attribute__((aligned(64))) buf[VW];
+  for (int l = 0; l < VW; l++) buf[l] = base[offsets[l] + elem];
+  return simd_load_d(buf);
+}
+static inline void simd_scatter_aos_d(double *base, const int *offsets, int elem, simd_vd val) {
+  double __attribute__((aligned(64))) buf[VW];
+  simd_store_d(buf, val);
+  for (int l = 0; l < VW; l++) base[offsets[l] + elem] = buf[l];
+}
 /* Complex helpers (double) */
 static inline void simd_cmul_d(simd_vd *rre, simd_vd *rim, simd_vd are, simd_vd aim, simd_vd bre, simd_vd bim) {
   *rre = simd_fnmadd_d(aim, bim, simd_mul_d(are, bre));
@@ -446,6 +459,16 @@ static inline void simd_scatter_f(float *base, const int *indices, int elem, int
   simd_store_f(buf, val);
   for (int l = 0; l < VW; l++) { int g = indices[l]/VW, ln = indices[l]%VW; base[g*(VW*elems)+elem*VW+ln] = buf[l]; }
 }
+static inline simd_vf simd_gather_aos_f(const float *base, const int *offsets, int elem) {
+  float __attribute__((aligned(64))) buf[VW];
+  for (int l = 0; l < VW; l++) buf[l] = base[offsets[l] + elem];
+  return simd_load_f(buf);
+}
+static inline void simd_scatter_aos_f(float *base, const int *offsets, int elem, simd_vf val) {
+  float __attribute__((aligned(64))) buf[VW];
+  simd_store_f(buf, val);
+  for (int l = 0; l < VW; l++) base[offsets[l] + elem] = buf[l];
+}
 /* Complex helpers (float) */
 static inline void simd_cmul_f(simd_vf *rre, simd_vf *rim, simd_vf are, simd_vf aim, simd_vf bre, simd_vf bim) {
   *rre = simd_fnmadd_f(aim, bim, simd_mul_f(are, bre));
@@ -621,6 +644,16 @@ static inline void simd_scatter_i(int *base, const int *indices, int elem, int e
   int __attribute__((aligned(64))) buf[VW];
   simd_store_i(buf, val);
   for (int l = 0; l < VW; l++) { int g = indices[l]/VW, ln = indices[l]%VW; base[g*(VW*elems)+elem*VW+ln] = buf[l]; }
+}
+static inline simd_vi simd_gather_aos_i(const int *base, const int *offsets, int elem) {
+  int __attribute__((aligned(64))) buf[VW];
+  for (int l = 0; l < VW; l++) buf[l] = base[offsets[l] + elem];
+  return simd_load_i(buf);
+}
+static inline void simd_scatter_aos_i(int *base, const int *offsets, int elem, simd_vi val) {
+  int __attribute__((aligned(64))) buf[VW];
+  simd_store_i(buf, val);
+  for (int l = 0; l < VW; l++) base[offsets[l] + elem] = buf[l];
 }
 
 /* ========================================================================
@@ -809,6 +842,16 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   simd_store_l(buf, val);
   for (int l = 0; l < VW; l++) { int g = indices[l]/VW, ln = indices[l]%VW; base[g*(VW*elems)+elem*VW+ln] = buf[l]; }
 }
+static inline simd_vl simd_gather_aos_l(const long long *base, const int *offsets, int elem) {
+  long long __attribute__((aligned(64))) buf[VW];
+  for (int l = 0; l < VW; l++) buf[l] = base[offsets[l] + elem];
+  return simd_load_l(buf);
+}
+static inline void simd_scatter_aos_l(long long *base, const int *offsets, int elem, simd_vl val) {
+  long long __attribute__((aligned(64))) buf[VW];
+  simd_store_l(buf, val);
+  for (int l = 0; l < VW; l++) base[offsets[l] + elem] = buf[l];
+}
 
 #endif /* RELIQ_SIMD_INTRINSICS_H */
 
@@ -838,6 +881,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
 #undef simd_hadd
 #undef simd_gather
 #undef simd_scatter
+#undef simd_gather_aos
+#undef simd_scatter_aos
 #undef simd_cmul
 #undef simd_cmadd
 
@@ -856,6 +901,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   #define simd_hadd(v)      simd_hadd_d(v)
   #define simd_gather(b,i,e,n) simd_gather_d((const double*)(b),i,e,n)
   #define simd_scatter(b,i,e,n,v) simd_scatter_d((double*)(b),i,e,n,v)
+  #define simd_gather_aos(b,o,e) simd_gather_aos_d((const double*)(b),o,e)
+  #define simd_scatter_aos(b,o,e,v) simd_scatter_aos_d((double*)(b),o,e,v)
   #define simd_cmul   simd_cmul_d
   #define simd_cmadd  simd_cmadd_d
 #elif defined(SIMD_USE_FLOAT)
@@ -873,6 +920,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   #define simd_hadd(v)      simd_hadd_f(v)
   #define simd_gather(b,i,e,n) simd_gather_f((const float*)(b),i,e,n)
   #define simd_scatter(b,i,e,n,v) simd_scatter_f((float*)(b),i,e,n,v)
+  #define simd_gather_aos(b,o,e) simd_gather_aos_f((const float*)(b),o,e)
+  #define simd_scatter_aos(b,o,e,v) simd_scatter_aos_f((float*)(b),o,e,v)
   #define simd_cmul   simd_cmul_f
   #define simd_cmadd  simd_cmadd_f
 #elif defined(SIMD_USE_INT32)
@@ -890,6 +939,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   #define simd_hadd(v)      simd_hadd_i(v)
   #define simd_gather(b,i,e,n) simd_gather_i((const int*)(b),i,e,n)
   #define simd_scatter(b,i,e,n,v) simd_scatter_i((int*)(b),i,e,n,v)
+  #define simd_gather_aos(b,o,e) simd_gather_aos_i((const int*)(b),o,e)
+  #define simd_scatter_aos(b,o,e,v) simd_scatter_aos_i((int*)(b),o,e,v)
 #elif defined(SIMD_USE_INT64)
   #define simd_v            simd_vl
   #define simd_load(p)      simd_load_l((const long long*)(p))
@@ -905,6 +956,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   #define simd_hadd(v)      simd_hadd_l(v)
   #define simd_gather(b,i,e,n) simd_gather_l((const long long*)(b),i,e,n)
   #define simd_scatter(b,i,e,n,v) simd_scatter_l((long long*)(b),i,e,n,v)
+  #define simd_gather_aos(b,o,e) simd_gather_aos_l((const long long*)(b),o,e)
+  #define simd_scatter_aos(b,o,e,v) simd_scatter_aos_l((long long*)(b),o,e,v)
 #else
   /* Default to double if nothing specified */
   #define simd_v            simd_vd
@@ -921,6 +974,8 @@ static inline void simd_scatter_l(long long *base, const int *indices, int elem,
   #define simd_hadd(v)      simd_hadd_d(v)
   #define simd_gather(b,i,e,n) simd_gather_d((const double*)(b),i,e,n)
   #define simd_scatter(b,i,e,n,v) simd_scatter_d((double*)(b),i,e,n,v)
+  #define simd_gather_aos(b,o,e) simd_gather_aos_d((const double*)(b),o,e)
+  #define simd_scatter_aos(b,o,e,v) simd_scatter_aos_d((double*)(b),o,e,v)
   #define simd_cmul   simd_cmul_d
   #define simd_cmadd  simd_cmadd_d
 #endif
