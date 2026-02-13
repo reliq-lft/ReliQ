@@ -41,7 +41,7 @@
 ##   automatic MPI decomposition and ghost region allocation
 ## - **Local data access**: `accessLocal`, `accessGhosts`, `releaseLocal`
 ##   provide raw pointers into the local partition (with or without ghost cells)
-## - **Ghost exchange**: `updateGhosts`, `updateAllGhosts` synchronise
+## - **Ghost exchange**: `updateGhosts`, `exchange` synchronise
 ##   boundary data between MPI ranks via `GA_Update_ghost_dir`
 ## - **Coordinate utilities**: `lexToCoords`, `coordsToLex`, `localIdx`,
 ##   `localLexIdx` handle the C row-major memory layout used by GA
@@ -316,23 +316,23 @@ proc updateGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   else:
     handle.GA_Update_ghost_dir(cint(dim), cint(direction), updateCornersFlag)
 
-proc updateAllGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
+proc exchange*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T],
-  updateCorners: bool = false
+  updateCorners: bool = true
 ) =
   ## Update ghost regions in all lattice dimensions
   ##
-  ## Skips dimensions with ghost width 0 (including inner tensor/complex
-  ## dimensions).  Uses ``GA_Update_ghost_dir`` for each lattice dimension.
+  ## Uses ``GA_Update_ghosts`` which updates all dimensions simultaneously,
+  ## including edge and corner ghost cells across multiple dimensions.
   ##
   ## Example:
   ## ```nim
   ## var field = lat.newTensorField([3, 3]): Complex64
   ## # ... modify local data ...
-  ## field.updateAllGhosts()  # Update all ghost regions
+  ## field.exchange()  # Update all ghost regions
   ## ```
-  for dim in 0..<D:
-    tensor.updateGhosts(dim, 0, updateCorners)
+  let handle = tensor.data.getHandle()
+  handle.GA_Update_ghosts()
 
 proc hasGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T]
@@ -391,7 +391,7 @@ proc newLatticeStencil*[D: static[int], R: static[int], L: Lattice[D], T](
   ## 
   ## # Use stencil with views in each loop
   ## var local = field.newLocalTensorField()
-  ## field.updateAllGhosts()
+  ## field.exchange()
   ## 
   ## block:
   ##   var view = local.newTensorFieldView(iokRead)
@@ -433,7 +433,7 @@ proc accessGhosts*[D: static[int], R: static[int], L: Lattice[D], T](
   ## Access local data including ghost regions
   ##
   ## Returns a raw pointer to the padded data (local + ghost regions).
-  ## Ghost regions must have been updated via ``updateAllGhosts`` first.
+  ## Ghost regions must have been updated via ``exchange`` first.
   ## Must call ``releaseLocal`` when done.
   when not isComplex(T):
     let (p, _, _) = tensor.data.accessGhosts()
@@ -653,7 +653,7 @@ proc apply*[D: static[int], R: static[int], L: Lattice[D], T](
   
   # 1. Update ghosts — update all dimensions/directions to ensure periodic BC
   # work correctly even for single-rank dimensions
-  src.updateAllGhosts()
+  src.exchange()
   
   # 2. Access ghost-padded source data
   let srcPtr = src.accessGhosts()
@@ -754,7 +754,7 @@ proc discreteLaplacian*[D: static[int], R: static[int], L: Lattice[D], T](
   ## ``scratch`` is used as temporary storage.
   
   # Update all ghosts at once for efficiency
-  src.updateAllGhosts()
+  src.exchange()
   
   let srcGhost = src.accessGhosts()
   let destLocal = dest.accessLocal()
@@ -900,7 +900,7 @@ when isMainModule:
           GA_Sync()
 
           # Update ghosts
-          field.updateAllGhosts()
+          field.exchange()
 
           # Read ghost-padded data and check t-neighbors
           let padded = field.paddedGrid()

@@ -367,6 +367,18 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var OmpCodeCtx, d: int): MatR
         return (p & target & "[0] = simd_set1(" & name & "); " & target & "[1] = simd_setzero();\n", "2")
       else:
         return (p & target & "[0] = simd_set1(" & name & ");\n", "1")
+    # Check if this is a complex scalar (not a matrix proxy)
+    var isComplex = false
+    var isMat = false
+    try: isComplex = isComplexSym(n)
+    except: discard
+    try: isMat = isMatrixTypedNode(n)
+    except: discard
+    if isComplex and not isMat:
+      # Complex scalar: fill all elements with zero (used by := 0 pattern)
+      # A bare Complex64 sym used as a matrix RHS means "fill with this scalar"
+      return (p & "for (int _e = 0; _e < " & (if ctx.isComplex: "2*NC*NC" else: "NC*NC") & "; _e++) " & target & "[_e] = simd_setzero();\n",
+              if ctx.isComplex: "2*NC*NC" else: "NC*NC")
     let lb = ctx.info.getLetBinding(name)
     if lb.kind == lbkMatMul or lb.kind == lbkOther:
       let elemsName = name & "_elems"
@@ -605,26 +617,43 @@ proc ompTranspileStmt(stmt: NimNode, ctx: var OmpCodeCtx, info: KernelInfo, d: i
 
         case lb.kind
         of lbkStencilFwd:
+          let ptExpr = "2 * " & lb.dirExpr
           s &= p & "// fwd neighbor: " & vn & "\n"
           s &= p & "int " & vn & "_indices[VW];\n"
-          s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
-          s &= ind(d+1) & "int _site = group * VW + _lane;\n"
-          s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & "];\n"
-          s &= p & "}\n\n"
+          if lb.stencilIsView:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_data[group * " & lb.stencilName & "_npts * VW + (" & ptExpr & ") * VW + _lane];\n"
+            s &= p & "}\n\n"
+          else:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & "int _site = group * VW + _lane;\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & ptExpr & "];\n"
+            s &= p & "}\n\n"
         of lbkStencilBwd:
+          let ptExpr = "2 * " & lb.dirExpr & " + 1"
           s &= p & "// bwd neighbor: " & vn & "\n"
           s &= p & "int " & vn & "_indices[VW];\n"
-          s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
-          s &= ind(d+1) & "int _site = group * VW + _lane;\n"
-          s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + 2 * " & lb.dirExpr & " + 1];\n"
-          s &= p & "}\n\n"
+          if lb.stencilIsView:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_data[group * " & lb.stencilName & "_npts * VW + (" & ptExpr & ") * VW + _lane];\n"
+            s &= p & "}\n\n"
+          else:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & "int _site = group * VW + _lane;\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & ptExpr & "];\n"
+            s &= p & "}\n\n"
         of lbkStencilNeighbor:
           s &= p & "// stencil neighbor: " & vn & "\n"
           s &= p & "int " & vn & "_indices[VW];\n"
-          s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
-          s &= ind(d+1) & "int _site = group * VW + _lane;\n"
-          s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
-          s &= p & "}\n\n"
+          if lb.stencilIsView:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_data[group * " & lb.stencilName & "_npts * VW + (" & lb.pointExpr & ") * VW + _lane];\n"
+            s &= p & "}\n\n"
+          else:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & "int _site = group * VW + _lane;\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & lb.pointExpr & "];\n"
+            s &= p & "}\n\n"
         of lbkStencilCorner:
           let nd = $lb.nDim
           let sA = lb.signExprA
@@ -641,10 +670,15 @@ proc ompTranspileStmt(stmt: NimNode, ctx: var OmpCodeCtx, info: KernelInfo, d: i
           s &= p & "int " & prefix & "_si = (" & prefix & "_sA > 0 ? 0 : 2) + (" & prefix & "_sB > 0 ? 0 : 1);\n"
           s &= p & "int " & prefix & "_ptIdx = 2*" & nd & " + " & prefix & "_pair * 4 + " & prefix & "_si;\n"
           s &= p & "int " & vn & "_indices[VW];\n"
-          s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
-          s &= ind(d+1) & "int _site = group * VW + _lane;\n"
-          s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & prefix & "_ptIdx];\n"
-          s &= p & "}\n\n"
+          if lb.stencilIsView:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_data[group * " & lb.stencilName & "_npts * VW + " & prefix & "_ptIdx * VW + _lane];\n"
+            s &= p & "}\n\n"
+          else:
+            s &= p & "for (int _lane = 0; _lane < VW; _lane++) {\n"
+            s &= ind(d+1) & "int _site = group * VW + _lane;\n"
+            s &= ind(d+1) & vn & "_indices[_lane] = " & lb.stencilName & "_offsets[_site * " & lb.stencilName & "_npts + " & prefix & "_ptIdx];\n"
+            s &= p & "}\n\n"
         of lbkMatMul:
           s &= p & "// matrix temp: " & vn & "\n"
           s &= p & "simd_v " & vn & "[" & elemsGuess & "];\n"
@@ -727,8 +761,12 @@ proc ompTranspileStmt(stmt: NimNode, ctx: var OmpCodeCtx, info: KernelInfo, d: i
       if isElementLevelWrite(stmt):
         let innerCall = stmt[1]
         var viewName = "output"
-        if innerCall.len >= 3 and innerCall[1].kind == nnkSym:
-          viewName = innerCall[1].strVal
+        if innerCall.len >= 3:
+          let viewNode = innerCall[1]
+          if viewNode.kind == nnkSym:
+            viewName = viewNode.strVal
+          elif viewNode.kind in {nnkHiddenAddr, nnkHiddenDeref} and viewNode[0].kind == nnkSym:
+            viewName = viewNode[0].strVal
 
         let siteNode = innerCall[2]
         var elGroupVar = "group"
@@ -955,8 +993,12 @@ proc generateOmpFunction(body: NimNode, info: KernelInfo): tuple[funcSrc: string
   params.add "const int numGroups"
   params.add "const int NC"
   for s in info.stencils:
-    params.add "const int* " & s.name & "_offsets"
-    params.add "const int " & s.name & "_npts"
+    if s.isView:
+      params.add "const int* " & s.name & "_data"
+      params.add "const int " & s.name & "_npts"
+    else:
+      params.add "const int* " & s.name & "_offsets"
+      params.add "const int " & s.name & "_npts"
   let runtimeVars = findRuntimeIntVars(body, info)
   for rv in runtimeVars:
     params.add "const int " & rv.name
@@ -1102,13 +1144,19 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
   let ncExpr = quote do: `ncSym`.cint
   addParam(ncExpr, ident"cint")
 
-  # Stencil args: offsets pointer + nPoints
+  # Stencil args: data pointer + nPoints
   for s in info.stencils:
     let sSym = s.nimSym
-    let offsetExpr = quote do: cast[pointer](addr `sSym`.offsets[0])
-    addParam(offsetExpr, ident"pointer")
-    let npExpr = quote do: `sSym`.nPoints.cint
-    addParam(npExpr, ident"cint")
+    if s.isView:
+      let dataExpr = quote do: cast[pointer](addr `sSym`.view.aosoaData[0])
+      addParam(dataExpr, ident"pointer")
+      let npExpr = quote do: `sSym`.view.nPoints.cint
+      addParam(npExpr, ident"cint")
+    else:
+      let offsetExpr = quote do: cast[pointer](addr `sSym`.offsets[0])
+      addParam(offsetExpr, ident"pointer")
+      let npExpr = quote do: `sSym`.nPoints.cint
+      addParam(npExpr, ident"cint")
 
   # Runtime int vars
   let runtimeVars = findRuntimeIntVars(body, info)

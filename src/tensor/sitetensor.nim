@@ -341,6 +341,7 @@ type
     siteOffset*: int         # Precomputed flat offset for this site in padded GA memory
     shape*: array[R, int]    # Tensor shape
     elemsPerSite*: int       # Elements per site
+    elemOffsets*: ptr UncheckedArray[int]  # Maps storage element e -> padded inner offset from siteOffset
 
   LocalAddResult*[D: static[int], R: static[int], L, T] = object
     ## Result of local tensor addition/subtraction
@@ -576,34 +577,37 @@ proc re*[L, T](proxy: TensorSiteProxy[L, T]): float64 =
 import std/complex as localcomplex
 
 proc localProxyGet*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], elemIdx: int): T {.inline.} =
-  ## Read tensor element at given flat element index, handling complex storage
+  ## Read tensor element at given flat element index, handling complex storage.
+  ## Uses elemOffsets to skip inner ghost cells in the padded GA inner block.
+  ## For complex types, tensor element e maps to storage elements e*2 (re) and e*2+1 (im).
   when T is Complex64:
     let data = cast[ptr UncheckedArray[float64]](proxy.hostPtr)
-    let off = proxy.siteOffset + elemIdx * 2
+    let off = proxy.siteOffset + proxy.elemOffsets[elemIdx * 2]
     localcomplex.complex64(data[off], data[off + 1])
   elif T is Complex32:
     let data = cast[ptr UncheckedArray[float32]](proxy.hostPtr)
-    let off = proxy.siteOffset + elemIdx * 2
+    let off = proxy.siteOffset + proxy.elemOffsets[elemIdx * 2]
     localcomplex.complex32(data[off], data[off + 1])
   else:
     let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-    data[proxy.siteOffset + elemIdx]
+    data[proxy.siteOffset + proxy.elemOffsets[elemIdx]]
 
 proc localProxySet*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T], elemIdx: int, value: T) {.inline.} =
-  ## Write tensor element at given flat element index, handling complex storage
+  ## Write tensor element at given flat element index, handling complex storage.
+  ## Uses elemOffsets to skip inner ghost cells in the padded GA inner block.
   when T is Complex64:
     let data = cast[ptr UncheckedArray[float64]](proxy.hostPtr)
-    let off = proxy.siteOffset + elemIdx * 2
+    let off = proxy.siteOffset + proxy.elemOffsets[elemIdx * 2]
     data[off] = value.re
     data[off + 1] = value.im
   elif T is Complex32:
     let data = cast[ptr UncheckedArray[float32]](proxy.hostPtr)
-    let off = proxy.siteOffset + elemIdx * 2
+    let off = proxy.siteOffset + proxy.elemOffsets[elemIdx * 2]
     data[off] = value.re
     data[off + 1] = value.im
   else:
     let data = cast[ptr UncheckedArray[T]](proxy.hostPtr)
-    data[proxy.siteOffset + elemIdx] = value
+    data[proxy.siteOffset + proxy.elemOffsets[elemIdx]] = value
 
 # trace() on LocalSiteProxy: sum of diagonal elements (CPU-side, works on all backends)
 proc trace*[D: static[int], R: static[int], L, T](proxy: LocalSiteProxy[D, R, L, T]): T {.inline.} =

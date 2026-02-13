@@ -38,7 +38,7 @@ import profile/[profile]
 
 proc action*[D: static[int], L: Lattice[D], T](
   c: GaugeActionContext; 
-  u: GaugeField[D, L, T]
+  u: var GaugeField[D, L, T]
 ): float =
   initProfiler("GaugeAction")
   
@@ -47,10 +47,15 @@ proc action*[D: static[int], L: Lattice[D], T](
   let nd = u.nd
   let nc = u.nc
   var traceSum = 0.0
+
+  var ghostGrid: array[D, int]
+  for d in 0..<D: ghostGrid[d] = 1
   
   let lattice = u.lattice
-  let stencil = lattice.newStapleLatticeStencil()
+  let plattice = lattice.newPaddedLattice(ghostGrid)
+  var stencil = plattice.newStapleLatticeStencil()
 
+  var pu = plattice.newGaugeField(u)
   var action = lattice.newScalarField: T
 
   let nrm = float64(nc*nd*(nd-1)*lattice.globalVolume)
@@ -58,65 +63,75 @@ proc action*[D: static[int], L: Lattice[D], T](
   let cr = c.beta*c.cr/nrm/float64(nc)
   let cpg = c.beta*c.cpg/nrm/float64(nc)
 
+  let ns = lattice.globalVolume()
   var actionSum = 0.0
+
+  pu.exchange()
 
   toc()
 
   accelerator:
     tic("ViewCreation")
 
-    var vact = action.newScalarFieldView(iokWrite)
-    var vu = u.newGaugeFieldView(iokRead)
+    let sv = stencil.newStencilView()
+    let vu = pu.newGaugeFieldView(iokRead)
+    var va = action.newScalarFieldView(iokWrite)
 
-    vact := 0.0
+    va := 0.0
 
     toc()
     tic("ActionLoop")
 
     for mu in 1..<nd:
       for nu in 0..<mu:
-        for n in each vact.all:
-          let fwdMu = stencil.fwd(n, mu)
-          let fwdNu = stencil.fwd(n, nu)
+        # action calculation
+        for n in each va.all:
+          let fwdMu = sv.fwd(n, mu)
+          let fwdNu = sv.fwd(n, nu)
 
           let ta = vu[mu][n] * vu[nu][fwdMu]
           let tb = vu[nu][n] * vu[mu][fwdNu]
 
-          var id = siteIdentity(vu.TensorSiteProxy)
-
-          addFLOP 2*matMulFLOP(nc)
+          let id = siteIdentity(vu.TensorSiteProxy)
           
           # plaquette
-          if c.cp != 0.0: 
-            vact[n] += cp * trace(id - ta * tb.adjoint())
-            addFLOP matMulFLOP(nc) + matAddSubFLOP(nc) + traceFLOP(nc) + 1
+          if c.cp != 0.0: va[n] += cp * trace(id - ta * tb.adjoint())
 
           # rectangle
           if c.cr != 0.0:
-            let bwdMu = stencil.bwd(n, mu)
-            let bwdNu = stencil.bwd(n, nu)
-            let bwdMuFwdNu = stencil.corner(n, -1, mu, +1, nu)
-            let bwdNuFwdMu = stencil.corner(n, -1, nu, +1, mu)
+            let bwdMu = sv.bwd(n, mu)
+            let bwdNu = sv.bwd(n, nu)
+            let bwdMuFwdNu = sv.corner(n, -1, mu, +1, nu)
+            let bwdNuFwdMu = sv.corner(n, -1, nu, +1, mu)
             
-            let tc = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[nu][bwdNuFwdMu]
-            let td = tb * vu[nu][fwdMu].adjoint()
+            let tc = ta * vu[mu][fwdNu].adjoint()
+            let td = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[mu][bwdMuFwdNu]
 
-            let te = ta * vu[mu][fwdNu].adjoint()
-            let tf = vu[mu][bwdMu].adjoint() * vu[nu][bwdMu] * vu[mu][bwdMuFwdNu]
+            let te = vu[nu][bwdNu].adjoint() * vu[mu][bwdNu] * vu[nu][bwdNuFwdMu]
+            let tf = tb * vu[nu][fwdMu].adjoint()
             
-            vact[n] += cr * trace(2.0*id - tc * td.adjoint() - te * tf.adjoint())
-
-            addFLOP 6*matMulFLOP(nc) + 2*matAddSubFLOP(nc) + 2*traceFLOP(nc) + 2
+            va[n] += cr * trace(2.0*id - tc * td.adjoint() - te * tf.adjoint())
           
           # parallelogram
           if c.cpg != 0.0: discard
+        
+        # FLOP counting
+        addFLOP 2*ns*matMulFLOP(nc)
+        if c.cp != 0.0:
+          addFLOP ns*(matMulFLOP(nc) + matAddSubFLOP(nc) + traceFLOP(nc) + 1)
+        if c.cr != 0.0:
+          addFLOP ns*(6*matMulFLOP(nc) + 2*matAddSubFLOP(nc) + 2*traceFLOP(nc) + 2)
     
     toc()
+
     tic("Reduction")
     
-    for n in reduce vact.all:
-      actionSum += vact[n].re
-      addFLOP(1)
+    # reduce
+    for n in reduce va.all:
+      actionSum += va[n].re
+    
+    # count flops
+    addFLOP(ns)
     
     toc()
   
@@ -138,11 +153,11 @@ when isMainModule:
         let dim: array[4, int] = [8, 8, 8, 16]
         let lat = newSimpleCubicLattice(dim)
         let ctx = newGaugeFieldContext(gkSU3, rkFundamental)
-        let act = GaugeActionContext(beta: 7.5, cp: 1.0, cr: -1.0/20.0, cpg: 0.0)
+        
         var ua = lat.newGaugeField(ctx)
-      
         ua.readGaugeField(SampleILDGFile)
 
+        let act = GaugeActionContext(beta: 7.5, cp: 1.0, cr: -1.0/20.0, cpg: 0.0)
         let thisAction = act.action(ua)
 
         echo thisAction

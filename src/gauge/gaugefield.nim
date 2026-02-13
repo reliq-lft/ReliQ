@@ -187,6 +187,41 @@ proc nd*[D: static[int], L: Lattice[D], T](gaugeField: GaugeField[D, L, T]): int
   ## Get number of dimensions from the gauge field
   D
 
+#[ halo exchange ]#
+
+proc exchange*[D: static[int], L: Lattice[D], T](
+  u: var GaugeField[D, L, T]; 
+  updateCorners = true
+) =
+  for mu in 0..<D:
+    u.field[mu].exchange(updateCorners = updateCorners)
+
+#[ copy-constructing a gauge field on a different lattice ]#
+
+proc newGaugeField*[D: static[int], L1: Lattice[D], L2: Lattice[D], T](
+  lattice: L1; src: GaugeField[D, L2, T]
+): GaugeField[D, L1, T] =
+  ## Create a new gauge field on ``lattice`` and copy data from ``src``.
+  ## The two lattices may differ in ghost grid but must have the same
+  ## local volume.
+  result.ctx = src.ctx
+  let n = src.ctx.nc
+  for mu in 0..<D:
+    result.field[mu] = lattice.newTensorField([n, n]): T
+    var dstLocal = result.field[mu].newLocalTensorField()
+    let srcLocal = src.field[mu].newLocalTensorField()
+    let ns = dstLocal.numSites()
+    let eps = dstLocal.elemsPerSite
+    for site in 0..<ns:
+      let dstOff = dstLocal.siteOffsets[site]
+      let srcOff = srcLocal.siteOffsets[site]
+      for e in 0..<eps:
+        dstLocal.data[dstOff + dstLocal.elemOffsets[e]] = srcLocal.data[srcOff + srcLocal.elemOffsets[e]]
+
+template all*[D: static[int], L: Lattice[D], T](u: GaugeField[D, L, T]): untyped =
+  ## Return an iterator over all sites in the gauge field's lattice
+  u[0].all
+
 #[ methods ]#
 
 proc setToIdentity*[D: static[int], L: Lattice[D], T](u: var GaugeField[D, L, T]) =

@@ -317,8 +317,9 @@ type
     backend*: StencilBackend
     
     # Pre-computed lookup tables
-    offsets*: seq[int32]          # neighbor offset for each (site, point)
+    offsets*: seq[int32]          # neighbor offset for each (site, point) in reordered space
     isGhost*: seq[bool]           # whether neighbor is in ghost region
+    paddedToReordered*: seq[int32] # maps padded-lex index → reordered index (local first, then ghost)
     
     # SIMD support
     simdGrid*: array[D, int]
@@ -361,10 +362,41 @@ proc simdGridIsValid[D: static int](localGeom, simdGrid: array[D, int]): bool =
   return true
 
 proc buildLookupTables[D: static int](s: var LatticeStencil[D]) =
-  ## Build pre-computed offset tables for fast neighbor access
+  ## Build pre-computed offset tables for fast neighbor access.
+  ##
+  ## The stored offsets use **reordered** site indices where local sites come
+  ## first (indices 0 ..< nLocalSites in local-lex order) and ghost sites
+  ## follow (indices nLocalSites ..< nPaddedSites).  This allows AoSoA
+  ## buffers to be indexed directly with the group index ``n`` from an
+  ## ``each`` loop over local sites while stencil-gathered neighbors
+  ## correctly reference ghost data beyond the local range.
   let localStrides = computeStrides(s.localGeom)
   let paddedStrides = computeStrides(s.paddedGeom)
-  
+
+  # Build paddedLex-to-reordered mapping ---------------------------------
+  # Local sites: reordered index = local-lex index
+  # Ghost sites: reordered index = nLocalSites + sequential ghost counter
+  var paddedToReordered = newSeq[int32](s.nPaddedSites)
+  for i in 0..<s.nPaddedSites: paddedToReordered[i] = -1  # sentinel
+
+  for localSite in 0..<s.nLocalSites:
+    let localCoords = lexToCoords(localSite, s.localGeom, localStrides)
+    var paddedCoords: array[D, int]
+    for d in 0..<D:
+      paddedCoords[d] = localCoords[d] + s.ghostWidth[d]
+    let paddedIdx = coordsToLex(paddedCoords, paddedStrides)
+    paddedToReordered[paddedIdx] = localSite.int32
+
+  var ghostIdx = s.nLocalSites.int32
+  for paddedSite in 0..<s.nPaddedSites:
+    if paddedToReordered[paddedSite] < 0:
+      paddedToReordered[paddedSite] = ghostIdx
+      ghostIdx.inc
+
+  # Store the mapping for consumers that need to build matching AoSoA buffers
+  s.paddedToReordered = paddedToReordered
+
+  # Build per-site neighbor offsets in reordered space -------------------
   s.offsets = newSeq[int32](s.nLocalSites * s.nPoints)
   s.isGhost = newSeq[bool](s.nLocalSites * s.nPoints)
   
@@ -395,8 +427,9 @@ proc buildLookupTables[D: static int](s: var LatticeStencil[D]) =
         elif nbrPaddedCoords[d] >= s.paddedGeom[d]:
           nbrPaddedCoords[d] -= s.paddedGeom[d]
       
+      let paddedLexIdx = coordsToLex(nbrPaddedCoords, paddedStrides)
       let entryIdx = localSite * s.nPoints + pointIdx
-      s.offsets[entryIdx] = coordsToLex(nbrPaddedCoords, paddedStrides).int32
+      s.offsets[entryIdx] = paddedToReordered[paddedLexIdx]
       s.isGhost[entryIdx] = ghostFlag
 
 proc buildSimdTables[D: static int](s: var LatticeStencil[D]) =
@@ -626,9 +659,28 @@ proc newLatticeStencil*[D: static int, L: Lattice[D]](
       break
   
   if needsQuery:
-    # mpiGrid has auto-detect sentinels — query GlobalArrays for actual decomposition
-    let tmpGA = newGlobalArray[D](lat.globalGrid, lat.mpiGrid, lat.ghostGrid, float32)
-    localGeom = tmpGA.getLocalGrid()
+    # mpiGrid has auto-detect sentinels — query GlobalArrays for actual
+    # decomposition.  We must create a temp GA whose shape matches the
+    # tensor fields that will live on this lattice, otherwise GA's
+    # auto-partitioner may choose a different decomposition for a D-dim
+    # scalar array vs a (D+R+1)-dim tensor array.  Add 3 non-distributed
+    # inner dimensions to mimic the tensor field GA structure (e.g.
+    # [Lx,Ly,Lz,Lt, S0,S1,Cf] for a rank-2 complex tensor).
+    const DI = D + 3  # spatial + 3 dummy inner dims
+    var globalGridI: array[DI, int]
+    var mpiGridI: array[DI, int]
+    var ghostGridI: array[DI, int]
+    for d in 0..<D:
+      globalGridI[d] = lat.globalGrid[d]
+      mpiGridI[d] = lat.mpiGrid[d]
+      ghostGridI[d] = lat.ghostGrid[d]
+    for d in D..<DI:
+      globalGridI[d] = 1   # small dummy inner dims
+      mpiGridI[d] = 1      # not distributed
+      ghostGridI[d] = 1    # GA requires ghost >= 1
+    let tmpGA = newGlobalArray[DI](globalGridI, mpiGridI, ghostGridI, float32)
+    let tmpLocal = tmpGA.getLocalGrid()
+    for d in 0..<D: localGeom[d] = tmpLocal[d]
   else:
     for d in 0..<D:
       localGeom[d] = lat.globalGrid[d] div lat.mpiGrid[d]
@@ -881,6 +933,167 @@ proc offsetBufferSize*[D: static int](s: LatticeStencil[D]): int {.inline.} =
   s.nLocalSites * s.nPoints * sizeof(int32)
 
 #[ ============================================================================
+   StencilView — AoSoA-transformed stencil indices for SIMD kernels
+   ============================================================================
+
+   A ``StencilView`` is the stencil analogue of a ``TensorFieldView``.  It
+   stores the pre-computed neighbor indices of a ``LatticeStencil`` in the
+   same AoSoA layout that tensor/gauge field views use, so the C kernel can
+   read stencil indices with the same (group, lane) addressing as field data.
+
+   AoSoA layout (int32 elements):
+     data[group * nPoints * VW + point * VW + lane]
+
+   where ``group = 0 ..< nGroups``, ``lane = 0 ..< VW``, and the value at
+   each position is the **reordered** site index of the neighbor (local
+   sites 0..nLocal-1, ghost sites nLocal..nPadded-1).
+
+   This eliminates the per-lane flat-array lookup in the generated C code.
+   Instead of:
+     _site = group * VW + _lane;
+     indices[_lane] = offsets[_site * npts + pointIdx];
+   the kernel reads:
+     indices[_lane] = stencil_data[group * npts * VW + pointIdx * VW + _lane];
+   which naturally matches the site ordering of the field view's AoSoA buffer.
+]#
+
+import simd/simdlayout
+
+type
+  StencilViewObj* = object
+    ## AoSoA-transformed stencil neighbor indices for use in SIMD kernels.
+    nPoints*: int               ## stencil points per site
+    nLocalSites*: int           ## local sites (iteration range)
+    nGroups*: int               ## AoSoA groups = ceil(nLocalSites / VW)
+    aosoaData*: seq[int32]      ## AoSoA buffer: [nGroups * nPoints * VW]
+
+  StencilView*[D: static int] = object
+    ## Wraps a StencilViewObj with compile-time dimensionality.
+    view*: StencilViewObj
+    stencilRef*: ptr LatticeStencil[D]
+
+proc nPoints*(sv: StencilView): int {.inline.} = sv.view.nPoints
+proc nSites*(sv: StencilView): int {.inline.} = sv.view.nLocalSites
+proc numSites*(sv: StencilView): int {.inline.} = sv.view.nLocalSites
+proc offsets*[D: static int](sv: StencilView[D]): lent seq[int32] {.inline.} =
+  ## Backward-compat accessor: delegate to underlying stencil's offsets.
+  sv.stencilRef[].offsets
+
+proc newStencilView*[D: static int](
+  s: var LatticeStencil[D]
+): StencilView[D] =
+  ## Create an AoSoA-transformed view of a ``LatticeStencil``.
+  ##
+  ## For SIMD backends (OpenMP with VectorWidth > 1 and non-trivial simdGrid),
+  ## the view's AoSoA buffer uses the same SIMD layout (column-major
+  ## strides with ``VectorWidth`` lanes) as tensor field views.
+  ##
+  ## For non-SIMD backends (OpenCL, or simdGrid all ones), the stencil
+  ## offsets are stored directly without layout transformation since the
+  ## kernel indexes by flat site index and the offsets are already in
+  ## reordered form (local 0..nLocal-1, ghost nLocal..nPadded-1).
+  ##
+  ## Usage inside an ``accelerator`` block:
+  ##
+  ## .. code-block:: nim
+  ##   var sv = stencil.newStencilView()
+  ##   for n in each sv.all:
+  ##     let fwdMu = sv.fwd(n, mu)
+  ##     let val = vu[mu][fwdMu]
+  let npts = s.nPoints
+  let nLocal = s.nLocalSites
+  let vw = VectorWidth
+  let nGroups = (nLocal + vw - 1) div vw
+
+  # Check whether the SIMD grid is trivial (all ones = no SIMD layout)
+  var isSimdLayout = false
+  for d in 0..<D:
+    if s.simdGrid[d] > 1: isSimdLayout = true
+
+  if isSimdLayout:
+    # SIMD backend: build AoSoA-transformed offsets using SimdLatticeLayout
+    let localGeomSeq = @(s.localGeom)
+    let simdGridSeq = @(s.simdGrid)
+    let layout = newSimdLatticeLayout(localGeomSeq, simdGridSeq)
+
+    var aosoaData = newSeq[int32](nGroups * npts * vw)
+
+    for outerIdx in 0..<layout.nSitesOuter:
+      for lane in 0..<layout.nSitesInner:
+        let localSite = outerInnerToLocal(outerIdx, lane, layout)
+        if localSite < nLocal:
+          for pt in 0..<npts:
+            let srcIdx = localSite * npts + pt
+            let dstIdx = outerIdx * (npts * vw) + pt * vw + lane
+            if srcIdx >= s.offsets.len:
+              echo "BUG: srcIdx=", srcIdx, " >= offsets.len=", s.offsets.len,
+                " localSite=", localSite, " pt=", pt, " npts=", npts
+              continue
+            let nbrReordered = s.offsets[srcIdx].int
+            if dstIdx >= aosoaData.len:
+              echo "BUG: dstIdx=", dstIdx, " >= aosoaData.len=", aosoaData.len,
+                " outerIdx=", outerIdx, " pt=", pt, " lane=", lane
+              continue
+            if nbrReordered < nLocal:
+              let (nbrOuter, nbrInner) = localToOuterInner(nbrReordered, layout)
+              aosoaData[dstIdx] = int32(nbrOuter * vw + nbrInner)
+            else:
+              aosoaData[dstIdx] = s.offsets[srcIdx]
+
+    result.view = StencilViewObj(
+      nPoints: npts,
+      nLocalSites: nLocal,
+      nGroups: nGroups,
+      aosoaData: aosoaData
+    )
+  else:
+    # Non-SIMD backend (OpenCL): use simple site/VW, site%VW AoSoA layout.
+    # The stencil offsets are reordered: local sites 0..nLocal-1, ghost
+    # sites nLocal..nPadded-1.  The AoSoA transform groups VectorWidth
+    # consecutive sites so the OpenCL kernel can use
+    #   group = get_global_id(0) / VW;  lane = get_global_id(0) % VW;
+    # to access neighbors.
+    var aosoaData = newSeq[int32](nGroups * npts * vw)
+
+    for site in 0..<nLocal:
+      let g = site div vw
+      let lane = site mod vw
+      for pt in 0..<npts:
+        let srcIdx = site * npts + pt
+        let dstIdx = g * (npts * vw) + pt * vw + lane
+        aosoaData[dstIdx] = s.offsets[srcIdx]
+
+    result.view = StencilViewObj(
+      nPoints: npts,
+      nLocalSites: nLocal,
+      nGroups: nGroups,
+      aosoaData: aosoaData
+    )
+  result.stencilRef = addr s
+
+template all*(sv: StencilView): untyped =
+  ## Returns a range over all local sites: ``0 ..< nSites``.
+  ## Use with ``each`` loops: ``for n in each sv.all:``
+  0 ..< sv.nSites
+
+proc fwd*[D: static int](sv: StencilView[D], site: int, dir: int): StencilShift[D] {.inline.} =
+  ## Forward shift through the stencil view (semantics match LatticeStencil.fwd)
+  sv.stencilRef[].fwd(site, dir)
+
+proc bwd*[D: static int](sv: StencilView[D], site: int, dir: int): StencilShift[D] {.inline.} =
+  ## Backward shift through the stencil view
+  sv.stencilRef[].bwd(site, dir)
+
+proc corner*[D: static int](sv: StencilView[D], site: int,
+    signA, dirA: int, signB, dirB: int): StencilShift[D] {.inline.} =
+  ## Corner shift through the stencil view
+  sv.stencilRef[].corner(site, signA, dirA, signB, dirB)
+
+proc neighbor*[D: static int](sv: StencilView[D], site, point: int): int {.inline.} =
+  ## Get neighbor index through the stencil view
+  sv.stencilRef[].neighbor(site, point)
+
+#[ ============================================================================
    Backward Compatibility - Legacy Types (deprecated)
    ============================================================================ ]#
 
@@ -894,15 +1107,15 @@ type
     permute*: uint8
     wrapAround*: bool
 
-  StencilView*[D: static int] = object
+  LegacyStencilView*[D: static int] = object
     stencil*: StencilPattern[D]
     localGeom*: array[D, int]
     nSites*: int
     nPoints*: int
     entries*: seq[StencilEntry]
 
-proc newStencilView*[D: static int](stencil: StencilPattern[D], localGeom: array[D, int]): StencilView[D] =
-  ## Legacy constructor - creates a StencilView (use LatticeStencil instead)
+proc newLegacyStencilView*[D: static int](stencil: StencilPattern[D], localGeom: array[D, int]): LegacyStencilView[D] =
+  ## Legacy constructor - creates a LegacyStencilView (use LatticeStencil instead)
   result.stencil = stencil
   result.localGeom = localGeom
   result.nPoints = stencil.nPoints
@@ -932,10 +1145,10 @@ proc newStencilView*[D: static int](stencil: StencilPattern[D], localGeom: array
       entry.offset = coordsToLex(nbrCoords, strides)
       result.entries[site * result.nPoints + pointIdx] = entry
 
-proc getEntry*[D: static int](sv: StencilView[D], site, point: int): StencilEntry {.inline.} =
+proc getEntry*[D: static int](sv: LegacyStencilView[D], site, point: int): StencilEntry {.inline.} =
   sv.entries[site * sv.nPoints + point]
 
-proc neighborOffset*[D: static int](sv: StencilView[D], site, point: int): int {.inline.} =
+proc neighborOffset*[D: static int](sv: LegacyStencilView[D], site, point: int): int {.inline.} =
   sv.entries[site * sv.nPoints + point].offset
 
 #[ ============================================================================
@@ -1135,15 +1348,15 @@ when isMainModule:
       check s.nPoints == 5  # Origin + 4 steps
 
   suite "Legacy Compatibility":
-    test "StencilView still works":
+    test "LegacyStencilView still works":
       let s = nearestNeighborStencil[2]()
-      let sv = newStencilView(s, [4, 4])
+      let sv = newLegacyStencilView(s, [4, 4])
       check sv.nSites == 16
       check sv.nPoints == 4
 
-    test "StencilView neighbor matches LatticeStencil (no ghosts)":
+    test "LegacyStencilView neighbor matches LatticeStencil (no ghosts)":
       let pattern = nearestNeighborStencil[2]()
-      let sv = newStencilView(pattern, [4, 4])
+      let sv = newLegacyStencilView(pattern, [4, 4])
       let stencil = newLatticeStencil(pattern, [4, 4])
       for site in 0..<16:
         for p in 0..<4:

@@ -79,6 +79,26 @@ when isMainModule:
 
 type HostStorage*[T] = ptr UncheckedArray[T]
 
+# Column-major stride helpers matching the stencil convention (first dim fastest).
+# These must stay in sync with stencil.nim's computeStrides / lexToCoords /
+# coordsToLex so that the reordered site indices agree.
+
+proc computeStridesColMajor[D: static int](geom: array[D, int]): array[D, int] =
+  result[0] = 1
+  for d in 1..<D:
+    result[d] = result[d-1] * geom[d-1]
+
+proc lexToCoordsColMajor[D: static int](idx: int, geom: array[D, int], strides: array[D, int]): array[D, int] =
+  var remaining = idx
+  for d in countdown(D-1, 0):
+    result[d] = remaining div strides[d]
+    remaining = remaining mod strides[d]
+
+proc coordsToLexColMajor[D: static int](coords: array[D, int], strides: array[D, int]): int =
+  result = 0
+  for d in 0..<D:
+    result += coords[d] * strides[d]
+
 type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = object
   ## Local tensor field on host memory
   ## 
@@ -89,7 +109,7 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   ## Writes through ``data`` immediately modify the underlying Global Array.
   ## Because GA inner dimensions have ghost padding, a ``siteOffsets`` lookup
   ## table maps lexicographic site index → flat offset in padded memory:
-  ## ``data[siteOffsets[site] + e]`` reaches element ``e`` of that site.
+  ## ``data[siteOffsets[site] + elemOffsets[e]]`` reaches element ``e``.
   lattice*: L
   localGrid*: array[D, int]
   shape*: array[R, int]
@@ -97,20 +117,28 @@ type LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T] = objec
   elif isComplex64(T): data*: HostStorage[float64]
   else: data*: HostStorage[T]
   hasPadding*: bool
+  paddedGrid*: array[D, int] ## padded lattice geometry (local + 2*ghost per dim)
   # --- internal bookkeeping for padded GA strides ---
   siteOffsets*: seq[int]    ## precomputed flat offset for each lex site
-  elemsPerSite: int          ## real elements per site (product(shape) * complexFactor)
-  nLocalSites: int           ## product of localGrid
+  elemOffsets*: seq[int]    ## maps logical element e → offset from siteOffset
+  elemsPerSite*: int         ## real elements per site (product(shape) * complexFactor)
+  nLocalSites*: int           ## product of localGrid
 
 proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
-  tensor: TensorField[D, R, L, T];
-  padded: bool = false
+  tensor: TensorField[D, R, L, T]
 ): LocalTensorField[D, R, L, T] =
   ## Create a new local tensor field from a global tensor field
   ##
-  ## Obtains a direct pointer into rank-local GA memory via ``NGA_Access``
-  ## and precomputes a ``siteOffsets`` lookup table that maps each
-  ## lexicographic site index to its flat offset in the padded GA memory.
+  ## Obtains a direct pointer into rank-local GA memory and precomputes a
+  ## ``siteOffsets`` lookup table.  Whether padding (ghost data) is included
+  ## is determined **automatically** from the lattice's ``ghostGrid``:
+  ##
+  ## - If all ghost widths are zero, ``NGA_Access`` is used and offsets
+  ##   cover only the local volume.
+  ## - If any ghost width is non-zero, ``NGA_Access_ghosts`` is used and
+  ##   offsets cover the full padded volume (local + ghost regions) so that
+  ##   stencil padded-lex indices map directly into the AoSoA buffer.
+  ##
   ## Writes through ``data`` immediately modify the GA — no explicit
   ## copy-back is needed.
   const rank = D + R + 1
@@ -121,8 +149,14 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
   var p: pointer
   let pid = GA_Nodeid()
 
+  # Detect padding from the lattice ghost grid
+  let ghostWidth = tensor.ghostWidth()
+  var hasGhosts = false
+  for d in 0..<D:
+    if ghostWidth[d] > 0: hasGhosts = true
+
   handle.NGA_Distribution(pid, addr lo[0], addr hi[0])
-  if padded: handle.NGA_Access_ghosts(addr paddedGrid[0], addr p, addr ld[0])
+  if hasGhosts: handle.NGA_Access_ghosts(addr paddedGrid[0], addr p, addr ld[0])
   else: 
     handle.NGA_Access(addr lo[0], addr hi[0], addr p, addr ld[0])
     paddedGrid = tensor.data.getLocalGrid().mapTo(cint)
@@ -133,44 +167,162 @@ proc newLocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
     localGrid[i] = int(hi[i] - lo[i] + 1)
 
   # Compute inner block metrics
+  # GA requires ghost width >= 1 on ALL dimensions, including inner
+  # (tensor shape + complex) dimensions.  The actual inner padded block
+  # size depends on the tensor shape, not just the rank.  For a [3,3]
+  # Complex64 field, inner dims = [3, 3, 2], padded to [5, 5, 4] = 100.
   let innerGW = 1  # all inner dims have ghost width 1 (GA requirement)
-  let innerPadded = innerPaddedBlockSize(R, innerGW)
   let elemsPerSite = innerBlockSize(R, tensor.shape, isComplex(T))
+  # Actual inner padded block size: product of (shape[r]+2*gw) for all
+  # tensor dims, times (complexFactor+2*gw) for the complex dim.
+  let innerPadded = block:
+    var res = (if isComplex(T): 2 + 2*innerGW else: 1 + 2*innerGW)
+    for r in 0..<R:
+      res *= (tensor.shape[r] + 2*innerGW)
+    res
+  # Offset from inner block start to the first real element (center of
+  # the ghost-padded inner block).  Row-major: complex dim is fastest.
+  let innerOff = block:
+    var res = 0
+    var s = 1
+    res += innerGW * s
+    s *= (if isComplex(T): 2 + 2*innerGW else: 1 + 2*innerGW)
+    for r in countdown(R-1, 0):
+      res += innerGW * s
+      s *= (tensor.shape[r] + 2*innerGW)
+    res
+
+  # Precompute element offset table: maps logical element e → offset from
+  # the inner block center (siteOffset) to that element's position in the
+  # padded inner block.  This skips inner ghost cells.
+  # Layout: row-major with complex interleaved.  For Complex64 [3,3]:
+  #   e=0 → Re(0,0) at offset 0, e=1 → Im(0,0) at offset 1,
+  #   e=2 → Re(0,1) at offset 4, etc.
+  let elemOff = block:
+    let cf = if isComplex(T): 2 else: 1
+    let paddedCf = cf + 2 * innerGW
+    var paddedInnerStrides: seq[int]
+    paddedInnerStrides.setLen(R + 1)
+    paddedInnerStrides[R] = 1  # complex dim stride
+    for r in countdown(R - 1, 0):
+      paddedInnerStrides[r] = paddedInnerStrides[r + 1] * (if r == R - 1: paddedCf else: tensor.shape[r + 1] + 2 * innerGW)
+    # Wait, strides need to be: stride[R] = 1 (complex), stride[R-1] = paddedCf,
+    # stride[R-2] = paddedCf * (shape[R-1]+2gw), etc.
+    # Let me redo: dim ordering is [s0, s1, ..., s_{R-1}, complex], row-major
+    var strides: seq[int]
+    strides.setLen(R + 1)
+    strides[R] = 1  # complex dim (fastest)
+    for r in countdown(R - 1, 0):
+      if r == R - 1:
+        strides[r] = paddedCf
+      else:
+        strides[r] = strides[r + 1] * (tensor.shape[r + 1] + 2 * innerGW)
+    var offsets = newSeq[int](elemsPerSite)
+    for e in 0..<elemsPerSite:
+      # Decompose e into (idx[0], ..., idx[R-1], c_part) in row-major order
+      var remaining = e
+      let cPart = remaining mod cf
+      remaining = remaining div cf
+      var idx: seq[int]
+      idx.setLen(R)
+      for r in countdown(R - 1, 0):
+        idx[r] = remaining mod tensor.shape[r]
+        remaining = remaining div tensor.shape[r]
+      # Compute flat offset from center: each index uses the padded stride
+      var off = cPart  # complex part offset
+      for r in 0..<R:
+        off += idx[r] * strides[r]
+      offsets[e] = off
+    offsets
   
   # Compute number of local sites and padded geometry
   var nLocal = 1
   for d in 0..<D: nLocal *= localGrid[d]
   var paddedGeomD: array[D, int]
-  let ghostWidth = tensor.ghostWidth()
   for d in 0..<D:
     paddedGeomD[d] = localGrid[d] + 2 * ghostWidth[d]
 
-  # Precompute site offsets into padded GA memory
-  var offsets = newSeq[int](nLocal)
-  for site in 0..<nLocal:
-    let coords = lexToCoords(site, localGrid)
-    offsets[site] = localSiteOffset(coords, paddedGeomD, innerPadded)
+  # Precompute site offsets into GA memory
+  if hasGhosts:
+    # Padded mode: build offsets in **reordered** order that matches the
+    # stencil's paddedToReordered mapping.  Positions 0..nLocal-1 hold GA
+    # offsets for local sites (in local-lex order); positions nLocal..nPadded-1
+    # hold GA offsets for ghost sites.  This lets the AoSoA buffer's first
+    # nLocal sites be directly addressable with local group indices from the
+    # ``each`` loop, while stencil-gathered neighbors index into ghost data
+    # beyond the local range.
+    var nPadded = 1
+    for d in 0..<D: nPadded *= paddedGeomD[d]
+    var offsets = newSeq[int](nPadded)
 
-  result = LocalTensorField[D, R, L, T](
-    lattice: tensor.lattice,
-    localGrid: localGrid,
-    shape: tensor.shape,
-    hasPadding: padded,
-    siteOffsets: offsets,
-    elemsPerSite: elemsPerSite,
-    nLocalSites: nLocal,
-  )
+    # Use column-major convention (matching stencil.nim) for consistent ordering
+    let localStrides = computeStridesColMajor(localGrid)
+    let paddedStrides = computeStridesColMajor(paddedGeomD)
+
+    # Local sites → positions 0..nLocal-1  (column-major local-lex order)
+    for localSite in 0..<nLocal:
+      let localCoords = lexToCoordsColMajor(localSite, localGrid, localStrides)
+      # In NGA_Access_ghosts memory, the padded coords include the ghost offset
+      var paddedCoords: array[D, int]
+      for d in 0..<D:
+        paddedCoords[d] = localCoords[d] + ghostWidth[d]
+      offsets[localSite] = localSiteOffset(paddedCoords, paddedGeomD, innerPadded) + innerOff
+
+    # Ghost sites → positions nLocal..nPadded-1  (column-major padded-lex order)
+    var ghostIdx = nLocal
+    for paddedSite in 0..<nPadded:
+      let paddedCoords = lexToCoordsColMajor(paddedSite, paddedGeomD, paddedStrides)
+      var isLocal = true
+      for d in 0..<D:
+        if paddedCoords[d] < ghostWidth[d] or paddedCoords[d] >= ghostWidth[d] + localGrid[d]:
+          isLocal = false; break
+      if not isLocal:
+        offsets[ghostIdx] = localSiteOffset(paddedCoords, paddedGeomD, innerPadded) + innerOff
+        ghostIdx.inc
+
+    result = LocalTensorField[D, R, L, T](
+      lattice: tensor.lattice,
+      localGrid: localGrid,
+      paddedGrid: paddedGeomD,
+      shape: tensor.shape,
+      hasPadding: true,
+      siteOffsets: offsets,
+      elemOffsets: elemOff,
+      elemsPerSite: elemsPerSite,
+      nLocalSites: nLocal,
+    )
+  else:
+    var offsets = newSeq[int](nLocal)
+    # Column-major ordering: matches stencil.nim (computeStrides) and
+    # simdlayout.nim (outerInnerToLocal) so that offsets[colMajorLex]
+    # gives the GA memory offset for the site at column-major position
+    # colMajorLex.  The AoSoA transform and stencil neighbor indices
+    # both use column-major enumeration (first dimension fastest).
+    let localStridesNP = computeStridesColMajor(localGrid)
+    for site in 0..<nLocal:
+      let coords = lexToCoordsColMajor(site, localGrid, localStridesNP)
+      offsets[site] = localSiteOffset(coords, paddedGeomD, innerPadded)
+    result = LocalTensorField[D, R, L, T](
+      lattice: tensor.lattice,
+      localGrid: localGrid,
+      paddedGrid: paddedGeomD,
+      shape: tensor.shape,
+      hasPadding: false,
+      siteOffsets: offsets,
+      elemOffsets: elemOff,
+      elemsPerSite: elemsPerSite,
+      nLocalSites: nLocal,
+    )
 
   when isComplex32(T): result.data = cast[HostStorage[float32]](p)
   elif isComplex64(T): result.data = cast[HostStorage[float64]](p)
   else: result.data = cast[HostStorage[T]](p)
 
 proc newLocalScalarField*[D: static[int], L, T](
-  tensor: TensorField[D, 1, L, T];
-  padded: bool = false
+  tensor: TensorField[D, 1, L, T]
 ): LocalTensorField[D, 1, L, T] =
   ## Create a new local scalar field from a global scalar field
-  return tensor.newLocalTensorField(padded)
+  return tensor.newLocalTensorField()
 
 proc numGlobalSites*[D: static[int], R: static[int], L: Lattice[D], T](
   view: LocalTensorField[D, R, L, T]
@@ -246,12 +398,13 @@ proc `[]`*[D: static[int], R: static[int], L: Lattice[D], T](
   result.siteOffset = tensor.siteOffsets[site]
   result.shape = tensor.shape
   result.elemsPerSite = tensor.tensorElementsPerSite()
+  result.elemOffsets = cast[ptr UncheckedArray[int]](unsafeAddr tensor.elemOffsets[0])
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalSiteProxy[D, R, L, T]
 ) {.inline.} =
   ## Copy a site from one proxy to another
-  ## siteOffset and element indexing in storage-type units
+  ## Uses elemOffsets to skip inner ghost cells in padded GA memory
   const cf = when isComplex32(T) or isComplex64(T): 2 else: 1
   when isComplex64(T):
     let dstData = cast[ptr UncheckedArray[float64]](tensor.data)
@@ -266,7 +419,7 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let dstBase = tensor.siteOffsets[site]
   let srcBase = value.siteOffset
   for e in 0..<elemsPerSite * cf:
-    dstData[dstBase + e] = srcData[srcBase + e]
+    dstData[dstBase + tensor.elemOffsets[e]] = srcData[srcBase + value.elemOffsets[e]]
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalAddResult[D, R, L, T]
@@ -291,10 +444,10 @@ proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   let srcBBase = value.proxyB.siteOffset
   if value.isSubtraction:
     for e in 0..<elemsPerSite * cf:
-      dstData[dstBase + e] = srcAData[srcABase + e] - srcBData[srcBBase + e]
+      dstData[dstBase + tensor.elemOffsets[e]] = srcAData[srcABase + value.proxyA.elemOffsets[e]] - srcBData[srcBBase + value.proxyB.elemOffsets[e]]
   else:
     for e in 0..<elemsPerSite * cf:
-      dstData[dstBase + e] = srcAData[srcABase + e] + srcBData[srcBBase + e]
+      dstData[dstBase + tensor.elemOffsets[e]] = srcAData[srcABase + value.proxyA.elemOffsets[e]] + srcBData[srcBBase + value.proxyB.elemOffsets[e]]
 
 proc `[]=`*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: var LocalTensorField[D, R, L, T], site: int, value: LocalMulResult[D, R, L, T]

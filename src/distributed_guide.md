@@ -181,7 +181,7 @@ parallel:
     # No manual flush needed — data is already in the GA
 
     # Ghost exchange after modification
-    field.updateAllGhosts()
+    field.exchange()
 ```
 
 ## Module Reference

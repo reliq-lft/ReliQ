@@ -36,6 +36,9 @@ template gaParallel*(body: untyped): untyped =
   var argv = cargv(argc)
   initMPI(addr argc, addr argv)
   initGA()
+  # Initialize MA with generous stack/heap for GA_Update_ghosts
+  # MT_C_DBL = 1001 in GA/MA type codes
+  discard initMA(cint(1001), clong(10_000_000), clong(10_000_000))
   gaIsLive = true
   body
   gaIsLive = false

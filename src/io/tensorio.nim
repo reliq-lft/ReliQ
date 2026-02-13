@@ -337,25 +337,25 @@ proc readTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
         var re, im: float64
         copyMem(addr re, unsafeAddr data[fileOffset + e * 16], 8)
         copyMem(addr im, unsafeAddr data[fileOffset + e * 16 + 8], 8)
-        localTensor.data[localOffset + e * 2] = re
-        localTensor.data[localOffset + e * 2 + 1] = im
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2]] = re
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]] = im
     elif isComplex32(T):
       for e in 0..<elemsPerSite:
         var re, im: float32
         copyMem(addr re, unsafeAddr data[fileOffset + e * 8], 4)
         copyMem(addr im, unsafeAddr data[fileOffset + e * 8 + 4], 4)
-        localTensor.data[localOffset + e * 2] = re
-        localTensor.data[localOffset + e * 2 + 1] = im
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2]] = re
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]] = im
     elif T is float64:
       for e in 0..<elemsPerSite:
         var val: float64
         copyMem(addr val, unsafeAddr data[fileOffset + e * 8], 8)
-        localTensor.data[localOffset + e] = val
+        localTensor.data[localOffset + localTensor.elemOffsets[e]] = val
     elif T is float32:
       for e in 0..<elemsPerSite:
         var val: float32
         copyMem(addr val, unsafeAddr data[fileOffset + e * 4], 4)
-        localTensor.data[localOffset + e] = val
+        localTensor.data[localOffset + localTensor.elemOffsets[e]] = val
   
   # Data was written directly to GA via pointer — no flush needed
   
@@ -487,23 +487,23 @@ proc writeTensorField*[D: static[int], R: static[int], L: Lattice[D], T](
     
     when isComplex64(T):
       for e in 0..<elemsPerSite:
-        let re = localTensor.data[localOffset + e * 2]
-        let im = localTensor.data[localOffset + e * 2 + 1]
+        let re = localTensor.data[localOffset + localTensor.elemOffsets[e * 2]]
+        let im = localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]]
         copyMem(addr globalData[fileOffset + e * 16], unsafeAddr re, 8)
         copyMem(addr globalData[fileOffset + e * 16 + 8], unsafeAddr im, 8)
     elif isComplex32(T):
       for e in 0..<elemsPerSite:
-        let re = localTensor.data[localOffset + e * 2]
-        let im = localTensor.data[localOffset + e * 2 + 1]
+        let re = localTensor.data[localOffset + localTensor.elemOffsets[e * 2]]
+        let im = localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]]
         copyMem(addr globalData[fileOffset + e * 8], unsafeAddr re, 4)
         copyMem(addr globalData[fileOffset + e * 8 + 4], unsafeAddr im, 4)
     elif T is float64:
       for e in 0..<elemsPerSite:
-        let val = localTensor.data[localOffset + e]
+        let val = localTensor.data[localOffset + localTensor.elemOffsets[e]]
         copyMem(addr globalData[fileOffset + e * 8], unsafeAddr val, 8)
     elif T is float32:
       for e in 0..<elemsPerSite:
-        let val = localTensor.data[localOffset + e]
+        let val = localTensor.data[localOffset + localTensor.elemOffsets[e]]
         copyMem(addr globalData[fileOffset + e * 4], unsafeAddr val, 4)
   
   # Use GA_Dgop to sum the data across all ranks
@@ -681,8 +681,8 @@ proc readGaugeField*[D: static[int], L: Lattice[D]](
         var re, im: float64
         copyMem(addr re, unsafeAddr data[fileOffset + e * 16], 8)
         copyMem(addr im, unsafeAddr data[fileOffset + e * 16 + 8], 8)
-        localTensor.data[localOffset + e * 2] = re
-        localTensor.data[localOffset + e * 2 + 1] = im
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2]] = re
+        localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]] = im
     
     # Data was written directly to GA via pointer — no flush needed
   
@@ -752,8 +752,8 @@ proc writeGaugeField*[D: static[int], L: Lattice[D]](
       let localOffset = localTensor.siteOffsets[localSite]
       
       for e in 0..<elemsPerDir:
-        let re = localTensor.data[localOffset + e * 2]
-        let im = localTensor.data[localOffset + e * 2 + 1]
+        let re = localTensor.data[localOffset + localTensor.elemOffsets[e * 2]]
+        let im = localTensor.data[localOffset + localTensor.elemOffsets[e * 2 + 1]]
         copyMem(addr globalData[fileOffset + e * 16], unsafeAddr re, 8)
         copyMem(addr globalData[fileOffset + e * 16 + 8], unsafeAddr im, 8)
   

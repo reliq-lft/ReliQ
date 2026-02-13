@@ -80,7 +80,7 @@ The ``innerBlockSize`` and ``innerPaddedBlockSize`` procs compute these values.
 tensor.updateGhosts(dim=3, direction=1)
 
 # Update all ghost regions
-tensor.updateAllGhosts()
+tensor.exchange()
 ```
 
 ### Direct Local Access

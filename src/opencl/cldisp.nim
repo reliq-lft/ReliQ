@@ -307,7 +307,12 @@ proc emitMatExpr*(target: string, n: NimNode, ctx: var ClCodeCtx, d: int): MatRe
     else:
       # Scalar sym (float/int kernel parameter or local scalar) — broadcast
       if ctx.isComplex:
-        return (p & target & "[0] = (" & ctx.elemType & ")(" & name & ", 0);\n", "1")
+        if isComplexSym(n):
+          # Already complex (double2/float2) — assign directly
+          return (p & target & "[0] = " & name & ";\n", "1")
+        else:
+          # Real scalar — promote to complex with zero imaginary part
+          return (p & target & "[0] = (" & ctx.elemType & ")(" & name & ", 0);\n", "1")
       else:
         return (p & target & "[0] = " & name & ";\n", "1")
   
@@ -569,8 +574,12 @@ proc clTranspileStmt(stmt: NimNode, ctx: var ClCodeCtx, info: KernelInfo, d: int
         # Element-level write: view[n][i,j] = val
         let innerCall = stmt[1]
         var viewName = "output"
-        if innerCall[1].kind == nnkSym:
-          viewName = innerCall[1].strVal
+        if innerCall.len >= 3:
+          let viewNode = innerCall[1]
+          if viewNode.kind == nnkSym:
+            viewName = viewNode.strVal
+          elif viewNode.kind in {nnkHiddenAddr, nnkHiddenDeref} and viewNode[0].kind == nnkSym:
+            viewName = viewNode[0].strVal
 
         if stmt.len == 4:
           let idxCode = clTranspileScalar(stmt[2], ctx)
@@ -755,6 +764,10 @@ proc generateKernelSource(kernelName: string, body: NimNode, info: KernelInfo): 
   let runtimeFloatVars = findRuntimeFloatVars(body, info)
   for rv in runtimeFloatVars:
     params.add "const " & ctx.scalarType & " " & rv.name
+  # Runtime complex vars (Complex64/Complex32 scalars like fill values)
+  let runtimeComplexVars = findRuntimeComplexVars(body, info)
+  for rv in runtimeComplexVars:
+    params.add "const " & ctx.elemType & " " & rv.name
   # Runtime dot-accessed float vars (e.g. c.cp -> c_cp)
   let runtimeDotFloatVars = findRuntimeDotFloatVars(body, info)
   for rv in runtimeDotFloatVars:
@@ -959,6 +972,18 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
       `kernelSym`.setArg(`tmp`, `idx`)
     argIndex += 1
 
+  # Runtime complex variable args (Complex64/Complex32 fill values)
+  let runtimeComplexVars = findRuntimeComplexVars(body, info)
+  var runtimeComplexArgStmts = newStmtList()
+  for rv in runtimeComplexVars:
+    let idx = newLit(argIndex)
+    let rvsym = rv.sym
+    let tmp = genSym(nskVar, "rcv")
+    runtimeComplexArgStmts.add quote do:
+      var `tmp` = `rvsym`
+      `kernelSym`.setArg(`tmp`, `idx`)
+    argIndex += 1
+
   # Runtime dot-accessed float variable args (e.g. c.cp -> c_cp)
   let runtimeDotFloatVars = findRuntimeDotFloatVars(body, info)
   var runtimeDotFloatArgStmts = newStmtList()
@@ -1073,6 +1098,7 @@ macro eachImpl*(loopVar: untyped, lo: typed, hi: typed, body: typed): untyped =
           `stencilArgs`
           `runtimeArgStmts`
           `runtimeFloatArgStmts`
+          `runtimeComplexArgStmts`
           `runtimeDotFloatArgStmts`
           `runtimeDotIntArgStmts`
 

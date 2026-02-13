@@ -33,7 +33,7 @@ when isMainModule:
 
 template GlobalArrays*(body: untyped): untyped =
   {.pragma: ga, header: "ga.h".}
-  {.pragma: ma, header: "madecls.h".}
+  {.pragma: ma, header: "macdecls.h".}
   body
 
 GlobalArrays: discard
@@ -44,6 +44,9 @@ proc initGA*() {.importc: "GA_Initialize", ga.}
 
 proc initGA*(argc: ptr cint, argv: ptr cstringArray) 
   {.importc: "GA_Initialize_args", ga.}
+
+proc initMA*(datatype: cint, nstack: clong, nheap: clong): cint 
+  {.importc: "MA_init", ma, discardable.}
 
 proc finalizeGA*() {.importc: "GA_Terminate", ga.}
 

@@ -79,8 +79,17 @@ proc isTensorFieldViewSym*(n: NimNode): bool =
   except: return false
 
 proc isComplexSym*(n: NimNode): bool =
+  ## True when *n* is a value-carrying symbol of Complex64 or Complex32 type.
+  ## Excludes type symbols, procs, funcs, methods, iterators, converters, and
+  ## macros so that only genuine value-carrying symbols are matched.
   try:
+    let sk = n.symKind
+    # Only allow variable-like symbol kinds
+    if sk notin {nskVar, nskLet, nskConst, nskParam, nskForVar, nskResult}:
+      return false
     let ti = n.getTypeInst()
+    let r = ti.repr
+    if "typedesc" in r: return false
     return typeContains(ti, "Complex64") or typeContains(ti, "Complex32")
   except: return false
 
@@ -95,6 +104,13 @@ proc isMatMulSym*(n: NimNode): bool =
   try:
     let ti = n.getTypeInst()
     return typeContains(ti, "MatrixSiteProxy")
+  except: return false
+
+proc isStencilViewSym*(n: NimNode): bool =
+  ## True when *n* carries a StencilView type (AoSoA-transformed stencil).
+  try:
+    let ti = n.getTypeInst()
+    return typeContains(ti, "StencilView")
   except: return false
 
 proc isTensorSiteProxySym*(n: NimNode): bool =
@@ -181,6 +197,7 @@ type
   StencilEntry* = object
     name*: string
     nimSym*: NimNode
+    isView*: bool  ## True if this is a StencilView (AoSoA data), false for raw LatticeStencil
 
   LetBindingKind* = enum
     lbkStencilFwd, lbkStencilBwd, lbkStencilNeighbor, lbkStencilCorner, lbkMatMul, lbkOther
@@ -189,6 +206,7 @@ type
     varName*: string
     kind*: LetBindingKind
     stencilName*: string
+    stencilIsView*: bool  ## True if the referenced stencil is a StencilView
     dirExpr*: string
     pointExpr*: string
     # Corner-specific fields (for lbkStencilCorner)
@@ -245,7 +263,8 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
 
   proc addStencil(sym: NimNode, name: string) =
     if name notin stencilTab:
-      stencilTab[name] = StencilEntry(name: name, nimSym: sym)
+      let isView = isStencilViewSym(sym)
+      stencilTab[name] = StencilEntry(name: name, nimSym: sym, isView: isView)
     hasStencilFlag = true
 
   proc extractGaugeSym(n: NimNode): NimNode =
@@ -260,6 +279,12 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
           return arg
     return nil
 
+  proc unwrapHidden(n: NimNode): NimNode =
+    ## Unwrap nnkHiddenAddr/nnkHiddenDeref to get the underlying nnkSym
+    if n.kind == nnkSym: return n
+    if n.kind in {nnkHiddenAddr, nnkHiddenDeref} and n[0].kind == nnkSym: return n[0]
+    return nil
+
   proc walk(n: NimNode) =
     case n.kind
     of nnkCall:
@@ -268,13 +293,14 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
         case fn
         of "[]=":
           let target = n[1]
-          if target.kind == nnkSym and isTensorFieldViewSym(target):
-            addView(target, target.strVal, false, true)
+          let targetSym = unwrapHidden(target)
+          if targetSym != nil and isTensorFieldViewSym(targetSym):
+            addView(targetSym, targetSym.strVal, false, true)
           elif target.kind == nnkCall and target[0].kind == nnkSym and target[0].strVal == "[]":
             # Element-level write: view[n][i,j] = val
             if target.len >= 3:
-              let inner = target[1]
-              if inner.kind == nnkSym and isTensorFieldViewSym(inner):
+              let inner = unwrapHidden(target[1])
+              if inner != nil and isTensorFieldViewSym(inner):
                 addView(inner, inner.strVal, false, true)
           for i in 1..<n.len: walk(n[i])
         of "[]":
@@ -315,8 +341,8 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
         let lhs = n[1]
         if lhs.kind == nnkCall and lhs[0].kind == nnkSym and lhs[0].strVal == "[]":
           if lhs.len >= 3:
-            let viewSym = lhs[1]
-            if viewSym.kind == nnkSym and isTensorFieldViewSym(viewSym):
+            let viewSym = unwrapHidden(lhs[1])
+            if viewSym != nil and isTensorFieldViewSym(viewSym):
               addView(viewSym, viewSym.strVal, true, true)
       for child in n: walk(child)
 
@@ -330,6 +356,7 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
             let fn = val[0].strVal
             if fn == "fwd" or fn == "bwd":
               addStencil(val[1], val[1].strVal)
+              let isView = isStencilViewSym(val[1])
               var dirStr = ""
               if val[3].kind == nnkSym: dirStr = val[3].strVal
               elif val[3].kind in {nnkIntLit..nnkInt64Lit}: dirStr = $val[3].intVal
@@ -337,9 +364,11 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 varName: vsym.strVal,
                 kind: if fn == "fwd": lbkStencilFwd else: lbkStencilBwd,
                 stencilName: val[1].strVal,
+                stencilIsView: isView,
                 dirExpr: dirStr)
             elif fn == "corner":
               addStencil(val[1], val[1].strVal)
+              let isView = isStencilViewSym(val[1])
               proc extractIntExpr(node: NimNode): string =
                 if node.kind in {nnkIntLit..nnkInt64Lit}: $node.intVal
                 elif node.kind == nnkSym: node.strVal
@@ -355,6 +384,7 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 varName: vsym.strVal,
                 kind: lbkStencilCorner,
                 stencilName: val[1].strVal,
+                stencilIsView: isView,
                 signExprA: extractIntExpr(val[3]),
                 dirExprA: extractIntExpr(val[4]),
                 signExprB: extractIntExpr(val[5]),
@@ -362,6 +392,7 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 nDim: nDimVal)
             elif fn == "neighbor":
               addStencil(val[1], val[1].strVal)
+              let isView = isStencilViewSym(val[1])
               var ptStr = "0"
               if val.len >= 4:
                 if val[3].kind in {nnkIntLit..nnkInt64Lit}: ptStr = $val[3].intVal
@@ -370,6 +401,7 @@ proc gatherInfo*(body: NimNode, loopVar: NimNode): KernelInfo =
                 varName: vsym.strVal,
                 kind: lbkStencilNeighbor,
                 stencilName: val[1].strVal,
+                stencilIsView: isView,
                 pointExpr: ptStr)
             else:
               var isMat = false
@@ -498,6 +530,37 @@ proc findRuntimeFloatVars*(body: NimNode, info: KernelInfo): seq[tuple[name: str
          name notin viewNames and name notin gaugeNames and
          name notin stencilNames and name notin letNames:
         if isFloatSym(n):
+          seen.incl name
+          found.add (name, n)
+    else:
+      for child in n: scan(child)
+
+  scan(body)
+  return found
+
+proc findRuntimeComplexVars*(body: NimNode, info: KernelInfo): seq[tuple[name: string, sym: NimNode]] =
+  ## Find captured complex variables (Complex64/Complex32) that need to be
+  ## passed as kernel arguments.  Used by the OpenCL codegen to declare
+  ## ``double2`` / ``float2`` kernel parameters.
+  var seen: HashSet[string]
+  var viewNames, gaugeNames, stencilNames, letNames: HashSet[string]
+  var found: seq[tuple[name: string, sym: NimNode]]
+
+  for v in info.views: viewNames.incl v.name
+  for gv in info.gaugeViews: gaugeNames.incl gv.name
+  for s in info.stencils: stencilNames.incl s.name
+  for lb in info.letBindings: letNames.incl lb.varName
+
+  proc scan(n: NimNode) =
+    case n.kind
+    of nnkDotExpr:
+      if n.len >= 1: scan(n[0])
+    of nnkSym:
+      let name = n.strVal
+      if name != info.loopVarStr and name notin seen and
+         name notin viewNames and name notin gaugeNames and
+         name notin stencilNames and name notin letNames:
+        if isComplexSym(n):
           seen.incl name
           found.add (name, n)
     else:

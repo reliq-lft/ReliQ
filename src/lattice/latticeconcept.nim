@@ -10,6 +10,8 @@
   Copyright (c) 2025 reliq-lft
 ]#
 
+import simplecubiclattice
+
 ## Lattice Concept
 ## ===============
 ##
@@ -35,10 +37,8 @@ proc numSites*[D: static[int], L: Lattice[D]](lat: L): int =
   ## (correct for single-rank; multi-rank code should use view/stencil counts).
   result = 1
   for d in 0..<D:
-    if lat.mpiGrid[d] > 0:
-      result *= lat.globalGrid[d] div lat.mpiGrid[d]
-    else:
-      result *= lat.globalGrid[d]
+    if lat.mpiGrid[d] > 0: result *= lat.globalGrid[d] div lat.mpiGrid[d]
+    else: result *= lat.globalGrid[d]
 
 proc globalVolume*[D: static[int], L: Lattice[D]](lat: L): int =
   ## Total global lattice volume (same as numSites for single-rank)
@@ -51,3 +51,10 @@ template all*(lat: untyped): untyped =
   ## Use with ``each`` and ``reduce`` loops:
   ##   ``for n in each lattice.all:``
   0 ..< lat.numSites()
+
+template newPaddedLattice*[D: static[int], L: Lattice[D]](lat: L; ghostGrid: array[D, int]): untyped =
+  ## Create a new lattice with the same global and MPI grid as `lat` but with the specified `ghostGrid`.
+  ## This is used for creating padded lattices for stencil access.
+  when L is SimpleCubicLattice[D]: 
+    newSimpleCubicLattice(lat.globalGrid, lat.mpiGrid, ghostGrid)
+  else: L(globalGrid: lat.globalGrid, mpiGrid: lat.mpiGrid, ghostGrid: ghostGrid)
