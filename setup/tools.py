@@ -46,6 +46,7 @@ NIM_URL: str = 'nim-lang.org'
 GLOBALARRAYS_URL: str = 'hpc.pnl.gov/globalarrays'
 UPCXX_URL: str = 'docs.nersc.gov/development/programming-models/upcxx'
 KOKKOS_URL: str = 'kokkos.org'
+EIGEN_URL: str = 'eigen.tuxfamily.org'
 
 ### tools ###
 
@@ -138,6 +139,18 @@ def args(
     globalarrays.add_argument(
         '--globalarrays',
         help = 'Path to GlobalArrays; if PREFIX, then installed by Spack',
+        type = str,
+        default = constants.DEFAULT_STANDIN_PATH
+    )
+
+    # Eigen linear algebra library
+    eigen = parser.add_argument_group(
+        'Eigen (' + EIGEN_URL + ')', 
+        'C++ template library for linear algebra'
+    )
+    eigen.add_argument(
+        '--eigen',
+        help = 'Path to Eigen; if PREFIX, then installed by Spack',
         type = str,
         default = constants.DEFAULT_STANDIN_PATH
     )

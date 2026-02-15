@@ -78,6 +78,14 @@ const passL_GA = staticExec(metaGA + "--ldflags") +
                  staticExec(metaGA + "--libs") +
                  staticExec(metaGA + "--network_libs")
 
+# Eigen is header-only; find its include path under Spack
+const eigenIncDir = staticExec("find" + externalDir / "spack/opt/spack" +
+                               "-type d -name \"include\" -path \"*/eigen-*/*\" 2>/dev/null | head -1")
+const passC_Eigen = when eigenIncDir.len > 0: " -I" & eigenIncDir & "/eigen3"
+                    else: " -I" & externalDir / "include" / "eigen3"
+
+echo passC_Eigen
+
 const
   passC_reliq = ""
   # Add rpath and library path to ensure we use Spack's MPI library (not system's Intel MPI)
@@ -116,7 +124,7 @@ task clean, "cleaning files":
 
 task build, "building file":
   var 
-    passC = "-Ofast" + passC_GA + passC_reliq
+    passC = "-Ofast" + passC_GA + passC_reliq + passC_Eigen
     passL = ""
   
   when useCuda:
@@ -147,7 +155,7 @@ task build, "building file":
   when useHip:
     compiler = "clang"
 
-  cmpl = "external/bin/nim c --path:src"
+  cmpl = "external/bin/nim cpp --path:src"
   cmpl += "--nimcache:" & nimCache
   for nimArg in nimArgs: cmpl += nimArg
   cmpl += "--passC:\"" & passC & "\""
@@ -168,7 +176,7 @@ task build, "building file":
       case intrin:
       of "sse": cmpl += "--passC:\"-msse -msse2\""
       of "avx2": cmpl += "--passC:\"-mavx -mavx2\""
-      of "avx512": cmpl += "--passC:\"-mavx512f -mavx512dq\""
+      of "avx512": cmpl += "--passC:\"-mavx512f -mavx512dq -mfma\""
   cmpl += "--define:\"useMalloc\""
   for prmIdx in 0..<(args.len - 1): cmpl += args[prmIdx]
   cmpl += search("src", args[^1])

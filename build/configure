@@ -66,6 +66,12 @@ if [ -d "$CWD/external/spack" ]; then
         echo "  passL = \"-L$BLAS_LIB\"" >> $CWD/build/nim.cfg
         echo "-- Added OpenBLAS library path: $BLAS_LIB"
     fi
+
+    EIGEN_INC=$(find $CWD/external/spack/opt/spack -type d -name "include" -path "*/eigen-*/*" 2>/dev/null | head -1)
+    if [ -n "$EIGEN_INC" ]; then
+        echo "  passC = \"-I$EIGEN_INC/eigen3\"" >> $CWD/build/nim.cfg
+        echo "-- Added Eigen include path: $EIGEN_INC/eigen3"
+    fi
 fi
 
 ### poem, because why not 

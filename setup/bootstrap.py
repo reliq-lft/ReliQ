@@ -41,6 +41,7 @@ import tools
 import spack
 import nim
 import globalarrays
+import eigen
 import kokkos
 
 ### execute installation script ###
@@ -62,6 +63,7 @@ if __name__ == '__main__':
     #cmakev = versions['cmake']
     nimv = versions['nim']
     globalarraysv = versions['globalarrays']
+    eigenv = versions['eigen']
     #kokkosv = versions['kokkos']
 
     spack_path = spack.install(install_path, pathlib.Path(args.spack))
@@ -70,11 +72,13 @@ if __name__ == '__main__':
     #cmake.install(spack_path, cmakev)
     nim_path = nim.install(args, spack_path, pathlib.Path(args.nim), nimv)
     globalarrays_path = globalarrays.install(args, spack_path, pathlib.Path(args.globalarrays), globalarraysv)
+    eigen_path = eigen.install(args, spack_path, pathlib.Path(args.eigen), eigenv)
     #kokkos_path = kokkos.install(args, spack_path, pathlib.Path(args.kokkos), kokkosv)
 
     spack.link(spack_path, install_path)
     nim.link(nim_path, install_path)
     globalarrays.link(globalarrays_path, install_path)
+    eigen.link(eigen_path, install_path)
     #kokkos.link(kokkos_path, install_path)
 
     # install threading library

@@ -27,120 +27,130 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-proc flatToCoords*[D: static[int]](
-  idx: int,
-  dims: array[D, int]
-): array[D, int] =
-  ## Convert flat index to D-dimensional coordinates
-  ##
-  ## Parameters:
-  ## - `idx`: Flat index (0..numSites-1)
-  ## - `dims`: Dimensions of the local lattice portion
-  ##
-  ## Returns:
-  ## Array of D coordinates
-  var remaining = idx
-  for i in 0..<D:
-    result[i] = remaining mod dims[i]
-    remaining = remaining div dims[i]
+## GA memory layout
+## ================
+## 
+## GA's C API uses row-major (C-order) storage: the LAST dimension is the
+## fastest varying in memory.  For a 7-dimensional GA with dims
+## [d0, d1, d2, d3, d4, d5, d6], element (i0,i1,...,i6) is at flat index:
+##   i0 * (d1*d2*d3*d4*d5*d6) + i1 * (d2*d3*d4*d5*d6) + ... + i6
+##
+## For a TensorField[D=4, R=2, T=float64] with shape [1,1], the GA has 7
+## dimensions: [Lx, Ly, Lz, Lt, S0, S1, Cplx].
+## The last R+1 dimensions are "inner" (tensor shape + complex component).
+## For scalar real fields all inner dims are 1, so the inner stride factor is 1
+## and flat lattice indexing works directly.
+##
+## For ghost-padded arrays the inner dims get padded too (ghost width ≥ 1 is
+## required for ALL GA dimensions). To index into the ghost-padded array for
+## a lattice site we must:
+##   1. Compute the inner offset once (center of the padded inner dims)
+##   2. Multiply each lattice stride by the inner block size
 
-proc coordsToFlat*[D: static[int]](
-  coords: array[D, int],
-  dims: array[D, int]
+proc innerPaddedBlockSize*(
+  R: static[int], 
+  shape: openArray[int], 
+  complexFactor: int, 
+  ghostWidth: int
 ): int =
-  ## Convert D-dimensional coordinates to flat index
+  ## Compute the padded inner block size for ghost-padded arrays
   ##
-  ## Parameters:
-  ## - `coords`: Array of D coordinates
-  ## - `dims`: Dimensions of the local lattice portion
+  ## Each inner dimension of size S gets padded to ``S + 2*ghostWidth``.
+  ## The block size is the product of all padded inner dimensions
+  ## (R tensor dimensions + 1 complex/real dimension).
+  result = 1
+  for r in 0..<R: result *= (shape[r] + 2 * ghostWidth)
+  result *= (complexFactor + 2 * ghostWidth)
+
+proc innerPaddedOffset*(R: static[int], shape: openArray[int], complexFactor: int, ghostWidth: int): int =
+  ## Compute the flat offset to the center element of the padded inner block
   ##
-  ## Returns:
-  ## Flat index
+  ## In the ghost-padded inner block, each inner dimension of padded size P_i
+  ## has the real data at index ``ghostWidth``.  The offset from the start
+  ## of the padded block to the center (first real element) is:
+  ## ``sum_{i=0..R} ghostWidth * stride_i``
+  ## where stride_i is the product of padded sizes of dimensions i+1..R.
+  var paddedSizes: seq[int] = @[]
+  var stride = 1
+  
+  # Build padded sizes for all R+1 inner dims (R tensor dims + 1 complex dim)
+  for r in 0..<R: paddedSizes.add(shape[r] + 2 * ghostWidth)
+  paddedSizes.add(complexFactor + 2 * ghostWidth)
+
+  # Accumulate offset in row-major order (last dim fastest)
+  result = 0
+  for i in countdown(paddedSizes.len - 1, 0):
+    result += ghostWidth * stride
+    stride *= paddedSizes[i]
+
+proc lexToCoords*[D: static[int]](idx: int, geom: array[D, int]): array[D, int] =
+  ## Convert lexicographic index to D-dimensional coordinates
+  ##
+  ## Uses GA C-order convention: last dimension is fastest varying.
+  ## ``idx = coords[0] * stride0 + coords[1] * stride1 + ... + coords[D-1]``
+  var remaining = idx
+  for d in countdown(D-1, 0):
+    result[d] = remaining mod geom[d]
+    remaining = remaining div geom[d]
+
+proc coordsToLex*[D: static[int]](coords: array[D, int], geom: array[D, int]): int =
+  ## Convert D-dimensional coordinates to lexicographic index
+  ##
+  ## GA C-order: last dimension is fastest varying.
   result = 0
   var stride = 1
-  for i in 0..<D:
-    result += coords[i] * stride
-    stride *= dims[i]
+  for d in countdown(D-1, 0):
+    result += coords[d] * stride
+    stride *= geom[d]
 
-proc localToGlobalCoords*[D: static[int]](
-  localCoords: array[D, int],
-  lo: array[D, int]
-): array[D, int] =
-  ## Convert local coordinates to global coordinates
-  ##
-  ## Parameters:
-  ## - `localCoords`: Local coordinates within the process's portion
-  ## - `lo`: Lower bounds of this process's global array portion
-  ##
-  ## Returns:
-  ## Global coordinates
-  for i in 0..<D:
-    result[i] = localCoords[i] + lo[i]
-
-proc globalToLocalCoords*[D: static[int]](
-  globalCoords: array[D, int],
-  lo: array[D, int]
-): array[D, int] =
-  ## Convert global coordinates to local coordinates
-  ##
-  ## Parameters:
-  ## - `globalCoords`: Global coordinates in the full lattice
-  ## - `lo`: Lower bounds of this process's global array portion
-  ##
-  ## Returns:
-  ## Local coordinates within this process's portion
-  for i in 0..<D:
-    result[i] = globalCoords[i] - lo[i]
-
-proc localFlatToGlobalFlat*[D: static[int]](
-  localIdx: int,
-  localDims: array[D, int],
-  globalDims: array[D, int],
-  lo: array[D, int]
+proc coordsToPaddedLex*[D: static[int]](
+  coords: array[D, int],
+  paddedGeom: array[D, int],
+  ghostWidth: array[D, int],
+  innerBlockSize: int
 ): int =
-  ## Convert local flat index to global flat index
+  ## Convert local lattice coordinates to a flat index in the ghost-padded array
   ##
-  ## This function converts a flat index within a process's local portion
-  ## to the corresponding flat index in the global lattice.
+  ## The padded array has D lattice dimensions (each padded by ``2*ghostWidth``)
+  ## followed by R+1 inner dimensions (also padded). This function computes
+  ## the index for the center element of the inner block at the given lattice site.
   ##
   ## Parameters:
-  ## - `localIdx`: Flat index within local portion (0..numLocalSites-1)
-  ## - `localDims`: Dimensions of the local lattice portion
-  ## - `globalDims`: Dimensions of the full global lattice
-  ## - `lo`: Lower bounds of this process's global array portion
+  ## - coords: Local lattice coordinates (can be negative for backward ghost)
+  ## - paddedGeom: Padded lattice geometry (``localGeom + 2*ghostWidth`` per dim)
+  ## - ghostWidth: Ghost width per lattice dimension
+  ## - innerBlockSize: Product of all padded inner dimensions
   ##
   ## Returns:
-  ## Global flat index
-  ##
-  ## Example:
-  ## ```nim
-  ## # For a process with lo = [0, 8], localDims = [4, 4], globalDims = [4, 16]
-  ## # local index 0 -> local coords [0, 0] -> global coords [0, 8] -> global index 8
-  ## let globalIdx = localFlatToGlobalFlat(0, [4, 4], [4, 16], [0, 8])
-  ## ```
-  let localCoords = flatToCoords(localIdx, localDims)
-  let globalCoords = localToGlobalCoords(localCoords, lo)
-  result = coordsToFlat(globalCoords, globalDims)
+  ## Flat index into the padded data array (not including inner offset)
+  result = 0
+  var stride = innerBlockSize
+  for d in countdown(D-1, 0):
+    result += (coords[d] + ghostWidth[d]) * stride
+    stride *= paddedGeom[d]
 
-proc globalFlatToLocalFlat*[D: static[int]](
-  globalIdx: int,
-  localDims: array[D, int],
-  globalDims: array[D, int],
-  lo: array[D, int]
+proc localSiteOffset*[D: static[int]](
+  coords: array[D, int],
+  paddedGeom: array[D, int],
+  innerBlockSize: int
 ): int =
-  ## Convert global flat index to local flat index
+  ## Convert local lattice coordinates to a flat offset in the local data pointer
   ##
-  ## This function converts a flat index in the global lattice to the
-  ## corresponding flat index within a process's local portion.
+  ## The local pointer from NGA_Access points into the padded memory at the start
+  ## of the local region. The memory layout still uses padded strides for the
+  ## lattice dimensions (which carry ghost regions). The inner block at each
+  ## lattice site is contiguous with ``innerBlockSize`` elements.
   ##
   ## Parameters:
-  ## - `globalIdx`: Flat index in global lattice (0..numGlobalSites-1)
-  ## - `localDims`: Dimensions of the local lattice portion
-  ## - `globalDims`: Dimensions of the full global lattice
-  ## - `lo`: Lower bounds of this process's global array portion
+  ## - coords: Local lattice coordinates
+  ## - paddedGeom: Padded lattice geometry (``localGeom + 2*ghostWidth`` per dim)
+  ## - innerBlockSize: Number of contiguous inner elements per lattice site
   ##
   ## Returns:
-  ## Local flat index within this process's portion
-  let globalCoords = flatToCoords(globalIdx, globalDims)
-  let localCoords = globalToLocalCoords(globalCoords, lo)
-  result = coordsToFlat(localCoords, localDims)
+  ## Flat offset from local pointer p[0] to the start of the inner block
+  ## for the given site.
+  result = 0
+  var stride = innerBlockSize
+  for d in countdown(D-1, 0):
+    result += coords[d] * stride
+    stride *= paddedGeom[d]

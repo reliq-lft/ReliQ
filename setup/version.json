@@ -1,1 +1,1 @@
-{"cmake": "4.0.3", "nim": "2.2.4", "globalarrays": "5.8", "kokkos": "4.6.01"}
+{"cmake": "4.0.3", "nim": "2.2.4", "globalarrays": "5.8", "kokkos": "4.6.01", "eigen": "3.4.0"}
