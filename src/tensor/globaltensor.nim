@@ -102,8 +102,8 @@
 ##     # # auto-decompose across all ranks
 ##     # let lat = newSimpleCubicLattice([8, 8, 8, 16])
 ## 
-##     var src  = lat.newTensorField([1, 1]): float64
-##     var dest = lat.newTensorField([1, 1]): float64
+##     var src  = lat.newTensorField([3, 3]): float64
+##     var dest = lat.newTensorField([3, 3]): float64
 ##
 ##     # Fill src with global lex index
 ##     let p = src.accessLocal()

@@ -33,11 +33,11 @@ import eigen/[eigen]
 import utils/[complex]
 
 import globaltensor
-import hostsitetensor
+#import hostsitetensor
 
 type LocalStorage*[T] = distinct ptr UncheckedArray[T]
 
-record LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
+record HostTensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
   var global*: TensorField[D, R, L, T]
 
   var lattice*: L
@@ -56,7 +56,7 @@ proc `[]`*[T](s: LocalStorage[T], i: int): var T =
 proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
   (ptr UncheckedArray[T])(s)[i] = val
 
-impl LocalTensorField:
+impl HostTensorField:
   method init(tensor: var TensorField[D, R, L, T]) =
     this.global = tensor
     this.lattice = tensor.lattice
@@ -68,9 +68,11 @@ impl LocalTensorField:
       this.data = cast[LocalStorage[float64]](tensor.accessPadded())
     else: this.data = cast[LocalStorage[T]](tensor.accessPadded())
 
+  #[
   method `[]`*(n: int): auto =
     let data = addr this.data[this.global.paddedLexIdx(n)]
     return data.newHostSiteTensor(this.shape): T
+  ]#
 
 #[ unit test ]#
 
@@ -84,6 +86,6 @@ when isMainModule:
     suite "GlobalTensor tests":
       test "TensorField construction and access" :
         var gf = lat.newTensorField([3, 3]): Complex64
-        var lf = gf.newLocalTensorField()
+        var lf = gf.newHostTensorField()
 
-        var sf = lf[0]
+        #var sf = lf[0]

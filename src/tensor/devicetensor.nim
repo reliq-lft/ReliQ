@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/proxy/proxyir.nim
+  Source file: src/types/devicetensor.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -26,14 +26,3 @@
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
-
-type
-  IntermediateRepresentationKind* = enum
-    irLoad,
-    irStore,
-    irMult,
-    irAdd,
-    irSub,
-    irDiv,
-    
-    

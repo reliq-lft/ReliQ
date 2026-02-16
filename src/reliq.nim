@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/proxy/proxyir.nim
+  Source file: src/reliq.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,13 +27,18 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-type
-  IntermediateRepresentationKind* = enum
-    irLoad,
-    irStore,
-    irMult,
-    irAdd,
-    irSub,
-    irDiv,
-    
-    
+import ga/[ga]
+import memory/[bufferpool]
+
+when defined(UseOpenMP):
+  import openmp/[openmp]
+elif defined(UseOpenCL):
+  import opencl/[opencl]
+else:
+  import opencl/[opencl]
+
+template reliq*(body: untyped): untyped =
+  var bufferPool {.inject.} = newBufferPool()
+  gaParallel:
+    block: body
+  bufferPool.drain()

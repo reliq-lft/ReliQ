@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/proxy/proxyir.nim
+  Source file: src/classes/classexports.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -27,13 +27,39 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-type
-  IntermediateRepresentationKind* = enum
-    irLoad,
-    irStore,
-    irMult,
-    irAdd,
-    irSub,
-    irDiv,
-    
-    
+## Auto-export all class fields and methods.
+##
+## Mirrors ``recordexports.nim`` — ensures all fields and methods
+## declared in a class body are publicly visible.
+
+{.used.}
+
+import std/[macros]
+
+import classinternal
+import classmethods
+import classvar
+
+proc exportAll(classDef: ClassDescription) =
+  # Export all fields
+  for varDef in classDef.vars.definitions:
+    if varDef.definition[0].kind == nnkPostfix:
+      continue
+    let nameNode = varDef.definition[0]
+    varDef.definition[0] = newNimNode(nnkPostfix, nameNode)
+    varDef.definition[0].add(ident"*")
+    varDef.definition[0].add(nameNode)
+
+  # Export all methods
+  for methodDef in classDef.methods.definitions:
+    if methodDef.definition[0].kind == nnkPostfix:
+      continue
+    let nameNode = methodDef.definition[0]
+    methodDef.definition[0] = newNimNode(nnkPostfix, nameNode)
+    methodDef.definition[0].add(ident"*")
+    methodDef.definition[0].add(nameNode)
+
+static:
+  classCompilerHooks.add(proc(stage: ClassCompilerStage, classDef: ClassDescription) =
+    if stage == ClassModifyDefinitions: exportAll(classDef)
+  )
