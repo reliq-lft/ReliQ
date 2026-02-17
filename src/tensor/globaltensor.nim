@@ -64,14 +64,14 @@
 ## inner block therefore has ``(S_i + 2)`` entries per tensor dimension
 ## and ``(complexFactor + 2)`` for the complex dimension; only the
 ## central ``product(shape) * complexFactor`` elements are real data.
-## Use ``innerPaddedBlockSize`` / ``innerPaddedOffset`` to navigate.
+## Use ``innerBlockSize`` / ``innerPaddedOffset`` to navigate.
 ##
 ## Two pointer types are available:
 ##
 ## - **Local pointer** (`accessLocal`): starts at the center of the
 ##   padded inner block for the first local lattice site.  ``p[0]``
 ##   is element 0 at local coordinates ``(0,0,...,0)``.  The stride
-##   between adjacent lattice sites is ``innerPaddedBlockSize`` (the
+##   between adjacent lattice sites is ``innerBlockSize`` (the
 ##   product of all padded inner dimensions), **not** the number of
 ##   real elements.  Use `localIdx` to compute the correct flat index.
 ## - **Ghost pointer** (`accessPadded`): starts at the first real
@@ -112,10 +112,13 @@
 ##     src.releaseLocal()
 
 import lattice/[lattice]
+import class/[class]
 import record/[record]
 import ga/[ga]
 import ga/[gawrap]
 import utils/[complex]
+import lattice/[indexing]
+import memory/[hostlayout]
 
 record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
   var lattice*: L
@@ -289,7 +292,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## ``NGA_Access`` returns a pointer to the center of the padded block
     ## for the first local lattice site, so ``p[0]`` is the first real
     ## element.  The stride between consecutive lattice sites is the product
-    ## of all padded inner dimensions (``innerPaddedBlockSize``).
+    ## of all padded inner dimensions (``innerBlockSize``).
     ## 
     ## The returned index points to the center of the padded inner block
     ## for the given lattice site.  Add ``e`` to reach element ``e`` (but
@@ -304,12 +307,12 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## at the given lattice site.
     let paddedGeom = this.paddedGrid()
     let cplxFactor = when isComplex(T): 2 else: 1
-    # innerPaddedBlockSize returns the stride in base-type units (e.g. float64).
+    # innerBlockSize returns the stride in base-type units (e.g. float64).
     # Since accessLocal/accessPadded cast the pointer to ptr UncheckedArray[T],
     # and Complex64 occupies 2 float64 slots, we divide by cplxFactor so the
     # index is in units of T.
-    let innerPadded = innerPaddedBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
-    return localSiteOffset(coords, paddedGeom, innerPadded)
+    let innerPadded = innerBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
+    return siteOffset(coords, paddedGeom, innerPadded)
 
   method localLexIdx*(site: int): int {.immutable.} =
     ## Compute the flat index for a lexicographically-ordered site
@@ -341,7 +344,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     let paddedGeom = this.paddedGrid()
     let ghosts = this.ghostWidth()
     let cplxFactor = when isComplex(T): 2 else: 1
-    let innerPadded = innerPaddedBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
+    let innerPadded = innerBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
     return coordsToPaddedLex(coords, paddedGeom, ghosts, innerPadded)
 
   method paddedLexIdx*(site: int): int {.immutable.} =
@@ -382,7 +385,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## Returns a pointer into the ghost-padded array, offset past the inner
     ## (tensor + complex) ghost cells so that ``p[0]`` is the first real
     ## inner element at the **lattice ghost origin** ``(-gw, ..., -gw)``.
-    ## The stride between adjacent lattice sites is ``innerPaddedBlockSize``
+    ## The stride between adjacent lattice sites is ``innerBlockSize``
     ## (same as for ``accessLocal``), so ``paddedIdx`` / ``paddedLexIdx``
     ## compute indices in the same units.  In particular, for any owned
     ## lattice site ``n``:
@@ -415,6 +418,10 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## Get the ghost/halo width in each dimension
     this.lattice.ghostGrid
 
+  method globalGrid*: array[D, int] {.immutable.} =
+    ## Get global grid dimensions (including all MPI ranks, excluding ghosts)
+    return this.lattice.globalGrid
+
   method localGrid*: array[D, int] {.immutable.} =
     ## Get local grid dimensions (excluding ghosts)
     ##
@@ -423,6 +430,10 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## the lattice mpiGrid uses auto-decomposition sentinels (-1).
     let mpiGrid = this.data.getMPIGrid()
     for d in 0..<D: result[d] = this.lattice.globalGrid[d] div mpiGrid[d]
+  
+  method mpiGrid*: array[D, int] {.immutable.} =
+    ## Get the MPI processor grid decomposition
+    return this.data.getMPIGrid()
 
   method paddedGrid*: array[D, int] {.immutable.} =
     ## Get padded grid dimensions (including ghosts on both sides)

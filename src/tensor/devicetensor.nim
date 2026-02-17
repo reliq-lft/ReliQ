@@ -26,3 +26,41 @@
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
+
+import reliq
+import globaltensor
+import hosttensor
+import devicesitetensor
+
+import record/[record]
+import memory/[hostlayout]
+import memory/[simdlayout]
+import lattice/[indexing]
+
+record DeviceTensor*[D: static[int], R: static[int], L: Lattice[D], T]:
+  var local*: HostTensorField[D, R, L, T]
+  var lattice*: L
+  var shape: array[R, int]
+
+  var simdLayout: SIMDLayout[D]
+  var hostData*: LocalStorage[T] # transformed data layout
+
+recordImpl DeviceTensorField:
+  method init(
+    tensor: var HostTensorField[D, R, L, T];
+    inputSIMDGrid: array[D, int] = defaultSIMDGrid[D]()
+  ) =
+  let paddedGrid = tensor.global.paddedGrid()
+
+  this.local = tensor
+  this.lattice = tensor.lattice
+  this.shape = tensor.shape
+  
+  this.simdLayout = newSIMDLayout(paddedGrid, inputSIMDGrid)
+
+when isMainModule:
+  import std/[unittest]
+
+  reliq:
+    discard
+

@@ -35,10 +35,10 @@ type SimpleCubicLattice*[D: static[int]] = object
   mpiGrid*: array[D, int]
   ghostGrid*: array[D, int]
 
-proc defaultMPIGrid[D: static[int]](): array[D, int] =
+proc defaultMPIGrid[D: static[int]]: array[D, int] =
   for i in 0..<D: result[i] = -1
 
-proc defaultGhostGrid[D: static[int]](): array[D, int] =
+proc defaultGhostGrid[D: static[int]]: array[D, int] =
   for i in 0..<D: result[i] = 0
 
 proc newSimpleCubicLattice*[D: static[int]](

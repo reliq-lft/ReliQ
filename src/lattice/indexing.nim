@@ -27,62 +27,6 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-## GA memory layout
-## ================
-## 
-## GA's C API uses row-major (C-order) storage: the LAST dimension is the
-## fastest varying in memory.  For a 7-dimensional GA with dims
-## [d0, d1, d2, d3, d4, d5, d6], element (i0,i1,...,i6) is at flat index:
-##   i0 * (d1*d2*d3*d4*d5*d6) + i1 * (d2*d3*d4*d5*d6) + ... + i6
-##
-## For a TensorField[D=4, R=2, T=float64] with shape [1,1], the GA has 7
-## dimensions: [Lx, Ly, Lz, Lt, S0, S1, Cplx].
-## The last R+1 dimensions are "inner" (tensor shape + complex component).
-## For scalar real fields all inner dims are 1, so the inner stride factor is 1
-## and flat lattice indexing works directly.
-##
-## For ghost-padded arrays the inner dims get padded too (ghost width ≥ 1 is
-## required for ALL GA dimensions). To index into the ghost-padded array for
-## a lattice site we must:
-##   1. Compute the inner offset once (center of the padded inner dims)
-##   2. Multiply each lattice stride by the inner block size
-
-proc innerPaddedBlockSize*(
-  R: static[int], 
-  shape: openArray[int], 
-  complexFactor: int, 
-  ghostWidth: int
-): int =
-  ## Compute the padded inner block size for ghost-padded arrays
-  ##
-  ## Each inner dimension of size S gets padded to ``S + 2*ghostWidth``.
-  ## The block size is the product of all padded inner dimensions
-  ## (R tensor dimensions + 1 complex/real dimension).
-  result = 1
-  for r in 0..<R: result *= (shape[r] + 2 * ghostWidth)
-  result *= (complexFactor + 2 * ghostWidth)
-
-proc innerPaddedOffset*(R: static[int], shape: openArray[int], complexFactor: int, ghostWidth: int): int =
-  ## Compute the flat offset to the center element of the padded inner block
-  ##
-  ## In the ghost-padded inner block, each inner dimension of padded size P_i
-  ## has the real data at index ``ghostWidth``.  The offset from the start
-  ## of the padded block to the center (first real element) is:
-  ## ``sum_{i=0..R} ghostWidth * stride_i``
-  ## where stride_i is the product of padded sizes of dimensions i+1..R.
-  var paddedSizes: seq[int] = @[]
-  var stride = 1
-  
-  # Build padded sizes for all R+1 inner dims (R tensor dims + 1 complex dim)
-  for r in 0..<R: paddedSizes.add(shape[r] + 2 * ghostWidth)
-  paddedSizes.add(complexFactor + 2 * ghostWidth)
-
-  # Accumulate offset in row-major order (last dim fastest)
-  result = 0
-  for i in countdown(paddedSizes.len - 1, 0):
-    result += ghostWidth * stride
-    stride *= paddedSizes[i]
-
 proc lexToCoords*[D: static[int]](idx: int, geom: array[D, int]): array[D, int] =
   ## Convert lexicographic index to D-dimensional coordinates
   ##
@@ -92,6 +36,21 @@ proc lexToCoords*[D: static[int]](idx: int, geom: array[D, int]): array[D, int] 
   for d in countdown(D-1, 0):
     result[d] = remaining mod geom[d]
     remaining = remaining div geom[d]
+
+proc lexToCoords*[D: static[int]](
+  idx: int; 
+  geom: array[D, int]; # not used, but needed to disambiguate from geom-based overload
+  strides: array[D, int]
+): array[D, int] =
+  ## Convert lexicographic index to D-dimensional coordinates using precomputed strides
+  ##
+  ## This version takes precomputed strides for efficiency when called in a
+  ## tight loop. The relationship is:
+  ## ``idx = coords[0] * strides[0] + coords[1] * strides[1] + ... + coords[D-1] * strides[D-1]``
+  var remaining = idx
+  for d in 0..<D:
+    result[d] = remaining div strides[d]
+    remaining = remaining mod strides[d]
 
 proc coordsToLex*[D: static[int]](coords: array[D, int], geom: array[D, int]): int =
   ## Convert D-dimensional coordinates to lexicographic index
@@ -127,30 +86,4 @@ proc coordsToPaddedLex*[D: static[int]](
   var stride = innerBlockSize
   for d in countdown(D-1, 0):
     result += (coords[d] + ghostWidth[d]) * stride
-    stride *= paddedGeom[d]
-
-proc localSiteOffset*[D: static[int]](
-  coords: array[D, int],
-  paddedGeom: array[D, int],
-  innerBlockSize: int
-): int =
-  ## Convert local lattice coordinates to a flat offset in the local data pointer
-  ##
-  ## The local pointer from NGA_Access points into the padded memory at the start
-  ## of the local region. The memory layout still uses padded strides for the
-  ## lattice dimensions (which carry ghost regions). The inner block at each
-  ## lattice site is contiguous with ``innerBlockSize`` elements.
-  ##
-  ## Parameters:
-  ## - coords: Local lattice coordinates
-  ## - paddedGeom: Padded lattice geometry (``localGeom + 2*ghostWidth`` per dim)
-  ## - innerBlockSize: Number of contiguous inner elements per lattice site
-  ##
-  ## Returns:
-  ## Flat offset from local pointer p[0] to the start of the inner block
-  ## for the given site.
-  result = 0
-  var stride = innerBlockSize
-  for d in countdown(D-1, 0):
-    result += coords[d] * stride
     stride *= paddedGeom[d]

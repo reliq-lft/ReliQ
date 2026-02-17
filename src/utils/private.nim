@@ -40,3 +40,6 @@ proc product*[D: static[int]](
   result = 1
   for i in 0..<D: result = result * arr[i]
   return result
+
+proc `div`*[D: static[int]](a, b: array[D, int]): array[D, int] =
+  for i in 0..<D: result[i] = a[i] div b[i]

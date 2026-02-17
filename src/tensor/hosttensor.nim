@@ -39,7 +39,6 @@ type LocalStorage*[T] = distinct ptr UncheckedArray[T]
 
 record HostTensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
   var global*: TensorField[D, R, L, T]
-
   var lattice*: L
   var shape: array[R, int]
 
