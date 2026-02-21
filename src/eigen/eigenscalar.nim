@@ -30,253 +30,16 @@
 import record/[record]
 import utils/[complex]
 
-{.emit: """/*TYPESECTION*/
-#include <Eigen/Dense>
+template eigenScalarHeader*: untyped =
+  {.pragma: scalar, header: "eigenscalar.h".}
 
-/* scalar handle — a pointer to a single value, optionally owned */
-
-struct EigenScalarHandleRS { float* val; };
-struct EigenScalarHandleRD { double* val; };
-struct EigenScalarHandleCS { std::complex<float>* val; };
-struct EigenScalarHandleCD { std::complex<double>* val; };
-
-/* constructors — map over existing data */
-
-inline EigenScalarHandleRS createEigenScalarRS(float* data) {
-  return EigenScalarHandleRS{data};
-}
-
-inline EigenScalarHandleRD createEigenScalarRD(double* data) {
-  return EigenScalarHandleRD{data};
-}
-
-inline EigenScalarHandleCS createEigenScalarCS(void* data) {
-  return EigenScalarHandleCS{static_cast<std::complex<float>*>(data)};
-}
-
-inline EigenScalarHandleCD createEigenScalarCD(void* data) {
-  return EigenScalarHandleCD{static_cast<std::complex<double>*>(data)};
-}
-
-/* temporary constructors — allocate owned data */
-
-inline EigenScalarHandleRS createTempEigenScalarRS() {
-  auto* data = new float(0);
-  return EigenScalarHandleRS{data};
-}
-
-inline EigenScalarHandleRD createTempEigenScalarRD() {
-  auto* data = new double(0);
-  return EigenScalarHandleRD{data};
-}
-
-inline EigenScalarHandleCS createTempEigenScalarCS() {
-  auto* data = new std::complex<float>(0, 0);
-  return EigenScalarHandleCS{data};
-}
-
-inline EigenScalarHandleCD createTempEigenScalarCD() {
-  auto* data = new std::complex<double>(0, 0);
-  return EigenScalarHandleCD{data};
-}
-
-/* destructors */
-
-inline void destroyEigenScalarRS(EigenScalarHandleRS handle, bool ownsData) {
-  if (ownsData) delete handle.val;
-}
-inline void destroyEigenScalarRD(EigenScalarHandleRD handle, bool ownsData) {
-  if (ownsData) delete handle.val;
-}
-inline void destroyEigenScalarCS(EigenScalarHandleCS handle, bool ownsData) {
-  if (ownsData) delete handle.val;
-}
-inline void destroyEigenScalarCD(EigenScalarHandleCD handle, bool ownsData) {
-  if (ownsData) delete handle.val;
-}
-
-/* accessors */
-
-inline float eigenScalarRSGet(const EigenScalarHandleRS handle) {
-  return *handle.val;
-}
-
-inline double eigenScalarRDGet(const EigenScalarHandleRD handle) {
-  return *handle.val;
-}
-
-inline void eigenScalarCSGet(const EigenScalarHandleCS handle, void* out) {
-  *static_cast<std::complex<float>*>(out) = *handle.val;
-}
-
-inline void eigenScalarCDGet(const EigenScalarHandleCD handle, void* out) {
-  *static_cast<std::complex<double>*>(out) = *handle.val;
-}
-
-inline void eigenScalarRSSet(EigenScalarHandleRS handle, float value) {
-  *handle.val = value;
-}
-
-inline void eigenScalarRDSet(EigenScalarHandleRD handle, double value) {
-  *handle.val = value;
-}
-
-inline void eigenScalarCSSet(EigenScalarHandleCS handle, const void* value) {
-  *handle.val = *static_cast<const std::complex<float>*>(value);
-}
-
-inline void eigenScalarCDSet(EigenScalarHandleCD handle, const void* value) {
-  *handle.val = *static_cast<const std::complex<double>*>(value);
-}
-
-/* algebra */
-
-inline void eigenScalarRSAdd(
-  const EigenScalarHandleRS a, const EigenScalarHandleRS b, EigenScalarHandleRS out
-) { *out.val = *a.val + *b.val; }
-
-inline void eigenScalarRDAdd(
-  const EigenScalarHandleRD a, const EigenScalarHandleRD b, EigenScalarHandleRD out
-) { *out.val = *a.val + *b.val; }
-
-inline void eigenScalarCSAdd(
-  const EigenScalarHandleCS a, const EigenScalarHandleCS b, EigenScalarHandleCS out
-) { *out.val = *a.val + *b.val; }
-
-inline void eigenScalarCDAdd(
-  const EigenScalarHandleCD a, const EigenScalarHandleCD b, EigenScalarHandleCD out
-) { *out.val = *a.val + *b.val; }
-
-inline void eigenScalarRSSub(
-  const EigenScalarHandleRS a, const EigenScalarHandleRS b, EigenScalarHandleRS out
-) { *out.val = *a.val - *b.val; }
-
-inline void eigenScalarRDSub(
-  const EigenScalarHandleRD a, const EigenScalarHandleRD b, EigenScalarHandleRD out
-) { *out.val = *a.val - *b.val; }
-
-inline void eigenScalarCSSub(
-  const EigenScalarHandleCS a, const EigenScalarHandleCS b, EigenScalarHandleCS out
-) { *out.val = *a.val - *b.val; }
-
-inline void eigenScalarCDSub(
-  const EigenScalarHandleCD a, const EigenScalarHandleCD b, EigenScalarHandleCD out
-) { *out.val = *a.val - *b.val; }
-
-inline void eigenScalarRSMul(
-  const EigenScalarHandleRS a, const EigenScalarHandleRS b, EigenScalarHandleRS out
-) { *out.val = *a.val * *b.val; }
-
-inline void eigenScalarRDMul(
-  const EigenScalarHandleRD a, const EigenScalarHandleRD b, EigenScalarHandleRD out
-) { *out.val = *a.val * *b.val; }
-
-inline void eigenScalarCSMul(
-  const EigenScalarHandleCS a, const EigenScalarHandleCS b, EigenScalarHandleCS out
-) { *out.val = *a.val * *b.val; }
-
-inline void eigenScalarCDMul(
-  const EigenScalarHandleCD a, const EigenScalarHandleCD b, EigenScalarHandleCD out
-) { *out.val = *a.val * *b.val; }
-
-inline void eigenScalarRSDiv(
-  const EigenScalarHandleRS a, const EigenScalarHandleRS b, EigenScalarHandleRS out
-) { *out.val = *a.val / *b.val; }
-
-inline void eigenScalarRDDiv(
-  const EigenScalarHandleRD a, const EigenScalarHandleRD b, EigenScalarHandleRD out
-) { *out.val = *a.val / *b.val; }
-
-inline void eigenScalarCSDiv(
-  const EigenScalarHandleCS a, const EigenScalarHandleCS b, EigenScalarHandleCS out
-) { *out.val = *a.val / *b.val; }
-
-inline void eigenScalarCDDiv(
-  const EigenScalarHandleCD a, const EigenScalarHandleCD b, EigenScalarHandleCD out
-) { *out.val = *a.val / *b.val; }
-
-/* compound assignment */
-
-inline void eigenScalarRSAddAssign(EigenScalarHandleRS a, const EigenScalarHandleRS b) {
-  *a.val += *b.val;
-}
-inline void eigenScalarRDAddAssign(EigenScalarHandleRD a, const EigenScalarHandleRD b) {
-  *a.val += *b.val;
-}
-inline void eigenScalarCSAddAssign(EigenScalarHandleCS a, const EigenScalarHandleCS b) {
-  *a.val += *b.val;
-}
-inline void eigenScalarCDAddAssign(EigenScalarHandleCD a, const EigenScalarHandleCD b) {
-  *a.val += *b.val;
-}
-
-inline void eigenScalarRSSubAssign(EigenScalarHandleRS a, const EigenScalarHandleRS b) {
-  *a.val -= *b.val;
-}
-inline void eigenScalarRDSubAssign(EigenScalarHandleRD a, const EigenScalarHandleRD b) {
-  *a.val -= *b.val;
-}
-inline void eigenScalarCSSubAssign(EigenScalarHandleCS a, const EigenScalarHandleCS b) {
-  *a.val -= *b.val;
-}
-inline void eigenScalarCDSubAssign(EigenScalarHandleCD a, const EigenScalarHandleCD b) {
-  *a.val -= *b.val;
-}
-
-inline void eigenScalarRSMulAssign(EigenScalarHandleRS a, const EigenScalarHandleRS b) {
-  *a.val *= *b.val;
-}
-inline void eigenScalarRDMulAssign(EigenScalarHandleRD a, const EigenScalarHandleRD b) {
-  *a.val *= *b.val;
-}
-inline void eigenScalarCSMulAssign(EigenScalarHandleCS a, const EigenScalarHandleCS b) {
-  *a.val *= *b.val;
-}
-inline void eigenScalarCDMulAssign(EigenScalarHandleCD a, const EigenScalarHandleCD b) {
-  *a.val *= *b.val;
-}
-
-inline void eigenScalarRSDivAssign(EigenScalarHandleRS a, const EigenScalarHandleRS b) {
-  *a.val /= *b.val;
-}
-inline void eigenScalarRDDivAssign(EigenScalarHandleRD a, const EigenScalarHandleRD b) {
-  *a.val /= *b.val;
-}
-inline void eigenScalarCSDivAssign(EigenScalarHandleCS a, const EigenScalarHandleCS b) {
-  *a.val /= *b.val;
-}
-inline void eigenScalarCDDivAssign(EigenScalarHandleCD a, const EigenScalarHandleCD b) {
-  *a.val /= *b.val;
-}
-
-/* abs / conj */
-
-inline float eigenScalarRSAbs(const EigenScalarHandleRS handle) {
-  return std::abs(*handle.val);
-}
-inline double eigenScalarRDAbs(const EigenScalarHandleRD handle) {
-  return std::abs(*handle.val);
-}
-inline float eigenScalarCSAbs(const EigenScalarHandleCS handle) {
-  return std::abs(*handle.val);
-}
-inline double eigenScalarCDAbs(const EigenScalarHandleCD handle) {
-  return std::abs(*handle.val);
-}
-
-inline void eigenScalarCSConj(const EigenScalarHandleCS handle, void* out) {
-  *static_cast<std::complex<float>*>(out) = std::conj(*handle.val);
-}
-inline void eigenScalarCDConj(const EigenScalarHandleCD handle, void* out) {
-  *static_cast<std::complex<double>*>(out) = std::conj(*handle.val);
-}
-""".}
+eigenScalarHeader()
 
 type
-  EigenScalarHandleRS* {.importcpp: "EigenScalarHandleRS".} = object
-  EigenScalarHandleRD* {.importcpp: "EigenScalarHandleRD".} = object
-  EigenScalarHandleCS* {.importcpp: "EigenScalarHandleCS".} = object
-  EigenScalarHandleCD* {.importcpp: "EigenScalarHandleCD".} = object
+  EigenScalarHandleRS* {.importcpp: "EigenScalarHandleRS", scalar.} = object
+  EigenScalarHandleRD* {.importcpp: "EigenScalarHandleRD", scalar.} = object
+  EigenScalarHandleCS* {.importcpp: "EigenScalarHandleCS", scalar.} = object
+  EigenScalarHandleCD* {.importcpp: "EigenScalarHandleCD", scalar.} = object
 
 record EigenScalar*[T]:
   var ownsData: bool
@@ -294,194 +57,194 @@ record EigenScalar*[T]:
 # constructors
 
 proc createEigenScalarRS(data: ptr float32): EigenScalarHandleRS 
-  {.importcpp: "createEigenScalarRS(@)".}
+  {.importcpp: "createEigenScalarRS(@)", scalar.}
 
 proc createEigenScalarRD(data: ptr float64): EigenScalarHandleRD 
-  {.importcpp: "createEigenScalarRD(@)".}
+  {.importcpp: "createEigenScalarRD(@)", scalar.}
 
 proc createEigenScalarCS(data: pointer): EigenScalarHandleCS 
-  {.importcpp: "createEigenScalarCS(@)".}
+  {.importcpp: "createEigenScalarCS(@)", scalar.}
 
 proc createEigenScalarCD(data: pointer): EigenScalarHandleCD 
-  {.importcpp: "createEigenScalarCD(@)".}
+  {.importcpp: "createEigenScalarCD(@)", scalar.}
 
 # temp constructors
 
 proc createTempEigenScalarRS(): EigenScalarHandleRS 
-  {.importcpp: "createTempEigenScalarRS(@)".}
+  {.importcpp: "createTempEigenScalarRS(@)", scalar.}
 
 proc createTempEigenScalarRD(): EigenScalarHandleRD 
-  {.importcpp: "createTempEigenScalarRD(@)".}
+  {.importcpp: "createTempEigenScalarRD(@)", scalar.}
 
 proc createTempEigenScalarCS(): EigenScalarHandleCS 
-  {.importcpp: "createTempEigenScalarCS(@)".}
+  {.importcpp: "createTempEigenScalarCS(@)", scalar.}
 
 proc createTempEigenScalarCD(): EigenScalarHandleCD 
-  {.importcpp: "createTempEigenScalarCD(@)".}
+  {.importcpp: "createTempEigenScalarCD(@)", scalar.}
 
 # destructors
 
 proc destroyEigenScalarRS(handle: EigenScalarHandleRS, ownsData: bool) 
-  {.importcpp: "destroyEigenScalarRS(@)".}
+  {.importcpp: "destroyEigenScalarRS(@)", scalar.}
 
 proc destroyEigenScalarRD(handle: EigenScalarHandleRD, ownsData: bool) 
-  {.importcpp: "destroyEigenScalarRD(@)".}
+  {.importcpp: "destroyEigenScalarRD(@)", scalar.}
 
 proc destroyEigenScalarCS(handle: EigenScalarHandleCS, ownsData: bool) 
-  {.importcpp: "destroyEigenScalarCS(@)".}
+  {.importcpp: "destroyEigenScalarCS(@)", scalar.}
 
 proc destroyEigenScalarCD(handle: EigenScalarHandleCD, ownsData: bool) 
-  {.importcpp: "destroyEigenScalarCD(@)".}
+  {.importcpp: "destroyEigenScalarCD(@)", scalar.}
 
 # accessors
 
 proc eigenScalarRSGet(handle: EigenScalarHandleRS): float32 
-  {.importcpp: "eigenScalarRSGet(@)".}
+  {.importcpp: "eigenScalarRSGet(@)", scalar.}
 
 proc eigenScalarRDGet(handle: EigenScalarHandleRD): float64 
-  {.importcpp: "eigenScalarRDGet(@)".}
+  {.importcpp: "eigenScalarRDGet(@)", scalar.}
 
 proc eigenScalarCSGet(handle: EigenScalarHandleCS, outVal: pointer) 
-  {.importcpp: "eigenScalarCSGet(@)".}
+  {.importcpp: "eigenScalarCSGet(@)", scalar.}
 
 proc eigenScalarCDGet(handle: EigenScalarHandleCD, outVal: pointer) 
-  {.importcpp: "eigenScalarCDGet(@)".}
+  {.importcpp: "eigenScalarCDGet(@)", scalar.}
 
 proc eigenScalarRSSet(handle: EigenScalarHandleRS, value: float32) 
-  {.importcpp: "eigenScalarRSSet(@)".}
+  {.importcpp: "eigenScalarRSSet(@)", scalar.}
 
 proc eigenScalarRDSet(handle: EigenScalarHandleRD, value: float64) 
-  {.importcpp: "eigenScalarRDSet(@)".}
+  {.importcpp: "eigenScalarRDSet(@)", scalar.}
 
 proc eigenScalarCSSet(handle: EigenScalarHandleCS, value: pointer) 
-  {.importcpp: "eigenScalarCSSet(@)".}
+  {.importcpp: "eigenScalarCSSet(@)", scalar.}
 
 proc eigenScalarCDSet(handle: EigenScalarHandleCD, value: pointer) 
-  {.importcpp: "eigenScalarCDSet(@)".}
+  {.importcpp: "eigenScalarCDSet(@)", scalar.}
 
 # algebra
 
 proc eigenScalarRSAdd(a, b: EigenScalarHandleRS; c: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSAdd(@)".}
+  {.importcpp: "eigenScalarRSAdd(@)", scalar.}
 
 proc eigenScalarRDAdd(a, b: EigenScalarHandleRD; c: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDAdd(@)".}
+  {.importcpp: "eigenScalarRDAdd(@)", scalar.}
 
 proc eigenScalarCSAdd(a, b: EigenScalarHandleCS; c: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSAdd(@)".}
+  {.importcpp: "eigenScalarCSAdd(@)", scalar.}
 
 proc eigenScalarCDAdd(a, b: EigenScalarHandleCD; c: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDAdd(@)".}
+  {.importcpp: "eigenScalarCDAdd(@)", scalar.}
 
 proc eigenScalarRSSub(a, b: EigenScalarHandleRS; c: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSSub(@)".}
+  {.importcpp: "eigenScalarRSSub(@)", scalar.}
 
 proc eigenScalarRDSub(a, b: EigenScalarHandleRD; c: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDSub(@)".}
+  {.importcpp: "eigenScalarRDSub(@)", scalar.}
 
 proc eigenScalarCSSub(a, b: EigenScalarHandleCS; c: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSSub(@)".}
+  {.importcpp: "eigenScalarCSSub(@)", scalar.}
 
 proc eigenScalarCDSub(a, b: EigenScalarHandleCD; c: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDSub(@)".}
+  {.importcpp: "eigenScalarCDSub(@)", scalar.}
 
 proc eigenScalarRSMul(a, b: EigenScalarHandleRS; c: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSMul(@)".}
+  {.importcpp: "eigenScalarRSMul(@)", scalar.}
 
 proc eigenScalarRDMul(a, b: EigenScalarHandleRD; c: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDMul(@)".}
+  {.importcpp: "eigenScalarRDMul(@)", scalar.}
 
 proc eigenScalarCSMul(a, b: EigenScalarHandleCS; c: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSMul(@)".}
+  {.importcpp: "eigenScalarCSMul(@)", scalar.}
 
 proc eigenScalarCDMul(a, b: EigenScalarHandleCD; c: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDMul(@)".}
+  {.importcpp: "eigenScalarCDMul(@)", scalar.}
 
 proc eigenScalarRSDiv(a, b: EigenScalarHandleRS; c: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSDiv(@)".}
+  {.importcpp: "eigenScalarRSDiv(@)", scalar.}
 
 proc eigenScalarRDDiv(a, b: EigenScalarHandleRD; c: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDDiv(@)".}
+  {.importcpp: "eigenScalarRDDiv(@)", scalar.}
 
 proc eigenScalarCSDiv(a, b: EigenScalarHandleCS; c: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSDiv(@)".}
+  {.importcpp: "eigenScalarCSDiv(@)", scalar.}
 
 proc eigenScalarCDDiv(a, b: EigenScalarHandleCD; c: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDDiv(@)".}
+  {.importcpp: "eigenScalarCDDiv(@)", scalar.}
 
 # compound assignment
 
 proc eigenScalarRSAddAssign(a, b: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSAddAssign(@)".}
+  {.importcpp: "eigenScalarRSAddAssign(@)", scalar.}
 
 proc eigenScalarRDAddAssign(a, b: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDAddAssign(@)".}
+  {.importcpp: "eigenScalarRDAddAssign(@)", scalar.}
 
 proc eigenScalarCSAddAssign(a, b: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSAddAssign(@)".}
+  {.importcpp: "eigenScalarCSAddAssign(@)", scalar.}
 
 proc eigenScalarCDAddAssign(a, b: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDAddAssign(@)".}
+  {.importcpp: "eigenScalarCDAddAssign(@)", scalar.}
 
 proc eigenScalarRSSubAssign(a, b: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSSubAssign(@)".}
+  {.importcpp: "eigenScalarRSSubAssign(@)", scalar.}
 
 proc eigenScalarRDSubAssign(a, b: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDSubAssign(@)".}
+  {.importcpp: "eigenScalarRDSubAssign(@)", scalar.}
 
 proc eigenScalarCSSubAssign(a, b: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSSubAssign(@)".}
+  {.importcpp: "eigenScalarCSSubAssign(@)", scalar.}
 
 proc eigenScalarCDSubAssign(a, b: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDSubAssign(@)".}
+  {.importcpp: "eigenScalarCDSubAssign(@)", scalar.}
 
 proc eigenScalarRSMulAssign(a, b: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSMulAssign(@)".}
+  {.importcpp: "eigenScalarRSMulAssign(@)", scalar.}
 
 proc eigenScalarRDMulAssign(a, b: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDMulAssign(@)".}
+  {.importcpp: "eigenScalarRDMulAssign(@)", scalar.}
 
 proc eigenScalarCSMulAssign(a, b: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSMulAssign(@)".}
+  {.importcpp: "eigenScalarCSMulAssign(@)", scalar.}
 
 proc eigenScalarCDMulAssign(a, b: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDMulAssign(@)".}
+  {.importcpp: "eigenScalarCDMulAssign(@)", scalar.}
 
 proc eigenScalarRSDivAssign(a, b: EigenScalarHandleRS) 
-  {.importcpp: "eigenScalarRSDivAssign(@)".}
+  {.importcpp: "eigenScalarRSDivAssign(@)", scalar.}
 
 proc eigenScalarRDDivAssign(a, b: EigenScalarHandleRD) 
-  {.importcpp: "eigenScalarRDDivAssign(@)".}
+  {.importcpp: "eigenScalarRDDivAssign(@)", scalar.}
 
 proc eigenScalarCSDivAssign(a, b: EigenScalarHandleCS) 
-  {.importcpp: "eigenScalarCSDivAssign(@)".}
+  {.importcpp: "eigenScalarCSDivAssign(@)", scalar.}
 
 proc eigenScalarCDDivAssign(a, b: EigenScalarHandleCD) 
-  {.importcpp: "eigenScalarCDDivAssign(@)".}
+  {.importcpp: "eigenScalarCDDivAssign(@)", scalar.}
 
 # abs / conj
 
 proc eigenScalarRSAbs(handle: EigenScalarHandleRS): float32 
-  {.importcpp: "eigenScalarRSAbs(@)".}
+  {.importcpp: "eigenScalarRSAbs(@)", scalar.}
 
 proc eigenScalarRDAbs(handle: EigenScalarHandleRD): float64 
-  {.importcpp: "eigenScalarRDAbs(@)".}
+  {.importcpp: "eigenScalarRDAbs(@)", scalar.}
 
 proc eigenScalarCSAbs(handle: EigenScalarHandleCS): float32 
-  {.importcpp: "eigenScalarCSAbs(@)".}
+  {.importcpp: "eigenScalarCSAbs(@)", scalar.}
 
 proc eigenScalarCDAbs(handle: EigenScalarHandleCD): float64 
-  {.importcpp: "eigenScalarCDAbs(@)".}
+  {.importcpp: "eigenScalarCDAbs(@)", scalar.}
 
 proc eigenScalarCSConj(handle: EigenScalarHandleCS, outVal: pointer) 
-  {.importcpp: "eigenScalarCSConj(@)".}
+  {.importcpp: "eigenScalarCSConj(@)", scalar.}
 
 proc eigenScalarCDConj(handle: EigenScalarHandleCD, outVal: pointer) 
-  {.importcpp: "eigenScalarCDConj(@)".}
+  {.importcpp: "eigenScalarCDConj(@)", scalar.}
 
 #[ EigenScalar implementation ]#
 
-impl EigenScalar:
+recordImpl EigenScalar:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T) =
@@ -520,7 +283,7 @@ impl EigenScalar:
   
   #[ accessors ]#
 
-  method get(): T =
+  method `[]`(): T {.immutable.} =
     when isReal32(T):
       return eigenScalarRSGet(this.data)
     elif isReal64(T):
@@ -534,7 +297,7 @@ impl EigenScalar:
       eigenScalarCDGet(this.data, addr res)
       return res
   
-  method set(value: T) =
+  method `[]=`(value: T) =
     when isReal32(T):
       eigenScalarRSSet(this.data, value)
     elif isReal64(T):
@@ -548,29 +311,29 @@ impl EigenScalar:
   
   #[ algebra ]#
 
-  method `+`(other: EigenScalar[T]): EigenScalar[T] =
-    result = newEigenScalar[T](this.get())
+  method `+`(other: EigenScalar[T]): EigenScalar[T] {.immutable.} =
+    result = newEigenScalar[T](this[])
     when isReal32(T): eigenScalarRSAdd(this.data, other.data, result.data)
     elif isReal64(T): eigenScalarRDAdd(this.data, other.data, result.data)
     elif isComplex32(T): eigenScalarCSAdd(this.data, other.data, result.data)
     elif isComplex64(T): eigenScalarCDAdd(this.data, other.data, result.data)
   
-  method `-`(other: EigenScalar[T]): EigenScalar[T] =
-    result = newEigenScalar[T](this.get())
+  method `-`(other: EigenScalar[T]): EigenScalar[T] {.immutable.} =
+    result = newEigenScalar[T](this[])
     when isReal32(T): eigenScalarRSSub(this.data, other.data, result.data)
     elif isReal64(T): eigenScalarRDSub(this.data, other.data, result.data)
     elif isComplex32(T): eigenScalarCSSub(this.data, other.data, result.data)
     elif isComplex64(T): eigenScalarCDSub(this.data, other.data, result.data)
   
-  method `*`(other: EigenScalar[T]): EigenScalar[T] =
-    result = newEigenScalar[T](this.get())
+  method `*`(other: EigenScalar[T]): EigenScalar[T] {.immutable.} =
+    result = newEigenScalar[T](this[])
     when isReal32(T): eigenScalarRSMul(this.data, other.data, result.data)
     elif isReal64(T): eigenScalarRDMul(this.data, other.data, result.data)
     elif isComplex32(T): eigenScalarCSMul(this.data, other.data, result.data)
     elif isComplex64(T): eigenScalarCDMul(this.data, other.data, result.data)
   
-  method `/`(other: EigenScalar[T]): EigenScalar[T] =
-    result = newEigenScalar[T](this.get())
+  method `/`(other: EigenScalar[T]): EigenScalar[T] {.immutable.} =
+    result = newEigenScalar[T](this[])
     when isReal32(T): eigenScalarRSDiv(this.data, other.data, result.data)
     elif isReal64(T): eigenScalarRDDiv(this.data, other.data, result.data)
     elif isComplex32(T): eigenScalarCSDiv(this.data, other.data, result.data)
@@ -600,7 +363,7 @@ impl EigenScalar:
     elif isComplex32(T): eigenScalarCSDivAssign(this.data, other.data)
     elif isComplex64(T): eigenScalarCDDivAssign(this.data, other.data)
 
-  method abs(): auto =
+  method abs(): auto {.immutable.} =
     when isReal32(T):
       return eigenScalarRSAbs(this.data)
     elif isReal64(T):
@@ -610,7 +373,7 @@ impl EigenScalar:
     elif isComplex64(T):
       return eigenScalarCDAbs(this.data)
 
-  method conj(): EigenScalar[T] =
+  method conj(): EigenScalar[T] {.immutable.} =
     when isComplex32(T):
       var res: Complex32
       eigenScalarCSConj(this.data, addr res)
@@ -621,7 +384,64 @@ impl EigenScalar:
       result = newEigenScalar[T](res)
     else:
       # conj of a real is itself
-      result = newEigenScalar[T](this.get())
+      result = newEigenScalar[T](this[])
+
+  # Value-comparison operators — compare underlying data, not the struct.
+  # The record macro skips auto-generating these when they're user-defined.
+  method `==`(other: EigenScalar[T]): bool {.immutable.} = this[] == other[]
+  method `!=`(other: EigenScalar[T]): bool {.immutable.} = this[] != other[]
+  method `<`(other: EigenScalar[T]): bool {.immutable.} = this[] < other[]
+  method `<=`(other: EigenScalar[T]): bool {.immutable.} = this[] <= other[]
+  method `>`(other: EigenScalar[T]): bool {.immutable.} = this[] > other[]
+  method `>=`(other: EigenScalar[T]): bool {.immutable.} = this[] >= other[]
+
+# =copy hook: when an EigenScalar is copied (e.g. passed by value to an
+# {.immutable.} method), share the raw data pointer with ownsData=false
+# so the copy's =destroy never frees the value, leaving the original intact.
+proc `=copy`*[T](dst: var EigenScalar[T]; src: EigenScalar[T]) =
+  if addr(dst) == unsafeAddr(src): return
+  dst.ownsData = false
+  dst.data = src.data
+
+proc `=sink`*[T](dst: var EigenScalar[T]; src: EigenScalar[T]) =
+  # Transfer ownership from src to dst without cloning.
+  # =destroy will NOT be called on src by the compiler after this.
+  `=destroy`(dst)
+  dst.ownsData = src.ownsData
+  dst.data = src.data
+
+proc `:=`*[T](dst: EigenScalar[T]; val: T) =
+  ## Write a raw value through the scalar's underlying pointer.
+  ## Enables `s := complex(3.0, 4.0)` and `field[n] := val`.
+  ## dst need not be `var` — writes go through the C++ handle, not the struct.
+  when isReal32(T):    eigenScalarRSSet(dst.data, val)
+  elif isReal64(T):    eigenScalarRDSet(dst.data, val)
+  elif isComplex32(T):
+    var v = val
+    eigenScalarCSSet(dst.data, addr v)
+  elif isComplex64(T):
+    var v = val
+    eigenScalarCDSet(dst.data, addr v)
+
+converter toValue*[T](s: EigenScalar[T]): T =
+  ## Implicitly read an EigenScalar as its element type T.
+  ## Allows using a scalar anywhere T is expected (comparisons, arithmetic, abs, …).
+  s[]
+
+# Scalar vs raw value comparisons (and reverse) — different RHS type so
+# these are always unambiguous overloads alongside the record methods above.
+proc `==`*[T](s: EigenScalar[T]; val: T): bool = s[] == val
+proc `==`*[T](val: T; s: EigenScalar[T]): bool = val == s[]
+proc `!=`*[T](s: EigenScalar[T]; val: T): bool = s[] != val
+proc `!=`*[T](val: T; s: EigenScalar[T]): bool = val != s[]
+proc `<`*[T](s: EigenScalar[T]; val: T): bool = s[] < val
+proc `<`*[T](val: T; s: EigenScalar[T]): bool = val < s[]
+proc `<=`*[T](s: EigenScalar[T]; val: T): bool = s[] <= val
+proc `<=`*[T](val: T; s: EigenScalar[T]): bool = val <= s[]
+proc `>`*[T](s: EigenScalar[T]; val: T): bool = s[] > val
+proc `>`*[T](val: T; s: EigenScalar[T]): bool = val > s[]
+proc `>=`*[T](s: EigenScalar[T]; val: T): bool = s[] >= val
+proc `>=`*[T](val: T; s: EigenScalar[T]): bool = val >= s[]
 
 when isMainModule:
   import std/[unittest, math]
@@ -631,34 +451,32 @@ when isMainModule:
       var val = 42.0
       var s = newEigenScalar(addr val)
       check s.ownsData == false
-      check s.get() == 42.0
+      check s == 42.0
 
       # write through scalar → underlying value
-      s.set(99.0)
+      s = 99.0
       check val == 99.0
 
       # write through value → visible via scalar
       val = 7.0
-      check s.get() == 7.0
+      check s == 7.0
 
     test "complex creation and access":
       var cval = complex(3.0, 4.0)
       var s = newEigenScalar(addr cval)
-      var g = s.get()
-      check g.re == 3.0
-      check g.im == 4.0
+      check s == complex(3.0, 4.0)
 
-      s.set(complex(10.0, 20.0))
+      s := complex(10.0, 20.0)
       check cval.re == 10.0
       check cval.im == 20.0
 
     test "temporary scalar":
       var s = newEigenScalar[float64](0.0)
       check s.ownsData == true
-      check s.get() == 0.0
+      check s == 0.0
 
-      s.set(123.0)
-      check s.get() == 123.0
+      s = 123.0
+      check s == 123.0
 
     test "real arithmetic (+, -, *, /)":
       var aval = 10.0
@@ -667,16 +485,16 @@ when isMainModule:
       var b = newEigenScalar(addr bval)
 
       var s = a + b
-      check s.get() == 13.0
+      check s == 13.0
 
       var d = a - b
-      check d.get() == 7.0
+      check d == 7.0
 
       var p = a * b
-      check p.get() == 30.0
+      check p == 30.0
 
       var q = a / b
-      check abs(q.get() - 10.0 / 3.0) < 1e-12
+      check abs(q - 10.0 / 3.0) < 1e-12
 
     test "real compound assignment (+=, -=, *=, /=)":
       var aval = 10.0
@@ -685,17 +503,17 @@ when isMainModule:
       var b = newEigenScalar(addr bval)
 
       a += b
-      check a.get() == 13.0
+      check a == 13.0
       check aval == 13.0  # write-through
 
       a -= b
-      check a.get() == 10.0
+      check a == 10.0
 
       a *= b
-      check a.get() == 30.0
+      check a == 30.0
 
       a /= b
-      check abs(a.get() - 10.0) < 1e-12
+      check abs(a - 10.0) < 1e-12
 
     test "complex arithmetic":
       var ca = complex(1.0, 2.0)
@@ -704,14 +522,14 @@ when isMainModule:
       var b = newEigenScalar(addr cb)
 
       var s = a + b
-      check s.get() == complex(4.0, 6.0)
+      check s == complex(4.0, 6.0)
 
       var d = a - b
-      check d.get() == complex(-2.0, -2.0)
+      check d == complex(-2.0, -2.0)
 
       # (1+2i)(3+4i) = 3+4i+6i+8i² = -5+10i
       var p = a * b
-      check p.get() == complex(-5.0, 10.0)
+      check p == complex(-5.0, 10.0)
 
     test "abs":
       var rval = -5.0
@@ -726,13 +544,9 @@ when isMainModule:
     test "conj":
       var cval = complex(3.0, 4.0)
       var s = newEigenScalar(addr cval)
-      var c = s.conj()
-      var g = c.get()
-      check g.re == 3.0
-      check g.im == -4.0
+      check s.conj() == complex(3.0, -4.0)
 
       # conj of real is itself
       var rval = 7.0
       var rs = newEigenScalar(addr rval)
-      var rc = rs.conj()
-      check rc.get() == 7.0
+      check rs.conj() == 7.0

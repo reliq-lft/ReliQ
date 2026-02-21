@@ -36,191 +36,98 @@ export eigenscalar
 export eigenvector
 export eigenmatrix
 
-#[ C++ cross-type operations ]#
-
-{.emit: """/*TYPESECTION*/
-#include <Eigen/Dense>
-
-/* re-declare handle types needed for cross-type operations.
-   These must match the definitions in eigenmatrix, eigenvector, eigenscalar. */
-
-#define MatrixTemplateArgs Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor
-#define MapTemplateArgs Eigen::Unaligned, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>
-#define VectorStride Eigen::InnerStride<Eigen::Dynamic>
-
-#ifndef EIGEN_HANDLE_TYPES_DEFINED
-#define EIGEN_HANDLE_TYPES_DEFINED
-
-using EigenMatrixRS = Eigen::Matrix<float, MatrixTemplateArgs>;
-using EigenMatrixRD = Eigen::Matrix<double, MatrixTemplateArgs>;
-using EigenMatrixCS = Eigen::Matrix<std::complex<float>, MatrixTemplateArgs>;
-using EigenMatrixCD = Eigen::Matrix<std::complex<double>, MatrixTemplateArgs>;
-
-using EigenMapMatrixRS = Eigen::Map<EigenMatrixRS, MapTemplateArgs>;
-using EigenMapMatrixRD = Eigen::Map<EigenMatrixRD, MapTemplateArgs>;
-using EigenMapMatrixCS = Eigen::Map<EigenMatrixCS, MapTemplateArgs>;
-using EigenMapMatrixCD = Eigen::Map<EigenMatrixCD, MapTemplateArgs>;
-
-struct EigenMatrixHandleRS { EigenMapMatrixRS* mat; };
-struct EigenMatrixHandleRD { EigenMapMatrixRD* mat; };
-struct EigenMatrixHandleCS { EigenMapMatrixCS* mat; };
-struct EigenMatrixHandleCD { EigenMapMatrixCD* mat; };
-
-using EigenVectorRS = Eigen::Matrix<float, Eigen::Dynamic, 1>;
-using EigenVectorRD = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-using EigenVectorCS = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, 1>;
-using EigenVectorCD = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>;
-
-using EigenMapVectorRS = Eigen::Map<EigenVectorRS, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorRD = Eigen::Map<EigenVectorRD, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorCS = Eigen::Map<EigenVectorCS, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorCD = Eigen::Map<EigenVectorCD, Eigen::Unaligned, VectorStride>;
-
-struct EigenVectorHandleRS { EigenMapVectorRS* vec; };
-struct EigenVectorHandleRD { EigenMapVectorRD* vec; };
-struct EigenVectorHandleCS { EigenMapVectorCS* vec; };
-struct EigenVectorHandleCD { EigenMapVectorCD* vec; };
-
-struct EigenScalarHandleRS { float* val; };
-struct EigenScalarHandleRD { double* val; };
-struct EigenScalarHandleCS { std::complex<float>* val; };
-struct EigenScalarHandleCD { std::complex<double>* val; };
-
-#endif
-
-/* matrix-vector multiply:  out = mat * vec */
-
-inline void eigenMatVecRSMul(
-  const EigenMatrixHandleRS m, const EigenVectorHandleRS v, EigenVectorHandleRS out
-) { *out.vec = (*m.mat) * (*v.vec); }
-
-inline void eigenMatVecRDMul(
-  const EigenMatrixHandleRD m, const EigenVectorHandleRD v, EigenVectorHandleRD out
-) { *out.vec = (*m.mat) * (*v.vec); }
-
-inline void eigenMatVecCSMul(
-  const EigenMatrixHandleCS m, const EigenVectorHandleCS v, EigenVectorHandleCS out
-) { *out.vec = (*m.mat) * (*v.vec); }
-
-inline void eigenMatVecCDMul(
-  const EigenMatrixHandleCD m, const EigenVectorHandleCD v, EigenVectorHandleCD out
-) { *out.vec = (*m.mat) * (*v.vec); }
-
-/* outer product:  out = v * w^T  (or v * conj(w)^T for complex = v * w^H) */
-/* Uses v * w.transpose() for real and v * w.adjoint() for complex to match
-   the standard physics convention for outer products. */
-
-inline void eigenOuterProductRS(
-  const EigenVectorHandleRS v, const EigenVectorHandleRS w, EigenMatrixHandleRS out
-) { *out.mat = (*v.vec) * w.vec->transpose(); }
-
-inline void eigenOuterProductRD(
-  const EigenVectorHandleRD v, const EigenVectorHandleRD w, EigenMatrixHandleRD out
-) { *out.mat = (*v.vec) * w.vec->transpose(); }
-
-inline void eigenOuterProductCS(
-  const EigenVectorHandleCS v, const EigenVectorHandleCS w, EigenMatrixHandleCS out
-) { *out.mat = (*v.vec) * w.vec->transpose(); }
-
-inline void eigenOuterProductCD(
-  const EigenVectorHandleCD v, const EigenVectorHandleCD w, EigenMatrixHandleCD out
-) { *out.mat = (*v.vec) * w.vec->transpose(); }
-
-/* scalar * matrix */
-
-inline void eigenScalarMatRSMul(
-  const EigenScalarHandleRS s, const EigenMatrixHandleRS m, EigenMatrixHandleRS out
-) { *out.mat = (*s.val) * (*m.mat); }
-
-inline void eigenScalarMatRDMul(
-  const EigenScalarHandleRD s, const EigenMatrixHandleRD m, EigenMatrixHandleRD out
-) { *out.mat = (*s.val) * (*m.mat); }
-
-inline void eigenScalarMatCSMul(
-  const EigenScalarHandleCS s, const EigenMatrixHandleCS m, EigenMatrixHandleCS out
-) { *out.mat = (*s.val) * (*m.mat); }
-
-inline void eigenScalarMatCDMul(
-  const EigenScalarHandleCD s, const EigenMatrixHandleCD m, EigenMatrixHandleCD out
-) { *out.mat = (*s.val) * (*m.mat); }
-
-/* scalar * vector */
-
-inline void eigenScalarVecRSMul(
-  const EigenScalarHandleRS s, const EigenVectorHandleRS v, EigenVectorHandleRS out
-) { *out.vec = (*s.val) * (*v.vec); }
-
-inline void eigenScalarVecRDMul(
-  const EigenScalarHandleRD s, const EigenVectorHandleRD v, EigenVectorHandleRD out
-) { *out.vec = (*s.val) * (*v.vec); }
-
-inline void eigenScalarVecCSMul(
-  const EigenScalarHandleCS s, const EigenVectorHandleCS v, EigenVectorHandleCS out
-) { *out.vec = (*s.val) * (*v.vec); }
-
-inline void eigenScalarVecCDMul(
-  const EigenScalarHandleCD s, const EigenVectorHandleCD v, EigenVectorHandleCD out
-) { *out.vec = (*s.val) * (*v.vec); }
-
-""".}
-
 #[ Nim wrappers for cross-type C++ functions ]#
+
+template eigenHeaders*: untyped =
+  eigenScalarHeader()
+  eigenVectorHeader()
+  eigenMatrixHeader()
+  {.pragma: eigen, header: "eigen.h".}
+
+eigenHeaders()
+
+#[ extra constructors ]#
+
+proc newLocalScalar*(T: typedesc): EigenScalar[T] = newEigenScalar(default(T))
+
+proc newLocalVector*(size: int; T: typedesc): EigenVector[T] =
+  const ghostWidth = 1
+  when isComplex(T): 
+    let stride = (2 + 2 * ghostWidth) div 2
+  else: 
+    let stride = 1 + 2 * ghostWidth
+  return newEigenVector[T](size, stride)
+
+proc newLocalMatrix*[R: static[int]](shape: array[R, int]; T: typedesc): EigenMatrix[R, T] =
+  const ghostWidth = 1
+  when isComplex(T): 
+    let inner = (2 + 2 * ghostWidth) div 2
+  else: 
+    let inner = 1 + 2 * ghostWidth
+  let outer = (shape[1] + 2 * ghostWidth) * inner
+  return newEigenMatrix[R, T](shape[0], shape[1], inner, outer)
+
+proc newLocalTensor*[R: static[int]](shape: array[R, int]; T: typedesc): auto =
+  when R == 0: return newLocalScalar(T)
+  elif R == 1: return newLocalVector(shape[0], T)
+  elif R == 2: return newLocalMatrix(shape, T)
+  else: raise newException(ValueError, "Unsupported tensor rank")
 
 # matrix-vector multiply
 
 proc eigenMatVecRSMul(m: EigenMatrixHandleRS, v: EigenVectorHandleRS, o: EigenVectorHandleRS)
-  {.importcpp: "eigenMatVecRSMul(@)".}
+  {.importcpp: "eigenMatVecRSMul(@)", eigen.}
 
 proc eigenMatVecRDMul(m: EigenMatrixHandleRD, v: EigenVectorHandleRD, o: EigenVectorHandleRD)
-  {.importcpp: "eigenMatVecRDMul(@)".}
+  {.importcpp: "eigenMatVecRDMul(@)", eigen.}
 
 proc eigenMatVecCSMul(m: EigenMatrixHandleCS, v: EigenVectorHandleCS, o: EigenVectorHandleCS)
-  {.importcpp: "eigenMatVecCSMul(@)".}
+  {.importcpp: "eigenMatVecCSMul(@)", eigen.}
 
 proc eigenMatVecCDMul(m: EigenMatrixHandleCD, v: EigenVectorHandleCD, o: EigenVectorHandleCD)
-  {.importcpp: "eigenMatVecCDMul(@)".}
+  {.importcpp: "eigenMatVecCDMul(@)", eigen.}
 
 # outer product
 
 proc eigenOuterProductRS(v, w: EigenVectorHandleRS, o: EigenMatrixHandleRS)
-  {.importcpp: "eigenOuterProductRS(@)".}
+  {.importcpp: "eigenOuterProductRS(@)", eigen.}
 
 proc eigenOuterProductRD(v, w: EigenVectorHandleRD, o: EigenMatrixHandleRD)
-  {.importcpp: "eigenOuterProductRD(@)".}
+  {.importcpp: "eigenOuterProductRD(@)", eigen.}
 
 proc eigenOuterProductCS(v, w: EigenVectorHandleCS, o: EigenMatrixHandleCS)
-  {.importcpp: "eigenOuterProductCS(@)".}
+  {.importcpp: "eigenOuterProductCS(@)", eigen.}
 
 proc eigenOuterProductCD(v, w: EigenVectorHandleCD, o: EigenMatrixHandleCD)
-  {.importcpp: "eigenOuterProductCD(@)".}
+  {.importcpp: "eigenOuterProductCD(@)", eigen.}
 
 # scalar * matrix
 
 proc eigenScalarMatRSMul(s: EigenScalarHandleRS, m: EigenMatrixHandleRS, o: EigenMatrixHandleRS)
-  {.importcpp: "eigenScalarMatRSMul(@)".}
+  {.importcpp: "eigenScalarMatRSMul(@)", eigen.}
 
 proc eigenScalarMatRDMul(s: EigenScalarHandleRD, m: EigenMatrixHandleRD, o: EigenMatrixHandleRD)
-  {.importcpp: "eigenScalarMatRDMul(@)".}
+  {.importcpp: "eigenScalarMatRDMul(@)", eigen.}
 
 proc eigenScalarMatCSMul(s: EigenScalarHandleCS, m: EigenMatrixHandleCS, o: EigenMatrixHandleCS)
-  {.importcpp: "eigenScalarMatCSMul(@)".}
+  {.importcpp: "eigenScalarMatCSMul(@)", eigen.}
 
 proc eigenScalarMatCDMul(s: EigenScalarHandleCD, m: EigenMatrixHandleCD, o: EigenMatrixHandleCD)
-  {.importcpp: "eigenScalarMatCDMul(@)".}
+  {.importcpp: "eigenScalarMatCDMul(@)", eigen.}
 
 # scalar * vector
 
 proc eigenScalarVecRSMul(s: EigenScalarHandleRS, v: EigenVectorHandleRS, o: EigenVectorHandleRS)
-  {.importcpp: "eigenScalarVecRSMul(@)".}
+  {.importcpp: "eigenScalarVecRSMul(@)", eigen.}
 
 proc eigenScalarVecRDMul(s: EigenScalarHandleRD, v: EigenVectorHandleRD, o: EigenVectorHandleRD)
-  {.importcpp: "eigenScalarVecRDMul(@)".}
+  {.importcpp: "eigenScalarVecRDMul(@)", eigen.}
 
 proc eigenScalarVecCSMul(s: EigenScalarHandleCS, v: EigenVectorHandleCS, o: EigenVectorHandleCS)
-  {.importcpp: "eigenScalarVecCSMul(@)".}
+  {.importcpp: "eigenScalarVecCSMul(@)", eigen.}
 
 proc eigenScalarVecCDMul(s: EigenScalarHandleCD, v: EigenVectorHandleCD, o: EigenVectorHandleCD)
-  {.importcpp: "eigenScalarVecCDMul(@)".}
+  {.importcpp: "eigenScalarVecCDMul(@)", eigen.}
 
 #[ exported cross-type operations ]#
 

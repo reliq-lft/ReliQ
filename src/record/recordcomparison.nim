@@ -40,6 +40,7 @@ import std/[macros]
 
 import recordinternal
 import recordvar
+import recordmethods
 import recordutils
 
 #[ Generate comparison operators ]#
@@ -47,6 +48,18 @@ import recordutils
 proc generateComparisons(recDef: RecordDescription) =
   let className = recDef.fullType
   let fields = recDef.vars.definitions
+
+  # Collect the names of comparison operators already defined by the user
+  # as methods in this record body.  If the user provides e.g. `method ==`,
+  # we skip auto-generating that operator so the user version wins.
+  var userDefined: set[char] = {}  # use chars as simple flags: '=' == !=, '<' <, 'l' <=
+  for m in recDef.methods.definitions:
+    let n = $m.definition.name
+    if n == "==": userDefined.incl('=')
+    elif n == "!=": userDefined.incl('!')
+    elif n == "<": userDefined.incl('<')
+    elif n == "<=": userDefined.incl('l')
+
   let eqOp = ident"=="
   let neqOp = ident"!="
   let ltOp = ident"<"
@@ -58,39 +71,41 @@ proc generateComparisons(recDef: RecordDescription) =
   let rhsIdent = ident"rhs"
 
   # `==`
-  var eqBody: NimNode
-  if fields.len == 0:
-    eqBody = quote do: return true
-  else:
-    var cond: NimNode = nil
-    for varDef in fields:
-      let name = varDef.definition.variableName
-      let fieldCmp = newCall(
-        eqOp,
-        newDotExpr(lhsIdent, name),
-        newDotExpr(rhsIdent, name)
-      )
-      if cond == nil: cond = fieldCmp
-      else: cond = newCall(andOp, cond, fieldCmp)
-    eqBody = newStmtList(newNimNode(nnkReturnStmt).add(cond))
+  if '=' notin userDefined:
+    var eqBody: NimNode
+    if fields.len == 0:
+      eqBody = quote do: return true
+    else:
+      var cond: NimNode = nil
+      for varDef in fields:
+        let name = varDef.definition.variableName
+        let fieldCmp = newCall(
+          eqOp,
+          newDotExpr(lhsIdent, name),
+          newDotExpr(rhsIdent, name)
+        )
+        if cond == nil: cond = fieldCmp
+        else: cond = newCall(andOp, cond, fieldCmp)
+      eqBody = newStmtList(newNimNode(nnkReturnStmt).add(cond))
 
-  let eqProc = quote do:
-    proc `eqOp`*(`lhsIdent`, `rhsIdent`: `className`): bool =
-      `eqBody`
-  eqProc.addGenericParams(recDef)
-  recDef.body.add(eqProc)
+    let eqProc = quote do:
+      proc `eqOp`*(`lhsIdent`, `rhsIdent`: `className`): bool =
+        `eqBody`
+    eqProc.addGenericParams(recDef)
+    recDef.body.add(eqProc)
 
   # `!=`
-  let neqBody = newStmtList(
-    newNimNode(nnkReturnStmt).add(newCall(notOp, newCall(eqOp, lhsIdent, rhsIdent)))
-  )
-  let neqProc = quote do:
-    proc `neqOp`*(`lhsIdent`, `rhsIdent`: `className`): bool = `neqBody`
-  neqProc.addGenericParams(recDef)
-  recDef.body.add(neqProc)
+  if '!' notin userDefined:
+    let neqBody = newStmtList(
+      newNimNode(nnkReturnStmt).add(newCall(notOp, newCall(eqOp, lhsIdent, rhsIdent)))
+    )
+    let neqProc = quote do:
+      proc `neqOp`*(`lhsIdent`, `rhsIdent`: `className`): bool = `neqBody`
+    neqProc.addGenericParams(recDef)
+    recDef.body.add(neqProc)
 
   # `<` (lexicographic)
-  if fields.len > 0:
+  if fields.len > 0 and '<' notin userDefined:
     var ltBody = newStmtList()
     for varDef in fields:
       let name = varDef.definition.variableName
@@ -111,7 +126,8 @@ proc generateComparisons(recDef: RecordDescription) =
     ltProc.addGenericParams(recDef)
     recDef.body.add(ltProc)
 
-    # `<=`
+  # `<=`
+  if fields.len > 0 and 'l' notin userDefined:
     let leBody = newStmtList(
       newNimNode(nnkReturnStmt).add(
         newCall(orOp,

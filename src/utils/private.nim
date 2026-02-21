@@ -41,5 +41,30 @@ proc product*[D: static[int]](
   for i in 0..<D: result = result * arr[i]
   return result
 
-proc `div`*[D: static[int]](a, b: array[D, int]): array[D, int] =
+proc `+`*[D: static[int], T](a, b: array[D, T]): array[D, T] =
+  for i in 0..<D: result[i] = a[i] + b[i]
+
+proc `-`*[D: static[int], T](a, b: array[D, T]): array[D, T] =
+  for i in 0..<D: result[i] = a[i] - b[i]
+
+proc `*`*[D: static[int], T](a, b: array[D, T]): array[D, T] =
+  for i in 0..<D: result[i] = a[i] * b[i]
+
+proc `*`*[D: static[int], T](a: T; b: array[D, T]): array[D, T] =
+  for i in 0..<D: result[i] = a * b[i]
+
+proc `*`*[D: static[int], T](a: array[D, T]; b: T): array[D, T] =
+  return b * a
+
+proc `/`*[D: static[int], T](a, b: array[D, T]): array[D, T] =
+  for i in 0..<D: result[i] = a[i] / b[i]
+
+proc `div`*[D: static[int]](a, b: array[D, SomeInteger]): array[D, SomeInteger] =
   for i in 0..<D: result[i] = a[i] div b[i]
+
+template alwaysInlinePragma* =
+  {.
+    pragma: alwaysinline, 
+    inline,
+    codegendecl: "inline __attribute__((always_inline)) $# $#$#"
+  .}

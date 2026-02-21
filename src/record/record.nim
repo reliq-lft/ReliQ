@@ -1314,7 +1314,7 @@ when isMainModule:
   # impl block definitions
   # -------------------------------------------------------------------------
 
-  impl ActorRecord:
+  recordImpl ActorRecord:
     ## Methods added via impl block
     method fullGreet(): string =
       return "Hello! " & this.greet()
@@ -1328,7 +1328,7 @@ when isMainModule:
     method typeName(): string {.static.} =
       return "ActorRecord"
 
-  impl MultiField:
+  recordImpl MultiField:
     method sum(): int {.immutable.} =
       return this.x + this.y
 
@@ -1337,15 +1337,15 @@ when isMainModule:
       this.y = 0
       this.label = ""
 
-  impl Box:
+  recordImpl Box:
     method show(): string {.immutable.} =
       return "Box(" & $this.value & ")"
 
-  impl NumBox:
+  recordImpl NumBox:
     method tripled(): T {.immutable.} =
       return this.value * 3
 
-  impl Pair:
+  recordImpl Pair:
     method description(): string {.immutable.} =
       return "(" & $this.first & ", " & $this.second & ")"
 
@@ -1447,7 +1447,7 @@ when isMainModule:
     var label: string = "default"
     var size: int = 0
 
-  impl Widget:
+  recordImpl Widget:
     method init(lbl: string; sz: int) =
       this.label = lbl
       this.size = sz
@@ -1455,7 +1455,7 @@ when isMainModule:
   record Container[T]:
     var payload: T
 
-  impl Container:
+  recordImpl Container:
     method init(val: T) =
       this.payload = val
 

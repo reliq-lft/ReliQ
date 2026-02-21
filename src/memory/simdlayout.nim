@@ -37,6 +37,8 @@ elif defined(GPUBuild):
 else: # assume CPU build
   const VectorWidth* {.intdefine.} = 8
 
+import hostlayout
+
 import class/[class]
 import lattice/[indexing]
 import utils/[private]

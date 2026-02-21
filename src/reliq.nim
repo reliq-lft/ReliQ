@@ -38,7 +38,7 @@ else:
   import opencl/[opencl]
 
 template reliq*(body: untyped): untyped =
-  var bufferPool {.inject.} = newBufferPool()
+  var currentBufferPool {.inject.} = newBufferPool()
   gaParallel:
     block: body
-  bufferPool.drain()
+  currentBufferPool.drain()

@@ -311,7 +311,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     # Since accessLocal/accessPadded cast the pointer to ptr UncheckedArray[T],
     # and Complex64 occupies 2 float64 slots, we divide by cplxFactor so the
     # index is in units of T.
-    let innerPadded = innerBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
+    let innerPadded = innerBlockSize(this.shape, cplxFactor, 1) div cplxFactor
     return siteOffset(coords, paddedGeom, innerPadded)
 
   method localLexIdx*(site: int): int {.immutable.} =
@@ -342,9 +342,9 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## Returns:
     ## Flat index (in units of ``T``) into the padded data pointer.
     let paddedGeom = this.paddedGrid()
-    let ghosts = this.ghostWidth()
+    let ghosts = this.ghostGrid()
     let cplxFactor = when isComplex(T): 2 else: 1
-    let innerPadded = innerBlockSize(R, this.shape, cplxFactor, 1) div cplxFactor
+    let innerPadded = innerBlockSize(this.shape, cplxFactor, 1) div cplxFactor
     return coordsToPaddedLex(coords, paddedGeom, ghosts, innerPadded)
 
   method paddedLexIdx*(site: int): int {.immutable.} =
@@ -414,7 +414,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
       if this.lattice.ghostGrid[d] > 0: return true
     return false
 
-  method ghostWidth*: array[D, int] {.immutable.} =
+  method ghostGrid*: array[D, int] {.immutable.} =
     ## Get the ghost/halo width in each dimension
     this.lattice.ghostGrid
 
@@ -438,7 +438,7 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
   method paddedGrid*: array[D, int] {.immutable.} =
     ## Get padded grid dimensions (including ghosts on both sides)
     let local = this.localGrid()
-    let ghosts = this.ghostWidth()
+    let ghosts = this.ghostGrid()
     for d in 0..<D: result[d] = local[d] + 2 * ghosts[d]
 
   method numLocalSites*: int {.immutable.} =
@@ -453,15 +453,15 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
 
 #[ convenience procedures/templates ]#
 
-proc newScalarField*[D: static[int], L: Lattice[D]](lattice: L, T: typedesc): TensorField[D, 1, L, T] =
+proc newScalarField*[D: static[int], L: Lattice[D]](lattice: L, T: typedesc): TensorField[D, 0, L, T] =
   ## Create a new scalar field (rank-0 tensor)
-  newTensorField(lattice, [], T)
+  return newTensorField(lattice, [], T)
 
 template all*[D: static[int], R: static[int], L: Lattice[D], T](
   tensor: TensorField[D, R, L, T]
 ): untyped =
   ## Get a range over all local sites (excluding ghosts)
-  0..<tensor.numLocalSites()
+  0..<tensor.numGlobalSites()
 
 #[ unit tests ]#
 
@@ -478,13 +478,13 @@ when isMainModule:
         
         # Test local access and indexing
         var l = field.accessLocal()
-        for n in field.all:
+        for n in 0..<field.numLocalSites():
           l[field.localLexIdx(n)] = complex(float(n), -float(n))
         field.releaseLocal()
 
         # check that local data was written correctly
         var p = field.accessPadded()
-        for n in field.all:
+        for n in 0..<field.numLocalSites():
           check p[field.paddedLexIdx(n)] == complex(float(n), -float(n))
         field.releaseLocal()
 

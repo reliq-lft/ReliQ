@@ -30,427 +30,16 @@
 import record/[record]
 import utils/[complex]
 
-{.emit: """/*TYPESECTION*/
-#include <Eigen/Dense>
+template eigenVectorHeader*: untyped =
+  {.pragma: vector, header: "eigenvector.h".}
 
-#define VectorStride Eigen::InnerStride<Eigen::Dynamic>
-
-/* base vector types */
-
-using EigenVectorRS = Eigen::Matrix<float, Eigen::Dynamic, 1>;
-using EigenVectorRD = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-using EigenVectorCS = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, 1>;
-using EigenVectorCD = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>;
-
-using EigenMapVectorRS = Eigen::Map<EigenVectorRS, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorRD = Eigen::Map<EigenVectorRD, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorCS = Eigen::Map<EigenVectorCS, Eigen::Unaligned, VectorStride>;
-using EigenMapVectorCD = Eigen::Map<EigenVectorCD, Eigen::Unaligned, VectorStride>;
-
-struct EigenVectorHandleRS { EigenMapVectorRS* vec; };
-struct EigenVectorHandleRD { EigenMapVectorRD* vec; };
-struct EigenVectorHandleCS { EigenMapVectorCS* vec; };
-struct EigenVectorHandleCD { EigenMapVectorCD* vec; };
-
-/* constructors */
-
-inline EigenVectorHandleRS createEigenVectorRS(
-  float* data, int size, int stride
-) {
-  auto* vec = new EigenMapVectorRS(data, size, VectorStride(stride));
-  return EigenVectorHandleRS{vec};
-}
-
-inline EigenVectorHandleRD createEigenVectorRD(
-  double* data, int size, int stride
-) {
-  auto* vec = new EigenMapVectorRD(data, size, VectorStride(stride));
-  return EigenVectorHandleRD{vec};
-}
-
-inline EigenVectorHandleCS createEigenVectorCS(
-  void* data, int size, int stride
-) {
-  auto* vec = new EigenMapVectorCS(static_cast<std::complex<float>*>(data), size, VectorStride(stride));
-  return EigenVectorHandleCS{vec};
-}
-
-inline EigenVectorHandleCD createEigenVectorCD(
-  void* data, int size, int stride
-) {
-  auto* vec = new EigenMapVectorCD(static_cast<std::complex<double>*>(data), size, VectorStride(stride));
-  return EigenVectorHandleCD{vec};
-}
-
-/* temporary constructors — allocate owned data buffer */
-
-inline EigenVectorHandleRS createTempEigenVectorRS(int size, int stride) {
-  auto* data = new float[size]();
-  auto* vec = new EigenMapVectorRS(data, size, VectorStride(stride));
-  return EigenVectorHandleRS{vec};
-}
-
-inline EigenVectorHandleRD createTempEigenVectorRD(int size, int stride) {
-  auto* data = new double[size]();
-  auto* vec = new EigenMapVectorRD(data, size, VectorStride(stride));
-  return EigenVectorHandleRD{vec};
-}
-
-inline EigenVectorHandleCS createTempEigenVectorCS(int size, int stride) {
-  auto* data = new std::complex<float>[size]();
-  auto* vec = new EigenMapVectorCS(data, size, VectorStride(stride));
-  return EigenVectorHandleCS{vec};
-}
-
-inline EigenVectorHandleCD createTempEigenVectorCD(int size, int stride) {
-  auto* data = new std::complex<double>[size]();
-  auto* vec = new EigenMapVectorCD(data, size, VectorStride(stride));
-  return EigenVectorHandleCD{vec};
-}
-
-/* destructors */
-
-inline void destroyEigenVectorRS(EigenVectorHandleRS handle, bool ownsData) {
-  if (ownsData) delete[] handle.vec->data();
-  delete handle.vec;
-}
-inline void destroyEigenVectorRD(EigenVectorHandleRD handle, bool ownsData) {
-  if (ownsData) delete[] handle.vec->data();
-  delete handle.vec;
-}
-inline void destroyEigenVectorCS(EigenVectorHandleCS handle, bool ownsData) {
-  if (ownsData) delete[] handle.vec->data();
-  delete handle.vec;
-}
-inline void destroyEigenVectorCD(EigenVectorHandleCD handle, bool ownsData) {
-  if (ownsData) delete[] handle.vec->data();
-  delete handle.vec;
-}
-
-/* accessors */
-
-inline float eigenVectorRSGet(const EigenVectorHandleRS handle, int idx) {
-  return (*handle.vec)(idx);
-}
-
-inline double eigenVectorRDGet(const EigenVectorHandleRD handle, int idx) {
-  return (*handle.vec)(idx);
-}
-
-inline void eigenVectorCSGet(
-  const EigenVectorHandleCS handle, int idx, void* out
-) { *static_cast<std::complex<float>*>(out) = (*handle.vec)(idx); }
-
-inline void eigenVectorCDGet(
-  const EigenVectorHandleCD handle, int idx, void* out
-) { *static_cast<std::complex<double>*>(out) = (*handle.vec)(idx); }
-
-inline void eigenVectorRSSet(EigenVectorHandleRS handle, int idx, float value) {
-  (*handle.vec)(idx) = value;
-}
-
-inline void eigenVectorRDSet(EigenVectorHandleRD handle, int idx, double value) {
-  (*handle.vec)(idx) = value;
-}
-
-inline void eigenVectorCSSet(
-  EigenVectorHandleCS handle, int idx, const void* value
-) { (*handle.vec)(idx) = *static_cast<const std::complex<float>*>(value); }
-
-inline void eigenVectorCDSet(
-  EigenVectorHandleCD handle, int idx, const void* value
-) { (*handle.vec)(idx) = *static_cast<const std::complex<double>*>(value); }
-
-/* algebra */
-
-inline void eigenVectorRSAdd(
-  const EigenVectorHandleRS a, const EigenVectorHandleRS b, EigenVectorHandleRS out
-) { *out.vec = *a.vec + *b.vec; }
-
-inline void eigenVectorRDAdd(
-  const EigenVectorHandleRD a, const EigenVectorHandleRD b, EigenVectorHandleRD out
-) { *out.vec = *a.vec + *b.vec; }
-
-inline void eigenVectorCSAdd(
-  const EigenVectorHandleCS a, const EigenVectorHandleCS b, EigenVectorHandleCS out
-) { *out.vec = *a.vec + *b.vec; }
-
-inline void eigenVectorCDAdd(
-  const EigenVectorHandleCD a, const EigenVectorHandleCD b, EigenVectorHandleCD out
-) { *out.vec = *a.vec + *b.vec; }
-
-inline void eigenVectorRSSub(
-  const EigenVectorHandleRS a, const EigenVectorHandleRS b, EigenVectorHandleRS out
-) { *out.vec = *a.vec - *b.vec; }
-
-inline void eigenVectorRDSub(
-  const EigenVectorHandleRD a, const EigenVectorHandleRD b, EigenVectorHandleRD out
-) { *out.vec = *a.vec - *b.vec; }
-
-inline void eigenVectorCSSub(
-  const EigenVectorHandleCS a, const EigenVectorHandleCS b, EigenVectorHandleCS out
-) { *out.vec = *a.vec - *b.vec; }
-
-inline void eigenVectorCDSub(
-  const EigenVectorHandleCD a, const EigenVectorHandleCD b, EigenVectorHandleCD out
-) { *out.vec = *a.vec - *b.vec; }
-
-/* element-wise multiply */
-
-inline void eigenVectorRSMul(
-  const EigenVectorHandleRS a, const EigenVectorHandleRS b, EigenVectorHandleRS out
-) { *out.vec = a.vec->cwiseProduct(*b.vec); }
-
-inline void eigenVectorRDMul(
-  const EigenVectorHandleRD a, const EigenVectorHandleRD b, EigenVectorHandleRD out
-) { *out.vec = a.vec->cwiseProduct(*b.vec); }
-
-inline void eigenVectorCSMul(
-  const EigenVectorHandleCS a, const EigenVectorHandleCS b, EigenVectorHandleCS out
-) { *out.vec = a.vec->cwiseProduct(*b.vec); }
-
-inline void eigenVectorCDMul(
-  const EigenVectorHandleCD a, const EigenVectorHandleCD b, EigenVectorHandleCD out
-) { *out.vec = a.vec->cwiseProduct(*b.vec); }
-
-/* dot product */
-
-inline float eigenVectorRSDot(
-  const EigenVectorHandleRS a, const EigenVectorHandleRS b
-) { return a.vec->dot(*b.vec); }
-
-inline double eigenVectorRDDot(
-  const EigenVectorHandleRD a, const EigenVectorHandleRD b
-) { return a.vec->dot(*b.vec); }
-
-inline void eigenVectorCSDot(
-  const EigenVectorHandleCS a, const EigenVectorHandleCS b, void* out
-) { *static_cast<std::complex<float>*>(out) = a.vec->dot(*b.vec); }
-
-inline void eigenVectorCDDot(
-  const EigenVectorHandleCD a, const EigenVectorHandleCD b, void* out
-) { *static_cast<std::complex<double>*>(out) = a.vec->dot(*b.vec); }
-
-/* norm */
-
-inline float eigenVectorRSNorm(const EigenVectorHandleRS handle) {
-  return handle.vec->norm();
-}
-
-inline double eigenVectorRDNorm(const EigenVectorHandleRD handle) {
-  return handle.vec->norm();
-}
-
-inline float eigenVectorCSNorm(const EigenVectorHandleCS handle) {
-  return handle.vec->norm();
-}
-
-inline double eigenVectorCDNorm(const EigenVectorHandleCD handle) {
-  return handle.vec->norm();
-}
-
-/* compound assignment */
-
-inline void eigenVectorRSAddAssign(
-  EigenVectorHandleRS a, const EigenVectorHandleRS b
-) { *a.vec += *b.vec; }
-
-inline void eigenVectorRDAddAssign(
-  EigenVectorHandleRD a, const EigenVectorHandleRD b
-) { *a.vec += *b.vec; }
-
-inline void eigenVectorCSAddAssign(
-  EigenVectorHandleCS a, const EigenVectorHandleCS b
-) { *a.vec += *b.vec; }
-
-inline void eigenVectorCDAddAssign(
-  EigenVectorHandleCD a, const EigenVectorHandleCD b
-) { *a.vec += *b.vec; }
-
-inline void eigenVectorRSSubAssign(
-  EigenVectorHandleRS a, const EigenVectorHandleRS b
-) { *a.vec -= *b.vec; }
-
-inline void eigenVectorRDSubAssign(
-  EigenVectorHandleRD a, const EigenVectorHandleRD b
-) { *a.vec -= *b.vec; }
-
-inline void eigenVectorCSSubAssign(
-  EigenVectorHandleCS a, const EigenVectorHandleCS b
-) { *a.vec -= *b.vec; }
-
-inline void eigenVectorCDSubAssign(
-  EigenVectorHandleCD a, const EigenVectorHandleCD b
-) { *a.vec -= *b.vec; }
-
-/* scalar multiply */
-
-inline void eigenVectorRSScalarMul(
-  const EigenVectorHandleRS a, float s, EigenVectorHandleRS out
-) { *out.vec = *a.vec * s; }
-
-inline void eigenVectorRDScalarMul(
-  const EigenVectorHandleRD a, double s, EigenVectorHandleRD out
-) { *out.vec = *a.vec * s; }
-
-inline void eigenVectorCSScalarMul(
-  const EigenVectorHandleCS a, const void* s, EigenVectorHandleCS out
-) { *out.vec = *a.vec * *static_cast<const std::complex<float>*>(s); }
-
-inline void eigenVectorCDScalarMul(
-  const EigenVectorHandleCD a, const void* s, EigenVectorHandleCD out
-) { *out.vec = *a.vec * *static_cast<const std::complex<double>*>(s); }
-
-inline void eigenVectorRSScalarMulAssign(EigenVectorHandleRS a, float s) {
-  *a.vec *= s;
-}
-
-inline void eigenVectorRDScalarMulAssign(EigenVectorHandleRD a, double s) {
-  *a.vec *= s;
-}
-
-inline void eigenVectorCSScalarMulAssign(EigenVectorHandleCS a, const void* s) {
-  *a.vec *= *static_cast<const std::complex<float>*>(s);
-}
-
-inline void eigenVectorCDScalarMulAssign(EigenVectorHandleCD a, const void* s) {
-  *a.vec *= *static_cast<const std::complex<double>*>(s);
-}
-
-/* conjugate */
-
-inline void eigenVectorRSConjugate(
-  const EigenVectorHandleRS a, EigenVectorHandleRS out
-) { *out.vec = a.vec->conjugate(); }
-
-inline void eigenVectorRDConjugate(
-  const EigenVectorHandleRD a, EigenVectorHandleRD out
-) { *out.vec = a.vec->conjugate(); }
-
-inline void eigenVectorCSConjugate(
-  const EigenVectorHandleCS a, EigenVectorHandleCS out
-) { *out.vec = a.vec->conjugate(); }
-
-inline void eigenVectorCDConjugate(
-  const EigenVectorHandleCD a, EigenVectorHandleCD out
-) { *out.vec = a.vec->conjugate(); }
-
-/* negate */
-
-inline void eigenVectorRSNegate(
-  const EigenVectorHandleRS a, EigenVectorHandleRS out
-) { *out.vec = -(*a.vec); }
-
-inline void eigenVectorRDNegate(
-  const EigenVectorHandleRD a, EigenVectorHandleRD out
-) { *out.vec = -(*a.vec); }
-
-inline void eigenVectorCSNegate(
-  const EigenVectorHandleCS a, EigenVectorHandleCS out
-) { *out.vec = -(*a.vec); }
-
-inline void eigenVectorCDNegate(
-  const EigenVectorHandleCD a, EigenVectorHandleCD out
-) { *out.vec = -(*a.vec); }
-
-/* normalized (returns unit vector copy) */
-
-inline void eigenVectorRSNormalized(
-  const EigenVectorHandleRS a, EigenVectorHandleRS out
-) { *out.vec = a.vec->normalized(); }
-
-inline void eigenVectorRDNormalized(
-  const EigenVectorHandleRD a, EigenVectorHandleRD out
-) { *out.vec = a.vec->normalized(); }
-
-inline void eigenVectorCSNormalized(
-  const EigenVectorHandleCS a, EigenVectorHandleCS out
-) { *out.vec = a.vec->normalized(); }
-
-inline void eigenVectorCDNormalized(
-  const EigenVectorHandleCD a, EigenVectorHandleCD out
-) { *out.vec = a.vec->normalized(); }
-
-/* normalize (in-place) */
-
-inline void eigenVectorRSNormalize(EigenVectorHandleRS a) {
-  a.vec->normalize();
-}
-
-inline void eigenVectorRDNormalize(EigenVectorHandleRD a) {
-  a.vec->normalize();
-}
-
-inline void eigenVectorCSNormalize(EigenVectorHandleCS a) {
-  a.vec->normalize();
-}
-
-inline void eigenVectorCDNormalize(EigenVectorHandleCD a) {
-  a.vec->normalize();
-}
-
-/* squaredNorm */
-
-inline float eigenVectorRSSquaredNorm(const EigenVectorHandleRS handle) {
-  return handle.vec->squaredNorm();
-}
-
-inline double eigenVectorRDSquaredNorm(const EigenVectorHandleRD handle) {
-  return handle.vec->squaredNorm();
-}
-
-inline float eigenVectorCSSquaredNorm(const EigenVectorHandleCS handle) {
-  return handle.vec->squaredNorm();
-}
-
-inline double eigenVectorCDSquaredNorm(const EigenVectorHandleCD handle) {
-  return handle.vec->squaredNorm();
-}
-
-/* cross product (3D only) — copy to Vector3 for compile-time size check */
-
-inline void eigenVectorRSCross(
-  const EigenVectorHandleRS a, const EigenVectorHandleRS b, EigenVectorHandleRS out
-) {
-  Eigen::Vector3f va = *a.vec;
-  Eigen::Vector3f vb = *b.vec;
-  Eigen::Vector3f vc = va.cross(vb);
-  *out.vec = vc;
-}
-
-inline void eigenVectorRDCross(
-  const EigenVectorHandleRD a, const EigenVectorHandleRD b, EigenVectorHandleRD out
-) {
-  Eigen::Vector3d va = *a.vec;
-  Eigen::Vector3d vb = *b.vec;
-  Eigen::Vector3d vc = va.cross(vb);
-  *out.vec = vc;
-}
-
-inline void eigenVectorCSCross(
-  const EigenVectorHandleCS a, const EigenVectorHandleCS b, EigenVectorHandleCS out
-) {
-  Eigen::Vector3cf va = *a.vec;
-  Eigen::Vector3cf vb = *b.vec;
-  Eigen::Vector3cf vc = va.cross(vb);
-  *out.vec = vc;
-}
-
-inline void eigenVectorCDCross(
-  const EigenVectorHandleCD a, const EigenVectorHandleCD b, EigenVectorHandleCD out
-) {
-  Eigen::Vector3cd va = *a.vec;
-  Eigen::Vector3cd vb = *b.vec;
-  Eigen::Vector3cd vc = va.cross(vb);
-  *out.vec = vc;
-}
-""".}
+eigenVectorHeader()
 
 type
-  EigenVectorHandleRS* {.importcpp: "EigenVectorHandleRS".} = object
-  EigenVectorHandleRD* {.importcpp: "EigenVectorHandleRD".} = object
-  EigenVectorHandleCS* {.importcpp: "EigenVectorHandleCS".} = object
-  EigenVectorHandleCD* {.importcpp: "EigenVectorHandleCD".} = object
+  EigenVectorHandleRS* {.importcpp: "EigenVectorHandleRS", vector.} = object
+  EigenVectorHandleRD* {.importcpp: "EigenVectorHandleRD", vector.} = object
+  EigenVectorHandleCS* {.importcpp: "EigenVectorHandleCS", vector.} = object
+  EigenVectorHandleCD* {.importcpp: "EigenVectorHandleCD", vector.} = object
 
 record EigenVector*[T]:
   var size: int
@@ -471,283 +60,311 @@ record EigenVector*[T]:
 
 proc createEigenVectorRS(
   data: ptr float32; size, stride: int
-): EigenVectorHandleRS {.importcpp: "createEigenVectorRS(@)".}
+): EigenVectorHandleRS {.importcpp: "createEigenVectorRS(@)", vector.}
 
 proc createEigenVectorRD(
   data: ptr float64; size, stride: int
-): EigenVectorHandleRD {.importcpp: "createEigenVectorRD(@)".}
+): EigenVectorHandleRD {.importcpp: "createEigenVectorRD(@)", vector.}
 
 proc createEigenVectorCS(
   data: pointer; size, stride: int
-): EigenVectorHandleCS {.importcpp: "createEigenVectorCS(@)".}
-
+): EigenVectorHandleCS {.importcpp: "createEigenVectorCS(@)", vector.}
 proc createEigenVectorCD(
   data: pointer; size, stride: int
-): EigenVectorHandleCD {.importcpp: "createEigenVectorCD(@)".}
+): EigenVectorHandleCD {.importcpp: "createEigenVectorCD(@)", vector.}
 
 # temp constructors
 
 proc createTempEigenVectorRS(
   size, stride: int
-): EigenVectorHandleRS {.importcpp: "createTempEigenVectorRS(@)".}
+): EigenVectorHandleRS {.importcpp: "createTempEigenVectorRS(@)", vector.}
 
 proc createTempEigenVectorRD(
   size, stride: int
-): EigenVectorHandleRD {.importcpp: "createTempEigenVectorRD(@)".}
-
+): EigenVectorHandleRD {.importcpp: "createTempEigenVectorRD(@)", vector.}
 proc createTempEigenVectorCS(
   size, stride: int
-): EigenVectorHandleCS {.importcpp: "createTempEigenVectorCS(@)".}
+): EigenVectorHandleCS {.importcpp: "createTempEigenVectorCS(@)", vector.}
 
 proc createTempEigenVectorCD(
   size, stride: int
-): EigenVectorHandleCD {.importcpp: "createTempEigenVectorCD(@)".}
-
+): EigenVectorHandleCD {.importcpp: "createTempEigenVectorCD(@)", vector.}
 # destructors
 
 proc destroyEigenVectorRS(handle: EigenVectorHandleRS, ownsData: bool) 
-  {.importcpp: "destroyEigenVectorRS(@)".}
+  {.importcpp: "destroyEigenVectorRS(@)", vector.}
 
 proc destroyEigenVectorRD(handle: EigenVectorHandleRD, ownsData: bool) 
-  {.importcpp: "destroyEigenVectorRD(@)".}
+  {.importcpp: "destroyEigenVectorRD(@)", vector.}
 
 proc destroyEigenVectorCS(handle: EigenVectorHandleCS, ownsData: bool) 
-  {.importcpp: "destroyEigenVectorCS(@)".}
+  {.importcpp: "destroyEigenVectorCS(@)", vector.}
 
 proc destroyEigenVectorCD(handle: EigenVectorHandleCD, ownsData: bool) 
-  {.importcpp: "destroyEigenVectorCD(@)".}
+  {.importcpp: "destroyEigenVectorCD(@)", vector.}
+
+# clone — for =copy hook (new Map pointing to same data, ownsData=false)
+
+proc cloneEigenVectorRS(handle: EigenVectorHandleRS): EigenVectorHandleRS
+  {.importcpp: "cloneEigenVectorRS(@)", vector.}
+proc cloneEigenVectorRD(handle: EigenVectorHandleRD): EigenVectorHandleRD
+  {.importcpp: "cloneEigenVectorRD(@)", vector.}
+proc cloneEigenVectorCS(handle: EigenVectorHandleCS): EigenVectorHandleCS
+  {.importcpp: "cloneEigenVectorCS(@)", vector.}
+proc cloneEigenVectorCD(handle: EigenVectorHandleCD): EigenVectorHandleCD
+  {.importcpp: "cloneEigenVectorCD(@)", vector.}
+
+# copy-from and fill — for := operator
+
+proc eigenVectorRSCopyFrom(dst, src: EigenVectorHandleRS)
+  {.importcpp: "eigenVectorRSCopyFrom(@)", vector.}
+proc eigenVectorRDCopyFrom(dst, src: EigenVectorHandleRD)
+  {.importcpp: "eigenVectorRDCopyFrom(@)", vector.}
+proc eigenVectorCSCopyFrom(dst, src: EigenVectorHandleCS)
+  {.importcpp: "eigenVectorCSCopyFrom(@)", vector.}
+proc eigenVectorCDCopyFrom(dst, src: EigenVectorHandleCD)
+  {.importcpp: "eigenVectorCDCopyFrom(@)", vector.}
+
+proc eigenVectorRSFill(handle: EigenVectorHandleRS, value: float32)
+  {.importcpp: "eigenVectorRSFill(@)", vector.}
+proc eigenVectorRDFill(handle: EigenVectorHandleRD, value: float64)
+  {.importcpp: "eigenVectorRDFill(@)", vector.}
+proc eigenVectorCSFill(handle: EigenVectorHandleCS, value: pointer)
+  {.importcpp: "eigenVectorCSFill(@)", vector.}
+proc eigenVectorCDFill(handle: EigenVectorHandleCD, value: pointer)
+  {.importcpp: "eigenVectorCDFill(@)", vector.}
 
 # accessors
 
 proc eigenVectorRSGet(handle: EigenVectorHandleRS, idx: int): float32 
-  {.importcpp: "eigenVectorRSGet(@)".}
+  {.importcpp: "eigenVectorRSGet(@)", vector.}
 
 proc eigenVectorRDGet(handle: EigenVectorHandleRD, idx: int): float64 
-  {.importcpp: "eigenVectorRDGet(@)".}
+  {.importcpp: "eigenVectorRDGet(@)", vector.}
 
 proc eigenVectorCSGet(handle: EigenVectorHandleCS, idx: int, outVal: pointer) 
-  {.importcpp: "eigenVectorCSGet(@)".}
+  {.importcpp: "eigenVectorCSGet(@)", vector.}
 
 proc eigenVectorCDGet(handle: EigenVectorHandleCD, idx: int, outVal: pointer) 
-  {.importcpp: "eigenVectorCDGet(@)".}
+  {.importcpp: "eigenVectorCDGet(@)", vector.}
 
 proc eigenVectorRSSet(handle: EigenVectorHandleRS, idx: int, value: float32) 
-  {.importcpp: "eigenVectorRSSet(@)".}
+  {.importcpp: "eigenVectorRSSet(@)", vector.}
 
 proc eigenVectorRDSet(handle: EigenVectorHandleRD, idx: int, value: float64) 
-  {.importcpp: "eigenVectorRDSet(@)".}
+  {.importcpp: "eigenVectorRDSet(@)", vector.}
 
 proc eigenVectorCSSet(handle: EigenVectorHandleCS, idx: int, value: pointer) 
-  {.importcpp: "eigenVectorCSSet(@)".}
+  {.importcpp: "eigenVectorCSSet(@)", vector.}
 
 proc eigenVectorCDSet(handle: EigenVectorHandleCD, idx: int, value: pointer) 
-  {.importcpp: "eigenVectorCDSet(@)".}
+  {.importcpp: "eigenVectorCDSet(@)", vector.}
 
 # algebra
 
 proc eigenVectorRSAdd(a, b: EigenVectorHandleRS; c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSAdd(@)".}
+  {.importcpp: "eigenVectorRSAdd(@)", vector.}
 
 proc eigenVectorRDAdd(a, b: EigenVectorHandleRD; c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDAdd(@)".}
+  {.importcpp: "eigenVectorRDAdd(@)", vector.}
 
 proc eigenVectorCSAdd(a, b: EigenVectorHandleCS; c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSAdd(@)".}
+  {.importcpp: "eigenVectorCSAdd(@)", vector.}
 
 proc eigenVectorCDAdd(a, b: EigenVectorHandleCD; c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDAdd(@)".}
+  {.importcpp: "eigenVectorCDAdd(@)", vector.}
 
 proc eigenVectorRSSub(a, b: EigenVectorHandleRS; c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSSub(@)".}
+  {.importcpp: "eigenVectorRSSub(@)", vector.}
 
 proc eigenVectorRDSub(a, b: EigenVectorHandleRD; c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDSub(@)".}
+  {.importcpp: "eigenVectorRDSub(@)", vector.}
 
 proc eigenVectorCSSub(a, b: EigenVectorHandleCS; c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSSub(@)".}
+  {.importcpp: "eigenVectorCSSub(@)", vector.}
 
 proc eigenVectorCDSub(a, b: EigenVectorHandleCD; c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDSub(@)".}
+  {.importcpp: "eigenVectorCDSub(@)", vector.}
 
 proc eigenVectorRSMul(a, b: EigenVectorHandleRS; c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSMul(@)".}
+  {.importcpp: "eigenVectorRSMul(@)", vector.}
 
 proc eigenVectorRDMul(a, b: EigenVectorHandleRD; c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDMul(@)".}
+  {.importcpp: "eigenVectorRDMul(@)", vector.}
 
 proc eigenVectorCSMul(a, b: EigenVectorHandleCS; c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSMul(@)".}
+  {.importcpp: "eigenVectorCSMul(@)", vector.}
 
 proc eigenVectorCDMul(a, b: EigenVectorHandleCD; c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDMul(@)".}
+  {.importcpp: "eigenVectorCDMul(@)", vector.}
 
 # dot product
 
 proc eigenVectorRSDot(a, b: EigenVectorHandleRS): float32 
-  {.importcpp: "eigenVectorRSDot(@)".}
+  {.importcpp: "eigenVectorRSDot(@)", vector.}
 
 proc eigenVectorRDDot(a, b: EigenVectorHandleRD): float64 
-  {.importcpp: "eigenVectorRDDot(@)".}
+  {.importcpp: "eigenVectorRDDot(@)", vector.}
 
 proc eigenVectorCSDot(a, b: EigenVectorHandleCS, outVal: pointer) 
-  {.importcpp: "eigenVectorCSDot(@)".}
+  {.importcpp: "eigenVectorCSDot(@)", vector.}
 
 proc eigenVectorCDDot(a, b: EigenVectorHandleCD, outVal: pointer) 
-  {.importcpp: "eigenVectorCDDot(@)".}
+  {.importcpp: "eigenVectorCDDot(@)", vector.}
 
 # norm
 
 proc eigenVectorRSNorm(handle: EigenVectorHandleRS): float32 
-  {.importcpp: "eigenVectorRSNorm(@)".}
+  {.importcpp: "eigenVectorRSNorm(@)", vector.}
 
 proc eigenVectorRDNorm(handle: EigenVectorHandleRD): float64 
-  {.importcpp: "eigenVectorRDNorm(@)".}
+  {.importcpp: "eigenVectorRDNorm(@)", vector.}
 
 proc eigenVectorCSNorm(handle: EigenVectorHandleCS): float32 
-  {.importcpp: "eigenVectorCSNorm(@)".}
+  {.importcpp: "eigenVectorCSNorm(@)", vector.}
 
 proc eigenVectorCDNorm(handle: EigenVectorHandleCD): float64 
-  {.importcpp: "eigenVectorCDNorm(@)".}
+  {.importcpp: "eigenVectorCDNorm(@)", vector.}
 
 # compound assignment
 
 proc eigenVectorRSAddAssign(a, b: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSAddAssign(@)".}
+  {.importcpp: "eigenVectorRSAddAssign(@)", vector.}
 
 proc eigenVectorRDAddAssign(a, b: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDAddAssign(@)".}
+  {.importcpp: "eigenVectorRDAddAssign(@)", vector.}
 
 proc eigenVectorCSAddAssign(a, b: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSAddAssign(@)".}
+  {.importcpp: "eigenVectorCSAddAssign(@)", vector.}
 
 proc eigenVectorCDAddAssign(a, b: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDAddAssign(@)".}
+  {.importcpp: "eigenVectorCDAddAssign(@)", vector.}
 
 proc eigenVectorRSSubAssign(a, b: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSSubAssign(@)".}
+  {.importcpp: "eigenVectorRSSubAssign(@)", vector.}
 
 proc eigenVectorRDSubAssign(a, b: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDSubAssign(@)".}
+  {.importcpp: "eigenVectorRDSubAssign(@)", vector.}
 
 proc eigenVectorCSSubAssign(a, b: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSSubAssign(@)".}
+  {.importcpp: "eigenVectorCSSubAssign(@)", vector.}
 
 proc eigenVectorCDSubAssign(a, b: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDSubAssign(@)".}
+  {.importcpp: "eigenVectorCDSubAssign(@)", vector.}
 
 # scalar multiply
 
 proc eigenVectorRSScalarMul(a: EigenVectorHandleRS, s: float32, c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSScalarMul(@)".}
+  {.importcpp: "eigenVectorRSScalarMul(@)", vector.}
 
 proc eigenVectorRDScalarMul(a: EigenVectorHandleRD, s: float64, c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDScalarMul(@)".}
+  {.importcpp: "eigenVectorRDScalarMul(@)", vector.}
 
 proc eigenVectorCSScalarMul(a: EigenVectorHandleCS, s: pointer, c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSScalarMul(@)".}
+  {.importcpp: "eigenVectorCSScalarMul(@)", vector.}
 
 proc eigenVectorCDScalarMul(a: EigenVectorHandleCD, s: pointer, c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDScalarMul(@)".}
+  {.importcpp: "eigenVectorCDScalarMul(@)", vector.}
 
 proc eigenVectorRSScalarMulAssign(a: EigenVectorHandleRS, s: float32) 
-  {.importcpp: "eigenVectorRSScalarMulAssign(@)".}
+  {.importcpp: "eigenVectorRSScalarMulAssign(@)", vector.}
 
 proc eigenVectorRDScalarMulAssign(a: EigenVectorHandleRD, s: float64) 
-  {.importcpp: "eigenVectorRDScalarMulAssign(@)".}
+  {.importcpp: "eigenVectorRDScalarMulAssign(@)", vector.}
 
 proc eigenVectorCSScalarMulAssign(a: EigenVectorHandleCS, s: pointer) 
-  {.importcpp: "eigenVectorCSScalarMulAssign(@)".}
+  {.importcpp: "eigenVectorCSScalarMulAssign(@)", vector.}
 
 proc eigenVectorCDScalarMulAssign(a: EigenVectorHandleCD, s: pointer) 
-  {.importcpp: "eigenVectorCDScalarMulAssign(@)".}
+  {.importcpp: "eigenVectorCDScalarMulAssign(@)", vector.}
 
 # conjugate
 
 proc eigenVectorRSConjugate(a: EigenVectorHandleRS, c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSConjugate(@)".}
+  {.importcpp: "eigenVectorRSConjugate(@)", vector.}
 
 proc eigenVectorRDConjugate(a: EigenVectorHandleRD, c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDConjugate(@)".}
+  {.importcpp: "eigenVectorRDConjugate(@)", vector.}
 
 proc eigenVectorCSConjugate(a: EigenVectorHandleCS, c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSConjugate(@)".}
+  {.importcpp: "eigenVectorCSConjugate(@)", vector.}
 
 proc eigenVectorCDConjugate(a: EigenVectorHandleCD, c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDConjugate(@)".}
+  {.importcpp: "eigenVectorCDConjugate(@)", vector.}
 
 # negate
 
 proc eigenVectorRSNegate(a: EigenVectorHandleRS, c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSNegate(@)".}
+  {.importcpp: "eigenVectorRSNegate(@)", vector.}
 
 proc eigenVectorRDNegate(a: EigenVectorHandleRD, c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDNegate(@)".}
+  {.importcpp: "eigenVectorRDNegate(@)", vector.}
 
 proc eigenVectorCSNegate(a: EigenVectorHandleCS, c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSNegate(@)".}
+  {.importcpp: "eigenVectorCSNegate(@)", vector.}
 
 proc eigenVectorCDNegate(a: EigenVectorHandleCD, c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDNegate(@)".}
+  {.importcpp: "eigenVectorCDNegate(@)", vector.}
 
 # normalized
 
 proc eigenVectorRSNormalized(a: EigenVectorHandleRS, c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSNormalized(@)".}
+  {.importcpp: "eigenVectorRSNormalized(@)", vector.}
 
 proc eigenVectorRDNormalized(a: EigenVectorHandleRD, c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDNormalized(@)".}
+  {.importcpp: "eigenVectorRDNormalized(@)", vector.}
 
 proc eigenVectorCSNormalized(a: EigenVectorHandleCS, c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSNormalized(@)".}
+  {.importcpp: "eigenVectorCSNormalized(@)", vector.}
 
 proc eigenVectorCDNormalized(a: EigenVectorHandleCD, c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDNormalized(@)".}
+  {.importcpp: "eigenVectorCDNormalized(@)", vector.}
 
 # normalize (in-place)
 
 proc eigenVectorRSNormalize(a: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSNormalize(@)".}
+  {.importcpp: "eigenVectorRSNormalize(@)", vector.}
 
 proc eigenVectorRDNormalize(a: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDNormalize(@)".}
+  {.importcpp: "eigenVectorRDNormalize(@)", vector.}
 
 proc eigenVectorCSNormalize(a: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSNormalize(@)".}
+  {.importcpp: "eigenVectorCSNormalize(@)", vector.}
 
 proc eigenVectorCDNormalize(a: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDNormalize(@)".}
+  {.importcpp: "eigenVectorCDNormalize(@)", vector.}
 
 # squaredNorm
 
 proc eigenVectorRSSquaredNorm(handle: EigenVectorHandleRS): float32 
-  {.importcpp: "eigenVectorRSSquaredNorm(@)".}
+  {.importcpp: "eigenVectorRSSquaredNorm(@)", vector.}
 
 proc eigenVectorRDSquaredNorm(handle: EigenVectorHandleRD): float64 
-  {.importcpp: "eigenVectorRDSquaredNorm(@)".}
+  {.importcpp: "eigenVectorRDSquaredNorm(@)", vector.}
 
 proc eigenVectorCSSquaredNorm(handle: EigenVectorHandleCS): float32 
-  {.importcpp: "eigenVectorCSSquaredNorm(@)".}
+  {.importcpp: "eigenVectorCSSquaredNorm(@)", vector.}
 
 proc eigenVectorCDSquaredNorm(handle: EigenVectorHandleCD): float64 
-  {.importcpp: "eigenVectorCDSquaredNorm(@)".}
+  {.importcpp: "eigenVectorCDSquaredNorm(@)", vector.}
 
 # cross product (3D only)
 
 proc eigenVectorRSCross(a, b: EigenVectorHandleRS; c: EigenVectorHandleRS) 
-  {.importcpp: "eigenVectorRSCross(@)".}
+  {.importcpp: "eigenVectorRSCross(@)", vector.}
 
 proc eigenVectorRDCross(a, b: EigenVectorHandleRD; c: EigenVectorHandleRD) 
-  {.importcpp: "eigenVectorRDCross(@)".}
+  {.importcpp: "eigenVectorRDCross(@)", vector.}
 
 proc eigenVectorCSCross(a, b: EigenVectorHandleCS; c: EigenVectorHandleCS) 
-  {.importcpp: "eigenVectorCSCross(@)".}
+  {.importcpp: "eigenVectorCSCross(@)", vector.}
 
 proc eigenVectorCDCross(a, b: EigenVectorHandleCD; c: EigenVectorHandleCD) 
-  {.importcpp: "eigenVectorCDCross(@)".}
+  {.importcpp: "eigenVectorCDCross(@)", vector.}
 
 #[ EigenVector implementation ]#
 
-impl EigenVector:
+recordImpl EigenVector:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T; numSize, numStride: int) =
@@ -786,7 +403,7 @@ impl EigenVector:
   
   #[ accessors ]#
 
-  method `[]`(idx: int): T =
+  method `[]`(idx: int): T {.immutable.} =
     when isReal32(T):
       return eigenVectorRSGet(this.data, idx)
     elif isReal64(T):
@@ -814,7 +431,7 @@ impl EigenVector:
   
   #[ algebra ]#
 
-  method `+`(other: EigenVector[T]): EigenVector[T] =
+  method `+`(other: EigenVector[T]): EigenVector[T] {.immutable.} =
     assert this.size == other.size, "size mismatch"
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSAdd(this.data, other.data, result.data)
@@ -822,7 +439,7 @@ impl EigenVector:
     elif isComplex32(T): eigenVectorCSAdd(this.data, other.data, result.data)
     elif isComplex64(T): eigenVectorCDAdd(this.data, other.data, result.data)
   
-  method `-`(other: EigenVector[T]): EigenVector[T] =
+  method `-`(other: EigenVector[T]): EigenVector[T] {.immutable.} =
     assert this.size == other.size, "size mismatch"
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSSub(this.data, other.data, result.data)
@@ -830,7 +447,7 @@ impl EigenVector:
     elif isComplex32(T): eigenVectorCSSub(this.data, other.data, result.data)
     elif isComplex64(T): eigenVectorCDSub(this.data, other.data, result.data)
   
-  method `*`(other: EigenVector[T]): EigenVector[T] =
+  method `*`(other: EigenVector[T]): EigenVector[T] {.immutable.} =
     assert this.size == other.size, "size mismatch"
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSMul(this.data, other.data, result.data)
@@ -838,7 +455,7 @@ impl EigenVector:
     elif isComplex32(T): eigenVectorCSMul(this.data, other.data, result.data)
     elif isComplex64(T): eigenVectorCDMul(this.data, other.data, result.data)
   
-  method `*`(scalar: T): EigenVector[T] =
+  method `*`(scalar: T): EigenVector[T] {.immutable.} =
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSScalarMul(this.data, scalar, result.data)
     elif isReal64(T): eigenVectorRDScalarMul(this.data, scalar, result.data)
@@ -849,7 +466,7 @@ impl EigenVector:
       var s = scalar
       eigenVectorCDScalarMul(this.data, addr s, result.data)
 
-  method dot(other: EigenVector[T]): T =
+  method dot(other: EigenVector[T]): T {.immutable.} =
     assert this.size == other.size, "size mismatch"
     when isReal32(T):
       return eigenVectorRSDot(this.data, other.data)
@@ -864,7 +481,7 @@ impl EigenVector:
       eigenVectorCDDot(this.data, other.data, addr res)
       return res
   
-  method norm(): auto =
+  method norm(): auto {.immutable.} =
     when isReal32(T):
       return eigenVectorRSNorm(this.data)
     elif isReal64(T):
@@ -900,21 +517,21 @@ impl EigenVector:
   
   #[ unary operations ]#
 
-  method conjugate(): EigenVector[T] =
+  method conjugate(): EigenVector[T] {.immutable.} =
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSConjugate(this.data, result.data)
     elif isReal64(T): eigenVectorRDConjugate(this.data, result.data)
     elif isComplex32(T): eigenVectorCSConjugate(this.data, result.data)
     elif isComplex64(T): eigenVectorCDConjugate(this.data, result.data)
   
-  method `-`(): EigenVector[T] =
+  method `-`(): EigenVector[T] {.immutable.} =
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSNegate(this.data, result.data)
     elif isReal64(T): eigenVectorRDNegate(this.data, result.data)
     elif isComplex32(T): eigenVectorCSNegate(this.data, result.data)
     elif isComplex64(T): eigenVectorCDNegate(this.data, result.data)
   
-  method normalized(): EigenVector[T] =
+  method normalized(): EigenVector[T] {.immutable.} =
     result = newEigenVector[T](this.size, this.stride)
     when isReal32(T): eigenVectorRSNormalized(this.data, result.data)
     elif isReal64(T): eigenVectorRDNormalized(this.data, result.data)
@@ -944,6 +561,53 @@ impl EigenVector:
     elif isReal64(T): eigenVectorRDCross(this.data, other.data, result.data)
     elif isComplex32(T): eigenVectorCSCross(this.data, other.data, result.data)
     elif isComplex64(T): eigenVectorCDCross(this.data, other.data, result.data)
+
+# =copy hook: when an EigenVector is copied (e.g. passed by value to an
+# {.immutable.} method), create a fresh Map pointing to the same underlying
+# data with ownsData=false so that the copy's =destroy only frees the Map
+# wrapper — not the data — leaving the original intact.
+proc `=copy`*[T](dst: var EigenVector[T]; src: EigenVector[T]) =
+  if addr(dst) == unsafeAddr(src): return
+  dst.size = src.size
+  dst.stride = src.stride
+  dst.ownsData = false
+  when isReal32(T):    dst.data = cloneEigenVectorRS(src.data)
+  elif isReal64(T):    dst.data = cloneEigenVectorRD(src.data)
+  elif isComplex32(T): dst.data = cloneEigenVectorCS(src.data)
+  elif isComplex64(T): dst.data = cloneEigenVectorCD(src.data)
+
+proc `=sink`*[T](dst: var EigenVector[T]; src: EigenVector[T]) =
+  # Transfer ownership from src to dst without cloning.
+  # =destroy will NOT be called on src by the compiler after this.
+  `=destroy`(dst)
+  dst.size = src.size
+  dst.stride = src.stride
+  dst.ownsData = src.ownsData
+  when isReal32(T):    dst.data = src.data
+  elif isReal64(T):    dst.data = src.data
+  elif isComplex32(T): dst.data = src.data
+  elif isComplex64(T): dst.data = src.data
+
+proc `:=`*[T](dst: EigenVector[T]; src: EigenVector[T]) =
+  ## Write-through: copies src's elements into dst's underlying buffer.
+  ## dst need not be `var` — writes go through the C++ handle, not the struct.
+  assert dst.size == src.size, "size mismatch"
+  when isReal32(T):    eigenVectorRSCopyFrom(dst.data, src.data)
+  elif isReal64(T):    eigenVectorRDCopyFrom(dst.data, src.data)
+  elif isComplex32(T): eigenVectorCSCopyFrom(dst.data, src.data)
+  elif isComplex64(T): eigenVectorCDCopyFrom(dst.data, src.data)
+
+proc `:=`*[T](dst: EigenVector[T]; val: T) =
+  ## Fill: set every element of the vector to val through the view.
+  ## dst need not be `var` — writes go through the C++ handle, not the struct.
+  when isReal32(T):    eigenVectorRSFill(dst.data, val)
+  elif isReal64(T):    eigenVectorRDFill(dst.data, val)
+  elif isComplex32(T):
+    var v = val
+    eigenVectorCSFill(dst.data, addr v)
+  elif isComplex64(T):
+    var v = val
+    eigenVectorCDFill(dst.data, addr v)
 
 when isMainModule:
   import std/[unittest, math]
@@ -1136,3 +800,39 @@ when isMainModule:
       check c2[0] == -3.0
       check c2[1] == 6.0
       check c2[2] == -3.0
+
+    test ":= copy-from (write-through from another vector)":
+      var adata = [1.0, 2.0, 3.0]
+      var bdata = [10.0, 20.0, 30.0]
+      var a = newEigenVector(addr adata[0], 3, 1)
+      var b = newEigenVector(addr bdata[0], 3, 1)
+
+      # := writes b's values into a's underlying buffer
+      a := b
+      check adata[0] == 10.0
+      check adata[1] == 20.0
+      check adata[2] == 30.0
+      check a[0] == 10.0
+      check a[1] == 20.0
+      check a[2] == 30.0
+
+      # b's buffer is untouched
+      check bdata[0] == 10.0
+
+    test ":= fill (set all elements to a scalar)":
+      var vdata = [1.0, 2.0, 3.0, 4.0]
+      var v = newEigenVector(addr vdata[0], 4, 1)
+
+      v := 99.0
+      for i in 0..<4:
+        check vdata[i] == 99.0
+        check v[i] == 99.0
+
+    test ":= complex fill":
+      var cdata = [complex(0.0, 0.0), complex(0.0, 0.0), complex(0.0, 0.0)]
+      var v = newEigenVector(addr cdata[0], 3, 1)
+
+      v := complex(3.0, -4.0)
+      for i in 0..<3:
+        check cdata[i] == complex(3.0, -4.0)
+        check v[i] == complex(3.0, -4.0)

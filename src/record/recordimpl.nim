@@ -146,7 +146,7 @@ proc generateImplConstructors(
 
     let body = newStmtList(
       newVarStmt(ident"o", newCall(newDotExpr(recDef.fullType, ident"init"))),
-      newAssignment(ident"o", initCall),
+      newNimNode(nnkDiscardStmt).add(initCall),
       newNimNode(nnkReturnStmt).add(ident"o")
     )
     def.body = body
@@ -168,7 +168,7 @@ proc generateImplConstructors(
 
 #[ The impl macro ]#
 
-macro impl*(head: untyped, body: untyped): untyped =
+macro recordImpl*(head: untyped, body: untyped): untyped =
   ## Add methods to an already-defined record outside its original body.
   let nameNode = resolveRecordName(head)
   let recDef = recordDefinitionFor(nameNode)

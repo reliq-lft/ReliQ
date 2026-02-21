@@ -49,10 +49,10 @@
 
 import utils/[private]
 import lattice/[indexing]
+import openmp/[ompbase]
 
-proc innerBlockSize*(
-  R: static[int], 
-  shape: openArray[int], 
+proc innerBlockSize*[R: static[int]](
+  shape: array[R, int],
   complexFactor: int, 
   ghostWidth: int
 ): int =
@@ -107,15 +107,15 @@ proc elementOffsets*[R: static[int]](
   ## Returns offsets[0..elemsPerSite-1] where each entry is the flat
   ## offset from the site's base pointer (after innerPaddedOffset) to
   ## the e-th real element.
-  let cf = (if isComplex: 2 else: 1)
-  let paddedCf = cf + 2 * ghostWidth
-  let elementsPerSite = product(shape) * paddedCf
+  let cmplxFctr = (if isComplex: 2 else: 1)
+  let paddedCmplxFctr = cmplxFctr + 2 * ghostWidth
+  let elementsPerSite = product(shape) * paddedCmplxFctr
 
   # calculate stride
   var strides: array[R+1, int]
   strides[R] = 1
   for r in countdown(R-1, 0):
-    let extent = (if r == R-1: paddedCf else: shape[r+1] + 2 * ghostWidth)
+    let extent = (if r == R-1: paddedCmplxFctr else: shape[r+1] + 2 * ghostWidth)
     strides[r] = strides[r+1] * extent
   
   # calculate offsets
@@ -123,10 +123,10 @@ proc elementOffsets*[R: static[int]](
   for elem in 0..<elementsPerSite:
     var remaining = elem
     var idx: array[R, int]
-    let cPart = remaining mod cf
+    let cPart = remaining mod cmplxFctr
 
     # decompose elem into row-major order
-    remaining = remaining div cf
+    remaining = remaining div cmplxFctr
     for r in countdown(R-1, 0):
       idx[r] = remaining mod shape[r]
       remaining = remaining div shape[r]
@@ -159,7 +159,10 @@ proc siteOffsets*[R: static[int]](
   let strides = strides(grid)
   let numSites = product(grid)
 
-  result = newSeq[int](numSites)
-  for n in 0..<numSites: # TODO: target for threading
-    let coords = n.lexToCoords(grid, strides)
-    result[n] = coords.siteOffset(grid, innerBlockSize)
+  var offsets = newSeq[int](numSites)
+  threads:
+    for n in 0..<numSites:
+      let coords = n.lexToCoords(grid, strides)
+      offsets[n] = coords.siteOffset(grid, innerBlockSize)
+  
+  return offsets

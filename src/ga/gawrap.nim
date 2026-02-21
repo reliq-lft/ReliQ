@@ -134,6 +134,10 @@ proc GA_Fgop*(x: ptr float32, n: cint, op: cstring)
 proc GA_Dgop*(x: ptr float64, n: cint, op: cstring) 
   {.importc: "GA_Dgop", ga, discardable.}
 
+#[ misc ]#
+
+# ...
+
 #[ derived wrappers ]#
 
 proc toGAType*(t: typedesc[int32]): cint = C_INT

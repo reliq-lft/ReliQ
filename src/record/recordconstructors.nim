@@ -142,7 +142,7 @@ proc generateExtraInits(recDef: RecordDescription) =
         proc `initName`*(`underscore`: typedesc[`classType`]): `classType`
       m.body = quote do:
         var o: `classType`
-        o = o.init()
+        discard o.init()
         return o
       m.definition.addGenericParams(recDef)
 
@@ -150,7 +150,7 @@ proc generateExtraInits(recDef: RecordDescription) =
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
         m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
-        m.body[1][1].add(nameNode)
+        m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)
 
@@ -163,14 +163,14 @@ proc generateExtraInits(recDef: RecordDescription) =
         proc `newName`*(): `classType`
       m.body = quote do:
         var o: `classType`
-        o = o.init()
+        discard o.init()
         return o
       m.definition.addGenericParams(recDef)
 
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
         m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
-        m.body[1][1].add(nameNode)
+        m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)
 
@@ -183,14 +183,14 @@ proc generateExtraInits(recDef: RecordDescription) =
         proc `newIdent`*(`underscore`: typedesc[`classType`]): `classType`
       m.body = quote do:
         var o: `classType`
-        o = o.init()
+        discard o.init()
         return o
       m.definition.addGenericParams(recDef)
 
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
         m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
-        m.body[1][1].add(nameNode)
+        m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)
 

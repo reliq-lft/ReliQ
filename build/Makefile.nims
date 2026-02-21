@@ -61,6 +61,7 @@ else:
 ### dependency specifications: users should not touch these ###
 
 const externalDir = cwd / "external"
+const srcDir = cwd / "src"
 const cudaRoot = "/usr/local/cuda"
 
 const 
@@ -81,8 +82,9 @@ const passL_GA = staticExec(metaGA + "--ldflags") +
 # Eigen is header-only; find its include path under Spack
 const eigenIncDir = staticExec("find" + externalDir / "spack/opt/spack" +
                                "-type d -name \"include\" -path \"*/eigen-*/*\" 2>/dev/null | head -1")
-const passC_Eigen = when eigenIncDir.len > 0: " -I" & eigenIncDir & "/eigen3"
-                    else: " -I" & externalDir / "include" / "eigen3"
+const passC_Eigen = (when eigenIncDir.len > 0: " -I" & eigenIncDir & "/eigen3"
+                    else: " -I" & externalDir / "include" / "eigen3") &
+                    " -I" & srcDir / "eigen"
 
 echo passC_Eigen
 

@@ -65,7 +65,9 @@
 ## CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import std/[macros]
-import std/[system]
+import std/[strutils]
+
+import utils/[private]
 
 {.passC: "-fopenmp".}
 {.passL: "-fopenmp".}
@@ -79,7 +81,7 @@ type
   ThreadLocal* = object
     threadNum*: int
     numThreads*: int
-    share*: ptr cArray[ThreadShare]
+    share*: ptr UncheckedArray[ThreadShare]
   
 var myThread* {.threadvar.}: int
 var numThreads* {.threadvar.}: int
@@ -88,12 +90,14 @@ var inited = false
 var ts: pointer = nil
 var nts = 0
 
+alwaysInlinePragma()
+
 proc omp_get_max_threads(): cint {.importc, header: "<omp.h>".}
 proc omp_get_thread_num(): cint {.importc, header: "<omp.h>".}
 proc omp_get_num_threads(): cint {.importc, header: "<omp.h>".}
 
 proc allocThreadShare {.alwaysinline.} =
-  if numThreads > nts and threadNum == 0:
+  if numThreads > nts and myThread == 0:
     if ts == nil: ts = allocShared(numThreads*sizeof(ThreadShare))
     else: ts = reallocShared(ts, numThreads*sizeof(ThreadShare))
     nts = numThreads
@@ -102,7 +106,7 @@ proc initThreadLocals =
   bind ts
   threadLocals.threadNum = myThread
   threadLocals.numThreads = numThreads
-  threadLocals.share = cast[ptr cArray[ThreadShare]](ts)
+  threadLocals.share = cast[ptr UncheckedArray[ThreadShare]](ts)
   threadLocals.share[myThread].p = nil
   threadLocals.share[myThread].counter = 0
 
@@ -150,6 +154,14 @@ template barrier* =
   ## ``#pragma omp barrier`` — synchronize all threads.
   ompPragma("barrier")
 
+template flush* =
+  ## ``#pragma omp flush`` — ensure memory visibility across threads.
+  ompPragma("flush")
+
+template main*(body: untyped) =
+  ## Main thread
+  ompBlock("master"): body
+
 template threads*(body: untyped) =
   checkThreadInit()
   doAssert numThreads == 1
@@ -178,3 +190,85 @@ template threads*(body: untyped) =
 
 when isMainModule:
   import std/[unittest]
+
+  suite "OpenMP Base Utilities":
+    test "Thread initialization sets correct state":
+      inited = false
+      myThread = -1
+      numThreads = -1
+      nts = 0
+      ts = nil
+      initThreads()
+      check:
+        inited == true
+        myThread == 0
+        numThreads == 1
+        nts == 1
+        ts != nil
+
+    test "checkThreadInit calls initThreads if needed":
+      inited = false
+      myThread = -1
+      numThreads = -1
+      nts = 0
+      ts = nil
+      checkThreadInit()
+      check:
+        inited == true
+        myThread == 0
+        numThreads == 1
+
+    test "ThreadLocal fields are set correctly":
+      inited = false
+      initThreads()
+      check:
+        threadLocals.threadNum == myThread
+        threadLocals.numThreads == numThreads
+        threadLocals.share != nil
+
+    test "allocThreadShare allocates and reallocates":
+      inited = false
+      myThread = 0
+      numThreads = 2
+      nts = 0
+      ts = nil
+      allocThreadShare()
+      let firstPtr = ts
+      check:
+        nts == 2
+        ts != nil
+      numThreads = 4
+      allocThreadShare()
+      check:
+        nts == 4
+        ts != nil
+        ts != firstPtr
+
+    test "initThreadLocals initializes share array":
+      inited = false
+      myThread = 0
+      numThreads = 2
+      nts = 0
+      ts = nil
+      allocThreadShare()
+      initThreadLocals()
+      check:
+        threadLocals.share != nil
+        threadLocals.share[myThread].p == nil
+        threadLocals.share[myThread].counter == 0
+
+    test "barrier and ompPragma macros compile":
+      # This test just ensures the macros can be called without error
+      threads:
+        barrier()
+        flush()
+      check true
+
+    test "threads template runs and sets thread state":
+      var ran = false
+      threads:
+        ran = true
+        check:
+          myThread == omp_get_thread_num()
+          numThreads == omp_get_max_threads()
+      check ran

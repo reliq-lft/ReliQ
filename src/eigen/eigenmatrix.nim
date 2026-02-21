@@ -30,484 +30,16 @@
 import record/[record]
 import utils/[complex]
 
-{.emit: """/*TYPESECTION*/
-#include <Eigen/Dense>
+template eigenMatrixHeader*: untyped =
+  {.pragma: matrix, header: "eigenmatrix.h".}
 
-#define MatrixTemplateArgs Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor
-#define MapTemplateArgs Eigen::Unaligned, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>
-
-#define EigenStride(outer, inner) Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>(outer, inner)
-
-/* base matrix types */
-
-using EigenMatrixRS = Eigen::Matrix<float, MatrixTemplateArgs>;
-using EigenMatrixRD = Eigen::Matrix<double, MatrixTemplateArgs>;
-using EigenMatrixCS = Eigen::Matrix<std::complex<float>, MatrixTemplateArgs>;
-using EigenMatrixCD = Eigen::Matrix<std::complex<double>, MatrixTemplateArgs>;
-
-using EigenMapMatrixRS = Eigen::Map<EigenMatrixRS, MapTemplateArgs>;
-using EigenMapMatrixRD = Eigen::Map<EigenMatrixRD, MapTemplateArgs>;
-using EigenMapMatrixCS = Eigen::Map<EigenMatrixCS, MapTemplateArgs>;
-using EigenMapMatrixCD = Eigen::Map<EigenMatrixCD, MapTemplateArgs>;
-
-struct EigenMatrixHandleRS { EigenMapMatrixRS* mat; };
-struct EigenMatrixHandleRD { EigenMapMatrixRD* mat; };
-struct EigenMatrixHandleCS { EigenMapMatrixCS* mat; };
-struct EigenMatrixHandleCD { EigenMapMatrixCD* mat; };
-
-/* base matrix constructors/destructors */
-
-inline EigenMatrixHandleRS createEigenMatrixRS(
-  float* data, int rows, int cols, int outer, int inner
-) {
-  auto* matrix = new EigenMapMatrixRS(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleRS{matrix};
-}
-
-inline EigenMatrixHandleRD createEigenMatrixRD(
-  double* data, int rows, int cols, int outer, int inner
-) {
-  auto* matrix = new EigenMapMatrixRD(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleRD{matrix};
-}
-
-inline EigenMatrixHandleCS createEigenMatrixCS(
-  void* data, int rows, int cols, int outer, int inner
-) {
-  auto* matrix = new EigenMapMatrixCS(static_cast<std::complex<float>*>(data), rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleCS{matrix};
-}
-
-inline EigenMatrixHandleCD createEigenMatrixCD(
-  void* data, int rows, int cols, int outer, int inner
-) {
-  auto* matrix = new EigenMapMatrixCD(static_cast<std::complex<double>*>(data), rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleCD{matrix};
-}
-
-/* temporary matrix constructors — allocate owned data buffer */
-
-inline EigenMatrixHandleRS createTempEigenMatrixRS(
-  int rows, int cols, int outer, int inner
-) {
-  auto* data = new float[rows * cols]();
-  auto* matrix = new EigenMapMatrixRS(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleRS{matrix};
-}
-
-inline EigenMatrixHandleRD createTempEigenMatrixRD(
-  int rows, int cols, int outer, int inner
-) {
-  auto* data = new double[rows * cols]();
-  auto* matrix = new EigenMapMatrixRD(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleRD{matrix};
-}
-
-inline EigenMatrixHandleCS createTempEigenMatrixCS(
-  int rows, int cols, int outer, int inner
-) {
-  auto* data = new std::complex<float>[rows * cols]();
-  auto* matrix = new EigenMapMatrixCS(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleCS{matrix};
-}
-
-inline EigenMatrixHandleCD createTempEigenMatrixCD(
-  int rows, int cols, int outer, int inner
-) {
-  auto* data = new std::complex<double>[rows * cols]();
-  auto* matrix = new EigenMapMatrixCD(data, rows, cols, EigenStride(outer, inner));
-  return EigenMatrixHandleCD{matrix};
-}
-
-/* destructors */
-
-inline void destroyEigenMatrixRS(EigenMatrixHandleRS handle, bool ownsData) {
-  if (ownsData) delete[] handle.mat->data();
-  delete handle.mat;
-}
-inline void destroyEigenMatrixRD(EigenMatrixHandleRD handle, bool ownsData) {
-  if (ownsData) delete[] handle.mat->data();
-  delete handle.mat;
-}
-inline void destroyEigenMatrixCS(EigenMatrixHandleCS handle, bool ownsData) {
-  if (ownsData) delete[] handle.mat->data();
-  delete handle.mat;
-}
-inline void destroyEigenMatrixCD(EigenMatrixHandleCD handle, bool ownsData) {
-  if (ownsData) delete[] handle.mat->data();
-  delete handle.mat;
-}
-
-/* accessors */
-
-inline float eigenMatrixRSGet(const EigenMatrixHandleRS handle, int row, int col) {
-  return (*handle.mat)(row, col);
-}
-
-inline double eigenMatrixRDGet(const EigenMatrixHandleRD handle, int row, int col) {
-  return (*handle.mat)(row, col);
-}
-
-inline void eigenMatrixCSGet(
-  const EigenMatrixHandleCS handle, 
-  int row, 
-  int col,
-  void* out
-) { *static_cast<std::complex<float>*>(out) = (*handle.mat)(row, col); }
-
-inline void eigenMatrixCDGet(
-  const EigenMatrixHandleCD handle, 
-  int row, 
-  int col,
-  void* out
-) { *static_cast<std::complex<double>*>(out) = (*handle.mat)(row, col); }
-
-inline void eigenMatrixRSSet(
-  EigenMatrixHandleRS handle, 
-  int row, 
-  int col, 
-  float value
-) { (*handle.mat)(row, col) = value; }
-
-inline void eigenMatrixRDSet(
-  EigenMatrixHandleRD handle, 
-  int row, 
-  int col, 
-  double value
-) { (*handle.mat)(row, col) = value; }
-
-inline void eigenMatrixCSSet(
-  EigenMatrixHandleCS handle, 
-  int row, 
-  int col, 
-  const void* value
-) { (*handle.mat)(row, col) = *static_cast<const std::complex<float>*>(value); }
-
-inline void eigenMatrixCDSet(
-  EigenMatrixHandleCD handle, 
-  int row, 
-  int col, 
-  const void* value
-) { (*handle.mat)(row, col) = *static_cast<const std::complex<double>*>(value); }
-
-/* algebra */
-
-inline void eigenMatrixRSAdd(
-  const EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b, 
-  EigenMatrixHandleRS out
-) { *out.mat = *a.mat + *b.mat; }
-
-inline void eigenMatrixRDAdd(
-  const EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b, 
-  EigenMatrixHandleRD out
-) { *out.mat = *a.mat + *b.mat; }
-
-inline void eigenMatrixCSAdd(
-  const EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b, 
-  EigenMatrixHandleCS out
-) { *out.mat = *a.mat + *b.mat; }
-
-inline void eigenMatrixCDAdd(
-  const EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b, 
-  EigenMatrixHandleCD out
-) { *out.mat = *a.mat + *b.mat; }
-
-inline void eigenMatrixRSSub(
-  const EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b, 
-  EigenMatrixHandleRS out
-) { *out.mat = *a.mat - *b.mat; }
-
-inline void eigenMatrixRDSub(
-  const EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b, 
-  EigenMatrixHandleRD out
-) { *out.mat = *a.mat - *b.mat; }
-
-inline void eigenMatrixCSSub(
-  const EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b, 
-  EigenMatrixHandleCS out
-) { *out.mat = *a.mat - *b.mat; }
-
-inline void eigenMatrixCDSub(
-  const EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b, 
-  EigenMatrixHandleCD out
-) { *out.mat = *a.mat - *b.mat; }
-
-inline void eigenMatrixRSMul(
-  const EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b, 
-  EigenMatrixHandleRS out
-) { *out.mat = (*a.mat) * (*b.mat); }
-
-inline void eigenMatrixRDMul(
-  const EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b, 
-  EigenMatrixHandleRD out
-) { *out.mat = (*a.mat) * (*b.mat); }
-
-inline void eigenMatrixCSMul(
-  const EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b, 
-  EigenMatrixHandleCS out
-) { *out.mat = (*a.mat) * (*b.mat); }
-
-inline void eigenMatrixCDMul(
-  const EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b, 
-  EigenMatrixHandleCD out
-) { *out.mat = (*a.mat) * (*b.mat); }
-
-inline void eigenMatrixRSAddAssign(
-  EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b
-) { *a.mat += *b.mat; }
-
-inline void eigenMatrixRDAddAssign(
-  EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b
-) { *a.mat += *b.mat; }
-
-inline void eigenMatrixCSAddAssign(
-  EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b
-) { *a.mat += *b.mat; }
-
-inline void eigenMatrixCDAddAssign(
-  EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b
-) { *a.mat += *b.mat; }
-
-inline void eigenMatrixRSSubAssign(
-  EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b
-) { *a.mat -= *b.mat; }
-
-inline void eigenMatrixRDSubAssign(
-  EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b
-) { *a.mat -= *b.mat; }
-
-inline void eigenMatrixCSSubAssign(
-  EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b
-) { *a.mat -= *b.mat; }
-
-inline void eigenMatrixCDSubAssign(
-  EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b
-) { *a.mat -= *b.mat; }
-
-inline void eigenMatrixRSMulAssign(
-  EigenMatrixHandleRS a, 
-  const EigenMatrixHandleRS b
-) { *a.mat *= *b.mat; }
-
-inline void eigenMatrixRDMulAssign(
-  EigenMatrixHandleRD a, 
-  const EigenMatrixHandleRD b
-) { *a.mat *= *b.mat; }
-
-inline void eigenMatrixCSMulAssign(
-  EigenMatrixHandleCS a, 
-  const EigenMatrixHandleCS b
-) { *a.mat *= *b.mat; }
-
-inline void eigenMatrixCDMulAssign(
-  EigenMatrixHandleCD a, 
-  const EigenMatrixHandleCD b
-) { *a.mat *= *b.mat; }
-
-/* transpose — out = a^T */
-
-inline void eigenMatrixRSTranspose(
-  const EigenMatrixHandleRS a, EigenMatrixHandleRS out
-) { *out.mat = a.mat->transpose(); }
-
-inline void eigenMatrixRDTranspose(
-  const EigenMatrixHandleRD a, EigenMatrixHandleRD out
-) { *out.mat = a.mat->transpose(); }
-
-inline void eigenMatrixCSTranspose(
-  const EigenMatrixHandleCS a, EigenMatrixHandleCS out
-) { *out.mat = a.mat->transpose(); }
-
-inline void eigenMatrixCDTranspose(
-  const EigenMatrixHandleCD a, EigenMatrixHandleCD out
-) { *out.mat = a.mat->transpose(); }
-
-/* adjoint (conjugate transpose) — out = a^H */
-
-inline void eigenMatrixRSAdjoint(
-  const EigenMatrixHandleRS a, EigenMatrixHandleRS out
-) { *out.mat = a.mat->adjoint(); }
-
-inline void eigenMatrixRDAdjoint(
-  const EigenMatrixHandleRD a, EigenMatrixHandleRD out
-) { *out.mat = a.mat->adjoint(); }
-
-inline void eigenMatrixCSAdjoint(
-  const EigenMatrixHandleCS a, EigenMatrixHandleCS out
-) { *out.mat = a.mat->adjoint(); }
-
-inline void eigenMatrixCDAdjoint(
-  const EigenMatrixHandleCD a, EigenMatrixHandleCD out
-) { *out.mat = a.mat->adjoint(); }
-
-/* conjugate — out = conj(a) */
-
-inline void eigenMatrixRSConjugate(
-  const EigenMatrixHandleRS a, EigenMatrixHandleRS out
-) { *out.mat = a.mat->conjugate(); }
-
-inline void eigenMatrixRDConjugate(
-  const EigenMatrixHandleRD a, EigenMatrixHandleRD out
-) { *out.mat = a.mat->conjugate(); }
-
-inline void eigenMatrixCSConjugate(
-  const EigenMatrixHandleCS a, EigenMatrixHandleCS out
-) { *out.mat = a.mat->conjugate(); }
-
-inline void eigenMatrixCDConjugate(
-  const EigenMatrixHandleCD a, EigenMatrixHandleCD out
-) { *out.mat = a.mat->conjugate(); }
-
-/* trace — returns sum of diagonal */
-
-inline float eigenMatrixRSTrace(const EigenMatrixHandleRS handle) {
-  return handle.mat->trace();
-}
-
-inline double eigenMatrixRDTrace(const EigenMatrixHandleRD handle) {
-  return handle.mat->trace();
-}
-
-inline void eigenMatrixCSTrace(const EigenMatrixHandleCS handle, void* out) {
-  *static_cast<std::complex<float>*>(out) = handle.mat->trace();
-}
-
-inline void eigenMatrixCDTrace(const EigenMatrixHandleCD handle, void* out) {
-  *static_cast<std::complex<double>*>(out) = handle.mat->trace();
-}
-
-/* determinant */
-
-inline float eigenMatrixRSDet(const EigenMatrixHandleRS handle) {
-  return Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>(*handle.mat).determinant();
-}
-
-inline double eigenMatrixRDDet(const EigenMatrixHandleRD handle) {
-  return Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>(*handle.mat).determinant();
-}
-
-inline void eigenMatrixCSDet(const EigenMatrixHandleCS handle, void* out) {
-  *static_cast<std::complex<float>*>(out) = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic>(*handle.mat).determinant();
-}
-
-inline void eigenMatrixCDDet(const EigenMatrixHandleCD handle, void* out) {
-  *static_cast<std::complex<double>*>(out) = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>(*handle.mat).determinant();
-}
-
-/* inverse */
-
-inline void eigenMatrixRSInverse(
-  const EigenMatrixHandleRS a, EigenMatrixHandleRS out
-) { *out.mat = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>(*a.mat).inverse(); }
-
-inline void eigenMatrixRDInverse(
-  const EigenMatrixHandleRD a, EigenMatrixHandleRD out
-) { *out.mat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>(*a.mat).inverse(); }
-
-inline void eigenMatrixCSInverse(
-  const EigenMatrixHandleCS a, EigenMatrixHandleCS out
-) { *out.mat = Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic>(*a.mat).inverse(); }
-
-inline void eigenMatrixCDInverse(
-  const EigenMatrixHandleCD a, EigenMatrixHandleCD out
-) { *out.mat = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>(*a.mat).inverse(); }
-
-/* scalar multiply */
-
-inline void eigenMatrixRSScalarMul(
-  const EigenMatrixHandleRS a, float s, EigenMatrixHandleRS out
-) { *out.mat = *a.mat * s; }
-
-inline void eigenMatrixRDScalarMul(
-  const EigenMatrixHandleRD a, double s, EigenMatrixHandleRD out
-) { *out.mat = *a.mat * s; }
-
-inline void eigenMatrixCSScalarMul(
-  const EigenMatrixHandleCS a, const void* s, EigenMatrixHandleCS out
-) { *out.mat = *a.mat * *static_cast<const std::complex<float>*>(s); }
-
-inline void eigenMatrixCDScalarMul(
-  const EigenMatrixHandleCD a, const void* s, EigenMatrixHandleCD out
-) { *out.mat = *a.mat * *static_cast<const std::complex<double>*>(s); }
-
-inline void eigenMatrixRSScalarMulAssign(EigenMatrixHandleRS a, float s) {
-  *a.mat *= s;
-}
-
-inline void eigenMatrixRDScalarMulAssign(EigenMatrixHandleRD a, double s) {
-  *a.mat *= s;
-}
-
-inline void eigenMatrixCSScalarMulAssign(EigenMatrixHandleCS a, const void* s) {
-  *a.mat *= *static_cast<const std::complex<float>*>(s);
-}
-
-inline void eigenMatrixCDScalarMulAssign(EigenMatrixHandleCD a, const void* s) {
-  *a.mat *= *static_cast<const std::complex<double>*>(s);
-}
-
-/* negate */
-
-inline void eigenMatrixRSNegate(
-  const EigenMatrixHandleRS a, EigenMatrixHandleRS out
-) { *out.mat = -(*a.mat); }
-
-inline void eigenMatrixRDNegate(
-  const EigenMatrixHandleRD a, EigenMatrixHandleRD out
-) { *out.mat = -(*a.mat); }
-
-inline void eigenMatrixCSNegate(
-  const EigenMatrixHandleCS a, EigenMatrixHandleCS out
-) { *out.mat = -(*a.mat); }
-
-inline void eigenMatrixCDNegate(
-  const EigenMatrixHandleCD a, EigenMatrixHandleCD out
-) { *out.mat = -(*a.mat); }
-
-/* Frobenius norm */
-
-inline float eigenMatrixRSNorm(const EigenMatrixHandleRS handle) {
-  return handle.mat->norm();
-}
-
-inline double eigenMatrixRDNorm(const EigenMatrixHandleRD handle) {
-  return handle.mat->norm();
-}
-
-inline float eigenMatrixCSNorm(const EigenMatrixHandleCS handle) {
-  return handle.mat->norm();
-}
-
-inline double eigenMatrixCDNorm(const EigenMatrixHandleCD handle) {
-  return handle.mat->norm();
-}
-""".}
+eigenMatrixHeader()
 
 type
-  EigenMatrixHandleRS* {.importcpp: "EigenMatrixHandleRS".} = object
-  EigenMatrixHandleRD* {.importcpp: "EigenMatrixHandleRD".} = object
-  EigenMatrixHandleCS* {.importcpp: "EigenMatrixHandleCS".} = object
-  EigenMatrixHandleCD* {.importcpp: "EigenMatrixHandleCD".} = object
+  EigenMatrixHandleRS* {.importcpp: "EigenMatrixHandleRS", matrix.} = object
+  EigenMatrixHandleRD* {.importcpp: "EigenMatrixHandleRD", matrix.} = object
+  EigenMatrixHandleCS* {.importcpp: "EigenMatrixHandleCS", matrix.} = object
+  EigenMatrixHandleCD* {.importcpp: "EigenMatrixHandleCD", matrix.} = object
 
 record EigenMatrix*[R: static[int], T]:
   var rows: int
@@ -531,296 +63,325 @@ record EigenMatrix*[R: static[int], T]:
 proc createEigenMatrixRS(
   data: ptr float32; 
   rows, cols, outer, inner: int
-): EigenMatrixHandleRS {.importcpp: "createEigenMatrixRS(@)".}
+): EigenMatrixHandleRS {.importcpp: "createEigenMatrixRS(@)", matrix.}
 
 proc createEigenMatrixRD(
   data: ptr float64; 
   rows, cols, outer, inner: int
-): EigenMatrixHandleRD {.importcpp: "createEigenMatrixRD(@)".}
+): EigenMatrixHandleRD {.importcpp: "createEigenMatrixRD(@)", matrix.}
 
 proc createEigenMatrixCS(
   data: pointer; 
   rows, cols, outer, inner: int
-): EigenMatrixHandleCS {.importcpp: "createEigenMatrixCS(@)".}
+): EigenMatrixHandleCS {.importcpp: "createEigenMatrixCS(@)", matrix.}
 
 proc createEigenMatrixCD(
   data: pointer; 
   rows, cols, outer, inner: int
-): EigenMatrixHandleCD {.importcpp: "createEigenMatrixCD(@)".}
+): EigenMatrixHandleCD {.importcpp: "createEigenMatrixCD(@)", matrix.}
   
 # temp constructors
 
 proc createTempEigenMatrixRS(
   rows, cols, outer, inner: int
-): EigenMatrixHandleRS {.importcpp: "createTempEigenMatrixRS(@)".}
+): EigenMatrixHandleRS {.importcpp: "createTempEigenMatrixRS(@)", matrix.}
 
 proc createTempEigenMatrixRD(
   rows, cols, outer, inner: int
-): EigenMatrixHandleRD {.importcpp: "createTempEigenMatrixRD(@)".}
-
+): EigenMatrixHandleRD {.importcpp: "createTempEigenMatrixRD(@)", matrix.}
 proc createTempEigenMatrixCS(
   rows, cols, outer, inner: int
-): EigenMatrixHandleCS {.importcpp: "createTempEigenMatrixCS(@)".}
+): EigenMatrixHandleCS {.importcpp: "createTempEigenMatrixCS(@)", matrix.}
 
 proc createTempEigenMatrixCD(
   rows, cols, outer, inner: int
-): EigenMatrixHandleCD {.importcpp: "createTempEigenMatrixCD(@)".}
-
+): EigenMatrixHandleCD {.importcpp: "createTempEigenMatrixCD(@)", matrix.}
 # destructors
 
 proc destroyEigenMatrixRS(handle: EigenMatrixHandleRS, ownsData: bool) 
-  {.importcpp: "destroyEigenMatrixRS(@)".}
+  {.importcpp: "destroyEigenMatrixRS(@)", matrix.}
 
 proc destroyEigenMatrixRD(handle: EigenMatrixHandleRD, ownsData: bool) 
-  {.importcpp: "destroyEigenMatrixRD(@)".}
+  {.importcpp: "destroyEigenMatrixRD(@)", matrix.}
 
 proc destroyEigenMatrixCS(handle: EigenMatrixHandleCS, ownsData: bool) 
-  {.importcpp: "destroyEigenMatrixCS(@)".}
+  {.importcpp: "destroyEigenMatrixCS(@)", matrix.}
 
 proc destroyEigenMatrixCD(handle: EigenMatrixHandleCD, ownsData: bool) 
-  {.importcpp: "destroyEigenMatrixCD(@)".}
+  {.importcpp: "destroyEigenMatrixCD(@)", matrix.}
+
+# clone — for =copy hook (new Map pointing to same data, ownsData=false)
+
+proc cloneEigenMatrixRS(handle: EigenMatrixHandleRS): EigenMatrixHandleRS
+  {.importcpp: "cloneEigenMatrixRS(@)", matrix.}
+proc cloneEigenMatrixRD(handle: EigenMatrixHandleRD): EigenMatrixHandleRD
+  {.importcpp: "cloneEigenMatrixRD(@)", matrix.}
+proc cloneEigenMatrixCS(handle: EigenMatrixHandleCS): EigenMatrixHandleCS
+  {.importcpp: "cloneEigenMatrixCS(@)", matrix.}
+proc cloneEigenMatrixCD(handle: EigenMatrixHandleCD): EigenMatrixHandleCD
+  {.importcpp: "cloneEigenMatrixCD(@)", matrix.}
+
+# copy-from and fill — for := operator
+
+proc eigenMatrixRSCopyFrom(dst, src: EigenMatrixHandleRS)
+  {.importcpp: "eigenMatrixRSCopyFrom(@)", matrix.}
+proc eigenMatrixRDCopyFrom(dst, src: EigenMatrixHandleRD)
+  {.importcpp: "eigenMatrixRDCopyFrom(@)", matrix.}
+proc eigenMatrixCSCopyFrom(dst, src: EigenMatrixHandleCS)
+  {.importcpp: "eigenMatrixCSCopyFrom(@)", matrix.}
+proc eigenMatrixCDCopyFrom(dst, src: EigenMatrixHandleCD)
+  {.importcpp: "eigenMatrixCDCopyFrom(@)", matrix.}
+
+proc eigenMatrixRSFill(handle: EigenMatrixHandleRS, value: float32)
+  {.importcpp: "eigenMatrixRSFill(@)", matrix.}
+proc eigenMatrixRDFill(handle: EigenMatrixHandleRD, value: float64)
+  {.importcpp: "eigenMatrixRDFill(@)", matrix.}
+proc eigenMatrixCSFill(handle: EigenMatrixHandleCS, value: pointer)
+  {.importcpp: "eigenMatrixCSFill(@)", matrix.}
+proc eigenMatrixCDFill(handle: EigenMatrixHandleCD, value: pointer)
+  {.importcpp: "eigenMatrixCDFill(@)", matrix.}
 
 # accessors
 
 proc eigenMatrixRSGet(handle: EigenMatrixHandleRS, row, col: int): float32 
-  {.importcpp: "eigenMatrixRSGet(@)".}
+  {.importcpp: "eigenMatrixRSGet(@)", matrix.}
 
 proc eigenMatrixRDGet(handle: EigenMatrixHandleRD, row, col: int): float64 
-  {.importcpp: "eigenMatrixRDGet(@)".}
+  {.importcpp: "eigenMatrixRDGet(@)", matrix.}
 
 proc eigenMatrixCSGet(handle: EigenMatrixHandleCS, row, col: int, outVal: pointer) 
-  {.importcpp: "eigenMatrixCSGet(@)".}
+  {.importcpp: "eigenMatrixCSGet(@)", matrix.}
 
 proc eigenMatrixCDGet(handle: EigenMatrixHandleCD, row, col: int, outVal: pointer) 
-  {.importcpp: "eigenMatrixCDGet(@)".}
+  {.importcpp: "eigenMatrixCDGet(@)", matrix.}
 
 proc eigenMatrixRSSet(handle: EigenMatrixHandleRS, row, col: int, value: float32) 
-  {.importcpp: "eigenMatrixRSSet(@)".}
+  {.importcpp: "eigenMatrixRSSet(@)", matrix.}
 
 proc eigenMatrixRDSet(handle: EigenMatrixHandleRD, row, col: int, value: float64) 
-  {.importcpp: "eigenMatrixRDSet(@)".}
+  {.importcpp: "eigenMatrixRDSet(@)", matrix.}
 
 proc eigenMatrixCSSet(handle: EigenMatrixHandleCS, row, col: int, value: pointer) 
-  {.importcpp: "eigenMatrixCSSet(@)".}
+  {.importcpp: "eigenMatrixCSSet(@)", matrix.}
 
 proc eigenMatrixCDSet(handle: EigenMatrixHandleCD, row, col: int, value: pointer) 
-  {.importcpp: "eigenMatrixCDSet(@)".}
+  {.importcpp: "eigenMatrixCDSet(@)", matrix.}
 
 # algebra
 
 proc eigenMatrixRSAdd(a, b: EigenMatrixHandleRS; c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSAdd(@)".}
+  {.importcpp: "eigenMatrixRSAdd(@)", matrix.}
 
 proc eigenMatrixRDAdd(a, b: EigenMatrixHandleRD; c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDAdd(@)".}
+  {.importcpp: "eigenMatrixRDAdd(@)", matrix.}
 
 proc eigenMatrixCSAdd(a, b: EigenMatrixHandleCS; c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSAdd(@)".}
+  {.importcpp: "eigenMatrixCSAdd(@)", matrix.}
 
 proc eigenMatrixCDAdd(a, b: EigenMatrixHandleCD; c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDAdd(@)".}
+  {.importcpp: "eigenMatrixCDAdd(@)", matrix.}
 
 proc eigenMatrixRSSub(a, b: EigenMatrixHandleRS; c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSSub(@)".}
+  {.importcpp: "eigenMatrixRSSub(@)", matrix.}
 
 proc eigenMatrixRDSub(a, b: EigenMatrixHandleRD; c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDSub(@)".}
+  {.importcpp: "eigenMatrixRDSub(@)", matrix.}
 
 proc eigenMatrixCSSub(a, b: EigenMatrixHandleCS; c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSSub(@)".}
+  {.importcpp: "eigenMatrixCSSub(@)", matrix.}
 
 proc eigenMatrixCDSub(a, b: EigenMatrixHandleCD; c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDSub(@)".}
+  {.importcpp: "eigenMatrixCDSub(@)", matrix.}
 
 proc eigenMatrixRSMul(a, b: EigenMatrixHandleRS; c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSMul(@)".}
+  {.importcpp: "eigenMatrixRSMul(@)", matrix.}
 
 proc eigenMatrixRDMul(a, b: EigenMatrixHandleRD; c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDMul(@)".}
+  {.importcpp: "eigenMatrixRDMul(@)", matrix.}
 
 proc eigenMatrixCSMul(a, b: EigenMatrixHandleCS; c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSMul(@)".}
+  {.importcpp: "eigenMatrixCSMul(@)", matrix.}
 
 proc eigenMatrixCDMul(a, b: EigenMatrixHandleCD; c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDMul(@)".}
+  {.importcpp: "eigenMatrixCDMul(@)", matrix.}
 
 proc eigenMatrixRSAddAssign(a, b: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSAddAssign(@)".}
+  {.importcpp: "eigenMatrixRSAddAssign(@)", matrix.}
 
 proc eigenMatrixRDAddAssign(a, b: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDAddAssign(@)".}
+  {.importcpp: "eigenMatrixRDAddAssign(@)", matrix.}
 
 proc eigenMatrixCSAddAssign(a, b: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSAddAssign(@)".}
+  {.importcpp: "eigenMatrixCSAddAssign(@)", matrix.}
 
 proc eigenMatrixCDAddAssign(a, b: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDAddAssign(@)".}
+  {.importcpp: "eigenMatrixCDAddAssign(@)", matrix.}
 
 proc eigenMatrixRSSubAssign(a, b: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSSubAssign(@)".}
+  {.importcpp: "eigenMatrixRSSubAssign(@)", matrix.}
 
 proc eigenMatrixRDSubAssign(a, b: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDSubAssign(@)".}
+  {.importcpp: "eigenMatrixRDSubAssign(@)", matrix.}
 
 proc eigenMatrixCSSubAssign(a, b: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSSubAssign(@)".}
+  {.importcpp: "eigenMatrixCSSubAssign(@)", matrix.}
 
 proc eigenMatrixCDSubAssign(a, b: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDSubAssign(@)".}
+  {.importcpp: "eigenMatrixCDSubAssign(@)", matrix.}
 
 proc eigenMatrixRSMulAssign(a, b: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSMulAssign(@)".}
+  {.importcpp: "eigenMatrixRSMulAssign(@)", matrix.}
 
 proc eigenMatrixRDMulAssign(a, b: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDMulAssign(@)".}
+  {.importcpp: "eigenMatrixRDMulAssign(@)", matrix.}
 
 proc eigenMatrixCSMulAssign(a, b: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSMulAssign(@)".}
+  {.importcpp: "eigenMatrixCSMulAssign(@)", matrix.}
 
 proc eigenMatrixCDMulAssign(a, b: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDMulAssign(@)".}
+  {.importcpp: "eigenMatrixCDMulAssign(@)", matrix.}
 
 # transpose
 
 proc eigenMatrixRSTranspose(a: EigenMatrixHandleRS, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSTranspose(@)".}
+  {.importcpp: "eigenMatrixRSTranspose(@)", matrix.}
 
 proc eigenMatrixRDTranspose(a: EigenMatrixHandleRD, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDTranspose(@)".}
+  {.importcpp: "eigenMatrixRDTranspose(@)", matrix.}
 
 proc eigenMatrixCSTranspose(a: EigenMatrixHandleCS, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSTranspose(@)".}
+  {.importcpp: "eigenMatrixCSTranspose(@)", matrix.}
 
 proc eigenMatrixCDTranspose(a: EigenMatrixHandleCD, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDTranspose(@)".}
+  {.importcpp: "eigenMatrixCDTranspose(@)", matrix.}
 
 # adjoint
 
 proc eigenMatrixRSAdjoint(a: EigenMatrixHandleRS, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSAdjoint(@)".}
+  {.importcpp: "eigenMatrixRSAdjoint(@)", matrix.}
 
 proc eigenMatrixRDAdjoint(a: EigenMatrixHandleRD, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDAdjoint(@)".}
+  {.importcpp: "eigenMatrixRDAdjoint(@)", matrix.}
 
 proc eigenMatrixCSAdjoint(a: EigenMatrixHandleCS, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSAdjoint(@)".}
+  {.importcpp: "eigenMatrixCSAdjoint(@)", matrix.}
 
 proc eigenMatrixCDAdjoint(a: EigenMatrixHandleCD, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDAdjoint(@)".}
+  {.importcpp: "eigenMatrixCDAdjoint(@)", matrix.}
 
 # conjugate
 
 proc eigenMatrixRSConjugate(a: EigenMatrixHandleRS, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSConjugate(@)".}
+  {.importcpp: "eigenMatrixRSConjugate(@)", matrix.}
 
 proc eigenMatrixRDConjugate(a: EigenMatrixHandleRD, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDConjugate(@)".}
+  {.importcpp: "eigenMatrixRDConjugate(@)", matrix.}
 
 proc eigenMatrixCSConjugate(a: EigenMatrixHandleCS, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSConjugate(@)".}
+  {.importcpp: "eigenMatrixCSConjugate(@)", matrix.}
 
 proc eigenMatrixCDConjugate(a: EigenMatrixHandleCD, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDConjugate(@)".}
+  {.importcpp: "eigenMatrixCDConjugate(@)", matrix.}
 
 # trace
 
 proc eigenMatrixRSTrace(handle: EigenMatrixHandleRS): float32 
-  {.importcpp: "eigenMatrixRSTrace(@)".}
+  {.importcpp: "eigenMatrixRSTrace(@)", matrix.}
 
 proc eigenMatrixRDTrace(handle: EigenMatrixHandleRD): float64 
-  {.importcpp: "eigenMatrixRDTrace(@)".}
+  {.importcpp: "eigenMatrixRDTrace(@)", matrix.}
 
 proc eigenMatrixCSTrace(handle: EigenMatrixHandleCS, outVal: pointer) 
-  {.importcpp: "eigenMatrixCSTrace(@)".}
+  {.importcpp: "eigenMatrixCSTrace(@)", matrix.}
 
 proc eigenMatrixCDTrace(handle: EigenMatrixHandleCD, outVal: pointer) 
-  {.importcpp: "eigenMatrixCDTrace(@)".}
+  {.importcpp: "eigenMatrixCDTrace(@)", matrix.}
 
 # determinant
 
 proc eigenMatrixRSDet(handle: EigenMatrixHandleRS): float32 
-  {.importcpp: "eigenMatrixRSDet(@)".}
+  {.importcpp: "eigenMatrixRSDet(@)", matrix.}
 
 proc eigenMatrixRDDet(handle: EigenMatrixHandleRD): float64 
-  {.importcpp: "eigenMatrixRDDet(@)".}
+  {.importcpp: "eigenMatrixRDDet(@)", matrix.}
 
 proc eigenMatrixCSDet(handle: EigenMatrixHandleCS, outVal: pointer) 
-  {.importcpp: "eigenMatrixCSDet(@)".}
+  {.importcpp: "eigenMatrixCSDet(@)", matrix.}
 
 proc eigenMatrixCDDet(handle: EigenMatrixHandleCD, outVal: pointer) 
-  {.importcpp: "eigenMatrixCDDet(@)".}
+  {.importcpp: "eigenMatrixCDDet(@)", matrix.}
 
 # inverse
 
 proc eigenMatrixRSInverse(a: EigenMatrixHandleRS, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSInverse(@)".}
+  {.importcpp: "eigenMatrixRSInverse(@)", matrix.}
 
 proc eigenMatrixRDInverse(a: EigenMatrixHandleRD, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDInverse(@)".}
+  {.importcpp: "eigenMatrixRDInverse(@)", matrix.}
 
 proc eigenMatrixCSInverse(a: EigenMatrixHandleCS, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSInverse(@)".}
+  {.importcpp: "eigenMatrixCSInverse(@)", matrix.}
 
 proc eigenMatrixCDInverse(a: EigenMatrixHandleCD, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDInverse(@)".}
+  {.importcpp: "eigenMatrixCDInverse(@)", matrix.}
 
 # scalar multiply
 
 proc eigenMatrixRSScalarMul(a: EigenMatrixHandleRS, s: float32, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSScalarMul(@)".}
+  {.importcpp: "eigenMatrixRSScalarMul(@)", matrix.}
 
 proc eigenMatrixRDScalarMul(a: EigenMatrixHandleRD, s: float64, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDScalarMul(@)".}
+  {.importcpp: "eigenMatrixRDScalarMul(@)", matrix.}
 
 proc eigenMatrixCSScalarMul(a: EigenMatrixHandleCS, s: pointer, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSScalarMul(@)".}
+  {.importcpp: "eigenMatrixCSScalarMul(@)", matrix.}
 
 proc eigenMatrixCDScalarMul(a: EigenMatrixHandleCD, s: pointer, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDScalarMul(@)".}
+  {.importcpp: "eigenMatrixCDScalarMul(@)", matrix.}
 
 proc eigenMatrixRSScalarMulAssign(a: EigenMatrixHandleRS, s: float32) 
-  {.importcpp: "eigenMatrixRSScalarMulAssign(@)".}
+  {.importcpp: "eigenMatrixRSScalarMulAssign(@)", matrix.}
 
 proc eigenMatrixRDScalarMulAssign(a: EigenMatrixHandleRD, s: float64) 
-  {.importcpp: "eigenMatrixRDScalarMulAssign(@)".}
+  {.importcpp: "eigenMatrixRDScalarMulAssign(@)", matrix.}
 
 proc eigenMatrixCSScalarMulAssign(a: EigenMatrixHandleCS, s: pointer) 
-  {.importcpp: "eigenMatrixCSScalarMulAssign(@)".}
+  {.importcpp: "eigenMatrixCSScalarMulAssign(@)", matrix.}
 
 proc eigenMatrixCDScalarMulAssign(a: EigenMatrixHandleCD, s: pointer) 
-  {.importcpp: "eigenMatrixCDScalarMulAssign(@)".}
+  {.importcpp: "eigenMatrixCDScalarMulAssign(@)", matrix.}
 
 # negate
 
 proc eigenMatrixRSNegate(a: EigenMatrixHandleRS, c: EigenMatrixHandleRS) 
-  {.importcpp: "eigenMatrixRSNegate(@)".}
+  {.importcpp: "eigenMatrixRSNegate(@)", matrix.}
 
 proc eigenMatrixRDNegate(a: EigenMatrixHandleRD, c: EigenMatrixHandleRD) 
-  {.importcpp: "eigenMatrixRDNegate(@)".}
+  {.importcpp: "eigenMatrixRDNegate(@)", matrix.}
 
 proc eigenMatrixCSNegate(a: EigenMatrixHandleCS, c: EigenMatrixHandleCS) 
-  {.importcpp: "eigenMatrixCSNegate(@)".}
+  {.importcpp: "eigenMatrixCSNegate(@)", matrix.}
 
 proc eigenMatrixCDNegate(a: EigenMatrixHandleCD, c: EigenMatrixHandleCD) 
-  {.importcpp: "eigenMatrixCDNegate(@)".}
+  {.importcpp: "eigenMatrixCDNegate(@)", matrix.}
 
 # norm (Frobenius)
 
 proc eigenMatrixRSNorm(handle: EigenMatrixHandleRS): float32 
-  {.importcpp: "eigenMatrixRSNorm(@)".}
+  {.importcpp: "eigenMatrixRSNorm(@)", matrix.}
 
 proc eigenMatrixRDNorm(handle: EigenMatrixHandleRD): float64 
-  {.importcpp: "eigenMatrixRDNorm(@)".}
+  {.importcpp: "eigenMatrixRDNorm(@)", matrix.}
 
 proc eigenMatrixCSNorm(handle: EigenMatrixHandleCS): float32 
-  {.importcpp: "eigenMatrixCSNorm(@)".}
+  {.importcpp: "eigenMatrixCSNorm(@)", matrix.}
 
 proc eigenMatrixCDNorm(handle: EigenMatrixHandleCD): float64 
-  {.importcpp: "eigenMatrixCDNorm(@)".}
+  {.importcpp: "eigenMatrixCDNorm(@)", matrix.}
 
 #[ EigenMatrix implementation ]#
 
-impl EigenMatrix:
+recordImpl EigenMatrix:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T; shape: array[R, int]; inner, outer: int) =
@@ -865,7 +426,7 @@ impl EigenMatrix:
   
   #[ accessors ]#
 
-  method `[]`(row, col: int): T =
+  method `[]`(row, col: int): T {.immutable.} =
     when isReal32(T):
       return eigenMatrixRSGet(this.data, row, col)
     elif isReal64(T):
@@ -893,7 +454,7 @@ impl EigenMatrix:
   
   #[ algebra ]#
 
-  method `+`(other: EigenMatrix[R, T]): EigenMatrix[R, T] =
+  method `+`(other: EigenMatrix[R, T]): EigenMatrix[R, T] {.immutable.} =
     assert this.cols == other.cols and this.rows == other.rows, "shape mismatch"
     assert this.inner == other.inner and this.outer == other.outer, "stride mismatch"
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
@@ -902,7 +463,7 @@ impl EigenMatrix:
     elif isComplex32(T): eigenMatrixCSAdd(this.data, other.data, result.data)
     elif isComplex64(T): eigenMatrixCDAdd(this.data, other.data, result.data)
   
-  method `-`(other: EigenMatrix[R, T]): EigenMatrix[R, T] =
+  method `-`(other: EigenMatrix[R, T]): EigenMatrix[R, T] {.immutable.} =
     assert this.cols == other.cols and this.rows == other.rows, "shape mismatch"
     assert this.inner == other.inner and this.outer == other.outer, "stride mismatch"
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
@@ -911,7 +472,7 @@ impl EigenMatrix:
     elif isComplex32(T): eigenMatrixCSSub(this.data, other.data, result.data)
     elif isComplex64(T): eigenMatrixCDSub(this.data, other.data, result.data)
   
-  method `*`(other: EigenMatrix[R, T]): EigenMatrix[R, T] =
+  method `*`(other: EigenMatrix[R, T]): EigenMatrix[R, T] {.immutable.} =
     assert this.cols == other.rows, "shape mismatch for multiplication"
     assert this.inner == other.inner and this.outer == other.outer, "stride mismatch"
     result = newEigenMatrix[R, T](this.rows, other.cols, this.inner, this.outer)
@@ -946,28 +507,28 @@ impl EigenMatrix:
   
   #[ unary operations ]#
 
-  method transpose: EigenMatrix[R, T] =
+  method transpose: EigenMatrix[R, T] {.immutable.} =
     result = newEigenMatrix[R, T](this.cols, this.rows, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSTranspose(this.data, result.data)
     elif isReal64(T): eigenMatrixRDTranspose(this.data, result.data)
     elif isComplex32(T): eigenMatrixCSTranspose(this.data, result.data)
     elif isComplex64(T): eigenMatrixCDTranspose(this.data, result.data)
   
-  method adjoint: EigenMatrix[R, T] =
+  method adjoint: EigenMatrix[R, T] {.immutable.} =
     result = newEigenMatrix[R, T](this.cols, this.rows, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSAdjoint(this.data, result.data)
     elif isReal64(T): eigenMatrixRDAdjoint(this.data, result.data)
     elif isComplex32(T): eigenMatrixCSAdjoint(this.data, result.data)
     elif isComplex64(T): eigenMatrixCDAdjoint(this.data, result.data)
   
-  method conjugate: EigenMatrix[R, T] =
+  method conjugate: EigenMatrix[R, T] {.immutable.} =
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSConjugate(this.data, result.data)
     elif isReal64(T): eigenMatrixRDConjugate(this.data, result.data)
     elif isComplex32(T): eigenMatrixCSConjugate(this.data, result.data)
     elif isComplex64(T): eigenMatrixCDConjugate(this.data, result.data)
   
-  method trace: T =
+  method trace: T {.immutable.} =
     assert this.rows == this.cols, "trace requires square matrix"
     when isReal32(T):
       return eigenMatrixRSTrace(this.data)
@@ -982,7 +543,7 @@ impl EigenMatrix:
       eigenMatrixCDTrace(this.data, addr res)
       return res
   
-  method determinant: T =
+  method determinant: T {.immutable.} =
     assert this.rows == this.cols, "determinant requires square matrix"
     when isReal32(T):
       return eigenMatrixRSDet(this.data)
@@ -997,7 +558,7 @@ impl EigenMatrix:
       eigenMatrixCDDet(this.data, addr res)
       return res
   
-  method inverse: EigenMatrix[R, T] =
+  method inverse: EigenMatrix[R, T] {.immutable.} =
     assert this.rows == this.cols, "inverse requires square matrix"
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSInverse(this.data, result.data)
@@ -1005,7 +566,7 @@ impl EigenMatrix:
     elif isComplex32(T): eigenMatrixCSInverse(this.data, result.data)
     elif isComplex64(T): eigenMatrixCDInverse(this.data, result.data)
   
-  method `*`(scalar: T): EigenMatrix[R, T] =
+  method `*`(scalar: T): EigenMatrix[R, T] {.immutable.} =
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSScalarMul(this.data, scalar, result.data)
     elif isReal64(T): eigenMatrixRDScalarMul(this.data, scalar, result.data)
@@ -1026,14 +587,14 @@ impl EigenMatrix:
       var s = scalar
       eigenMatrixCDScalarMulAssign(this.data, addr s)
   
-  method `-`: EigenMatrix[R, T] =
+  method `-`: EigenMatrix[R, T] {.immutable.} =
     result = newEigenMatrix[R, T](this.rows, this.cols, this.inner, this.outer)
     when isReal32(T): eigenMatrixRSNegate(this.data, result.data)
     elif isReal64(T): eigenMatrixRDNegate(this.data, result.data)
     elif isComplex32(T): eigenMatrixCSNegate(this.data, result.data)
     elif isComplex64(T): eigenMatrixCDNegate(this.data, result.data)
   
-  method norm: auto =
+  method norm: auto {.immutable.} =
     when isReal32(T):
       return eigenMatrixRSNorm(this.data)
     elif isReal64(T):
@@ -1042,6 +603,57 @@ impl EigenMatrix:
       return eigenMatrixCSNorm(this.data)
     elif isComplex64(T):
       return eigenMatrixCDNorm(this.data)
+
+# =copy hook: when an EigenMatrix is copied (e.g. passed by value to an
+# {.immutable.} method), create a fresh Map pointing to the same underlying
+# data with ownsData=false so that the copy's =destroy only frees the Map
+# wrapper — not the data — leaving the original intact.
+proc `=copy`*[R: static[int], T](dst: var EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
+  if addr(dst) == unsafeAddr(src): return
+  dst.rows = src.rows
+  dst.cols = src.cols
+  dst.inner = src.inner
+  dst.outer = src.outer
+  dst.ownsData = false
+  when isReal32(T):    dst.data = cloneEigenMatrixRS(src.data)
+  elif isReal64(T):    dst.data = cloneEigenMatrixRD(src.data)
+  elif isComplex32(T): dst.data = cloneEigenMatrixCS(src.data)
+  elif isComplex64(T): dst.data = cloneEigenMatrixCD(src.data)
+
+proc `=sink`*[R: static[int], T](dst: var EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
+  # Transfer ownership from src to dst without cloning.
+  # =destroy will NOT be called on src by the compiler after this.
+  `=destroy`(dst)
+  dst.rows = src.rows
+  dst.cols = src.cols
+  dst.inner = src.inner
+  dst.outer = src.outer
+  dst.ownsData = src.ownsData
+  when isReal32(T):    dst.data = src.data
+  elif isReal64(T):    dst.data = src.data
+  elif isComplex32(T): dst.data = src.data
+  elif isComplex64(T): dst.data = src.data
+
+proc `:=`*[R: static[int], T](dst: EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
+  ## Write-through: copies src's elements into dst's underlying buffer.
+  ## dst need not be `var` — writes go through the C++ handle, not the struct.
+  assert dst.rows == src.rows and dst.cols == src.cols, "shape mismatch"
+  when isReal32(T):    eigenMatrixRSCopyFrom(dst.data, src.data)
+  elif isReal64(T):    eigenMatrixRDCopyFrom(dst.data, src.data)
+  elif isComplex32(T): eigenMatrixCSCopyFrom(dst.data, src.data)
+  elif isComplex64(T): eigenMatrixCDCopyFrom(dst.data, src.data)
+
+proc `:=`*[R: static[int], T](dst: EigenMatrix[R, T]; val: T) =
+  ## Fill: set every element of the matrix to val through the view.
+  ## dst need not be `var` — writes go through the C++ handle, not the struct.
+  when isReal32(T):    eigenMatrixRSFill(dst.data, val)
+  elif isReal64(T):    eigenMatrixRDFill(dst.data, val)
+  elif isComplex32(T):
+    var v = val
+    eigenMatrixCSFill(dst.data, addr v)
+  elif isComplex64(T):
+    var v = val
+    eigenMatrixCDFill(dst.data, addr v)
 
 when isMainModule:
   import std/[unittest, math]
@@ -1298,3 +910,46 @@ when isMainModule:
       var adata = [1.0, 2.0, 3.0, 4.0]
       var a = newEigenMatrix(addr adata[0], [2, 2], 1, 2)
       check abs(a.norm() - sqrt(30.0)) < 1e-12
+
+    test ":= copy-from (write-through from another matrix)":
+      var adata = [1.0, 2.0, 3.0, 4.0]
+      var bdata = [10.0, 20.0, 30.0, 40.0]
+      var a = newEigenMatrix(addr adata[0], [2, 2], 1, 2)
+      var b = newEigenMatrix(addr bdata[0], [2, 2], 1, 2)
+
+      # := writes b's values into a's underlying buffer
+      a := b
+      check adata[0] == 10.0
+      check adata[1] == 20.0
+      check adata[2] == 30.0
+      check adata[3] == 40.0
+      check a[0, 0] == 10.0
+      check a[0, 1] == 20.0
+      check a[1, 0] == 30.0
+      check a[1, 1] == 40.0
+
+      # b's buffer is untouched
+      check bdata[0] == 10.0
+
+    test ":= fill (set all elements to a scalar)":
+      var adata = [1.0, 2.0, 3.0, 4.0]
+      var a = newEigenMatrix(addr adata[0], [2, 2], 1, 2)
+
+      a := 7.0
+      for i in 0..<4:
+        check adata[i] == 7.0
+      check a[0, 0] == 7.0
+      check a[0, 1] == 7.0
+      check a[1, 0] == 7.0
+      check a[1, 1] == 7.0
+
+    test ":= complex fill":
+      var cdata = [complex(0.0, 0.0), complex(0.0, 0.0),
+                   complex(0.0, 0.0), complex(0.0, 0.0)]
+      var a = newEigenMatrix(addr cdata[0], [2, 2], 1, 2)
+
+      a := complex(2.0, -1.0)
+      for i in 0..<4:
+        check cdata[i] == complex(2.0, -1.0)
+      check a[0, 0] == complex(2.0, -1.0)
+      check a[1, 1] == complex(2.0, -1.0)
