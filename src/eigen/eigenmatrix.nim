@@ -27,7 +27,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import record/[record]
+import utils/[composite]
 import utils/[complex]
 
 template eigenMatrixHeader*: untyped =
@@ -381,7 +381,7 @@ proc eigenMatrixCDNorm(handle: EigenMatrixHandleCD): float64
 
 #[ EigenMatrix implementation ]#
 
-recordImpl EigenMatrix:
+implement EigenMatrix with:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T; shape: array[R, int]; inner, outer: int) =
@@ -418,12 +418,41 @@ recordImpl EigenMatrix:
     elif isComplex64(T):
       this.data = createTempEigenMatrixCD(numRows, numCols, outer, inner)
   
-  method deinit() =
+  method deinit =
     when isReal32(T): destroyEigenMatrixRS(this.data, this.ownsData)
     elif isReal64(T): destroyEigenMatrixRD(this.data, this.ownsData)
     elif isComplex32(T): destroyEigenMatrixCS(this.data, this.ownsData)
     elif isComplex64(T): destroyEigenMatrixCD(this.data, this.ownsData)
   
+  #[ copy/move semantics ]#
+
+  method copy(src: EigenMatrix[R, T]) =
+    ## Shallow copy: create a new Map over the same data with ownsData=false
+    ## so the copy's =destroy only frees the Map wrapper, not the data.
+    if addr(this) == unsafeAddr(src): return
+    this.rows = src.rows
+    this.cols = src.cols
+    this.inner = src.inner
+    this.outer = src.outer
+    this.ownsData = false
+    when isReal32(T): this.data = cloneEigenMatrixRS(src.data)
+    elif isReal64(T): this.data = cloneEigenMatrixRD(src.data)
+    elif isComplex32(T): this.data = cloneEigenMatrixCS(src.data)
+    elif isComplex64(T): this.data = cloneEigenMatrixCD(src.data)
+
+  method sink(src: EigenMatrix[R, T]) =
+    ## Transfer ownership from src to this without cloning.
+    `=destroy`(this)
+    this.rows = src.rows
+    this.cols = src.cols
+    this.inner = src.inner
+    this.outer = src.outer
+    this.ownsData = src.ownsData
+    when isReal32(T): this.data = src.data
+    elif isReal64(T): this.data = src.data
+    elif isComplex32(T): this.data = src.data
+    elif isComplex64(T): this.data = src.data
+
   #[ accessors ]#
 
   method `[]`(row, col: int): T {.immutable.} =
@@ -451,6 +480,29 @@ recordImpl EigenMatrix:
     elif isComplex64(T):
       var v = value
       eigenMatrixCDSet(this.data, row, col, addr v)
+  
+  #[ copy operations ]#
+
+  method `:=`*(src: EigenMatrix[R, T]) {.immutable.} =
+    ## Write-through: copies src's elements into dst's underlying buffer.
+    ## dst need not be `var` — writes go through the C++ handle, not the struct.
+    assert this.rows == src.rows and this.cols == src.cols, "shape mismatch"
+    when isReal32(T): eigenMatrixRSCopyFrom(this.data, src.data)
+    elif isReal64(T): eigenMatrixRDCopyFrom(this.data, src.data)
+    elif isComplex32(T): eigenMatrixCSCopyFrom(this.data, src.data)
+    elif isComplex64(T): eigenMatrixCDCopyFrom(this.data, src.data)
+
+  method `:=`*(val: T) {.immutable.} =
+    ## Fill: set every element of the matrix to val through the view.
+    ## dst need not be `var` — writes go through the C++ handle, not the struct.
+    when isReal32(T): eigenMatrixRSFill(this.data, val)
+    elif isReal64(T): eigenMatrixRDFill(this.data, val)
+    elif isComplex32(T):
+      var v = val
+      eigenMatrixCSFill(this.data, addr v)
+    elif isComplex64(T):
+      var v = val
+      eigenMatrixCDFill(this.data, addr v)
   
   #[ algebra ]#
 
@@ -603,57 +655,6 @@ recordImpl EigenMatrix:
       return eigenMatrixCSNorm(this.data)
     elif isComplex64(T):
       return eigenMatrixCDNorm(this.data)
-
-# =copy hook: when an EigenMatrix is copied (e.g. passed by value to an
-# {.immutable.} method), create a fresh Map pointing to the same underlying
-# data with ownsData=false so that the copy's =destroy only frees the Map
-# wrapper — not the data — leaving the original intact.
-proc `=copy`*[R: static[int], T](dst: var EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
-  if addr(dst) == unsafeAddr(src): return
-  dst.rows = src.rows
-  dst.cols = src.cols
-  dst.inner = src.inner
-  dst.outer = src.outer
-  dst.ownsData = false
-  when isReal32(T):    dst.data = cloneEigenMatrixRS(src.data)
-  elif isReal64(T):    dst.data = cloneEigenMatrixRD(src.data)
-  elif isComplex32(T): dst.data = cloneEigenMatrixCS(src.data)
-  elif isComplex64(T): dst.data = cloneEigenMatrixCD(src.data)
-
-proc `=sink`*[R: static[int], T](dst: var EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
-  # Transfer ownership from src to dst without cloning.
-  # =destroy will NOT be called on src by the compiler after this.
-  `=destroy`(dst)
-  dst.rows = src.rows
-  dst.cols = src.cols
-  dst.inner = src.inner
-  dst.outer = src.outer
-  dst.ownsData = src.ownsData
-  when isReal32(T):    dst.data = src.data
-  elif isReal64(T):    dst.data = src.data
-  elif isComplex32(T): dst.data = src.data
-  elif isComplex64(T): dst.data = src.data
-
-proc `:=`*[R: static[int], T](dst: EigenMatrix[R, T]; src: EigenMatrix[R, T]) =
-  ## Write-through: copies src's elements into dst's underlying buffer.
-  ## dst need not be `var` — writes go through the C++ handle, not the struct.
-  assert dst.rows == src.rows and dst.cols == src.cols, "shape mismatch"
-  when isReal32(T):    eigenMatrixRSCopyFrom(dst.data, src.data)
-  elif isReal64(T):    eigenMatrixRDCopyFrom(dst.data, src.data)
-  elif isComplex32(T): eigenMatrixCSCopyFrom(dst.data, src.data)
-  elif isComplex64(T): eigenMatrixCDCopyFrom(dst.data, src.data)
-
-proc `:=`*[R: static[int], T](dst: EigenMatrix[R, T]; val: T) =
-  ## Fill: set every element of the matrix to val through the view.
-  ## dst need not be `var` — writes go through the C++ handle, not the struct.
-  when isReal32(T):    eigenMatrixRSFill(dst.data, val)
-  elif isReal64(T):    eigenMatrixRDFill(dst.data, val)
-  elif isComplex32(T):
-    var v = val
-    eigenMatrixCSFill(dst.data, addr v)
-  elif isComplex64(T):
-    var v = val
-    eigenMatrixCDFill(dst.data, addr v)
 
 when isMainModule:
   import std/[unittest, math]

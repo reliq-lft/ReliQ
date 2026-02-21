@@ -112,8 +112,8 @@
 ##     src.releaseLocal()
 
 import lattice/[lattice]
-import class/[class]
-import record/[record]
+import utils/[composite]
+import utils/[composite]
 import ga/[ga]
 import ga/[gawrap]
 import utils/[complex]

@@ -27,7 +27,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import record/[record]
+import utils/[composite]
 import utils/[complex]
 
 template eigenVectorHeader*: untyped =
@@ -364,7 +364,7 @@ proc eigenVectorCDCross(a, b: EigenVectorHandleCD; c: EigenVectorHandleCD)
 
 #[ EigenVector implementation ]#
 
-recordImpl EigenVector:
+implement EigenVector with:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T; numSize, numStride: int) =
@@ -395,12 +395,37 @@ recordImpl EigenVector:
     elif isComplex64(T):
       this.data = createTempEigenVectorCD(numSize, numStride)
   
-  method deinit() =
+  method deinit =
     when isReal32(T): destroyEigenVectorRS(this.data, this.ownsData)
     elif isReal64(T): destroyEigenVectorRD(this.data, this.ownsData)
     elif isComplex32(T): destroyEigenVectorCS(this.data, this.ownsData)
     elif isComplex64(T): destroyEigenVectorCD(this.data, this.ownsData)
   
+  #[ copy/move semantics ]#
+
+  method copy(src: EigenVector[T]) =
+    ## Shallow copy: create a new Map over the same data with ownsData=false
+    ## so the copy's =destroy only frees the Map wrapper, not the data.
+    if addr(this) == unsafeAddr(src): return
+    this.size = src.size
+    this.stride = src.stride
+    this.ownsData = false
+    when isReal32(T): this.data = cloneEigenVectorRS(src.data)
+    elif isReal64(T): this.data = cloneEigenVectorRD(src.data)
+    elif isComplex32(T): this.data = cloneEigenVectorCS(src.data)
+    elif isComplex64(T): this.data = cloneEigenVectorCD(src.data)
+
+  method sink(src: EigenVector[T]) =
+    ## Transfer ownership from src to this without cloning.
+    `=destroy`(this)
+    this.size = src.size
+    this.stride = src.stride
+    this.ownsData = src.ownsData
+    when isReal32(T): this.data = src.data
+    elif isReal64(T): this.data = src.data
+    elif isComplex32(T): this.data = src.data
+    elif isComplex64(T): this.data = src.data
+
   #[ accessors ]#
 
   method `[]`(idx: int): T {.immutable.} =
@@ -428,6 +453,29 @@ recordImpl EigenVector:
     elif isComplex64(T):
       var v = value
       eigenVectorCDSet(this.data, idx, addr v)
+
+  #[ copy operations ]#
+
+  method `:=`*(src: EigenVector[T]) {.immutable.} =
+    ## Write-through: copies src's elements into dst's underlying buffer.
+    ## dst need not be `var` — writes go through the C++ handle, not the struct.
+    assert this.size == src.size, "size mismatch"
+    when isReal32(T): eigenVectorRSCopyFrom(this.data, src.data)
+    elif isReal64(T): eigenVectorRDCopyFrom(this.data, src.data)
+    elif isComplex32(T): eigenVectorCSCopyFrom(this.data, src.data)
+    elif isComplex64(T): eigenVectorCDCopyFrom(this.data, src.data)
+
+  method `:=`*(val: T) {.immutable.} =
+    ## Fill: set every element of the vector to val through the view.
+    ## dst need not be `var` — writes go through the C++ handle, not the struct.
+    when isReal32(T):    eigenVectorRSFill(this.data, val)
+    elif isReal64(T):    eigenVectorRDFill(this.data, val)
+    elif isComplex32(T):
+      var v = val
+      eigenVectorCSFill(this.data, addr v)
+    elif isComplex64(T):
+      var v = val
+      eigenVectorCDFill(this.data, addr v)
   
   #[ algebra ]#
 
@@ -481,7 +529,7 @@ recordImpl EigenVector:
       eigenVectorCDDot(this.data, other.data, addr res)
       return res
   
-  method norm(): auto {.immutable.} =
+  method norm: auto {.immutable.} =
     when isReal32(T):
       return eigenVectorRSNorm(this.data)
     elif isReal64(T):
@@ -561,53 +609,6 @@ recordImpl EigenVector:
     elif isReal64(T): eigenVectorRDCross(this.data, other.data, result.data)
     elif isComplex32(T): eigenVectorCSCross(this.data, other.data, result.data)
     elif isComplex64(T): eigenVectorCDCross(this.data, other.data, result.data)
-
-# =copy hook: when an EigenVector is copied (e.g. passed by value to an
-# {.immutable.} method), create a fresh Map pointing to the same underlying
-# data with ownsData=false so that the copy's =destroy only frees the Map
-# wrapper — not the data — leaving the original intact.
-proc `=copy`*[T](dst: var EigenVector[T]; src: EigenVector[T]) =
-  if addr(dst) == unsafeAddr(src): return
-  dst.size = src.size
-  dst.stride = src.stride
-  dst.ownsData = false
-  when isReal32(T):    dst.data = cloneEigenVectorRS(src.data)
-  elif isReal64(T):    dst.data = cloneEigenVectorRD(src.data)
-  elif isComplex32(T): dst.data = cloneEigenVectorCS(src.data)
-  elif isComplex64(T): dst.data = cloneEigenVectorCD(src.data)
-
-proc `=sink`*[T](dst: var EigenVector[T]; src: EigenVector[T]) =
-  # Transfer ownership from src to dst without cloning.
-  # =destroy will NOT be called on src by the compiler after this.
-  `=destroy`(dst)
-  dst.size = src.size
-  dst.stride = src.stride
-  dst.ownsData = src.ownsData
-  when isReal32(T):    dst.data = src.data
-  elif isReal64(T):    dst.data = src.data
-  elif isComplex32(T): dst.data = src.data
-  elif isComplex64(T): dst.data = src.data
-
-proc `:=`*[T](dst: EigenVector[T]; src: EigenVector[T]) =
-  ## Write-through: copies src's elements into dst's underlying buffer.
-  ## dst need not be `var` — writes go through the C++ handle, not the struct.
-  assert dst.size == src.size, "size mismatch"
-  when isReal32(T):    eigenVectorRSCopyFrom(dst.data, src.data)
-  elif isReal64(T):    eigenVectorRDCopyFrom(dst.data, src.data)
-  elif isComplex32(T): eigenVectorCSCopyFrom(dst.data, src.data)
-  elif isComplex64(T): eigenVectorCDCopyFrom(dst.data, src.data)
-
-proc `:=`*[T](dst: EigenVector[T]; val: T) =
-  ## Fill: set every element of the vector to val through the view.
-  ## dst need not be `var` — writes go through the C++ handle, not the struct.
-  when isReal32(T):    eigenVectorRSFill(dst.data, val)
-  elif isReal64(T):    eigenVectorRDFill(dst.data, val)
-  elif isComplex32(T):
-    var v = val
-    eigenVectorCSFill(dst.data, addr v)
-  elif isComplex64(T):
-    var v = val
-    eigenVectorCDFill(dst.data, addr v)
 
 when isMainModule:
   import std/[unittest, math]

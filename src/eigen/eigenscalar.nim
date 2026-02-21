@@ -27,7 +27,7 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import record/[record]
+import utils/[composite]
 import utils/[complex]
 
 template eigenScalarHeader*: untyped =
@@ -244,7 +244,7 @@ proc eigenScalarCDConj(handle: EigenScalarHandleCD, outVal: pointer)
 
 #[ EigenScalar implementation ]#
 
-recordImpl EigenScalar:
+implement EigenScalar with:
   #[ constructor/destructor ]#
 
   method init(rawData: ptr T) =
@@ -275,15 +275,30 @@ recordImpl EigenScalar:
       var v = value
       eigenScalarCDSet(this.data, addr v)
   
-  method deinit() =
+  method deinit =
     when isReal32(T): destroyEigenScalarRS(this.data, this.ownsData)
     elif isReal64(T): destroyEigenScalarRD(this.data, this.ownsData)
     elif isComplex32(T): destroyEigenScalarCS(this.data, this.ownsData)
     elif isComplex64(T): destroyEigenScalarCD(this.data, this.ownsData)
   
+  #[ copy/move semantics ]#
+
+  method copy(src: EigenScalar[T]) =
+    ## Shallow copy: share the raw data pointer with ownsData=false
+    ## so this copy's =destroy never frees the underlying value.
+    if addr(this) == unsafeAddr(src): return
+    this.ownsData = false
+    this.data = src.data
+
+  method sink(src: EigenScalar[T]) =
+    ## Transfer ownership from src to this without cloning.
+    `=destroy`(this)
+    this.ownsData = src.ownsData
+    this.data = src.data
+
   #[ accessors ]#
 
-  method `[]`(): T {.immutable.} =
+  method `[]`: T {.immutable.} =
     when isReal32(T):
       return eigenScalarRSGet(this.data)
     elif isReal64(T):
@@ -307,6 +322,25 @@ recordImpl EigenScalar:
       eigenScalarCSSet(this.data, addr v)
     elif isComplex64(T):
       var v = value
+      eigenScalarCDSet(this.data, addr v)
+
+  #[ copy operation ]#
+
+  method `:=`(val: T) {.immutable.} = 
+    # shouldn't really be immutable, but this allows using `s := val` syntax to 
+    # write through to the underlying value without needing a var scalar, which 
+    # is more ergonomic for common use cases like `field[n] := val` and 
+    # `s := complex(3.0, 4.0)`.
+    ## Write a raw value through the scalar's underlying pointer.
+    ## Enables `s := complex(3.0, 4.0)` and `field[n] := val`.
+    ## dst need not be `var` — writes go through the C++ handle, not the struct.
+    when isReal32(T): eigenScalarRSSet(this.data, val)
+    elif isReal64(T): eigenScalarRDSet(this.data, val)
+    elif isComplex32(T):
+      var v = val
+      eigenScalarCSSet(this.data, addr v)
+    elif isComplex64(T):
+      var v = val
       eigenScalarCDSet(this.data, addr v)
   
   #[ algebra ]#
@@ -363,7 +397,7 @@ recordImpl EigenScalar:
     elif isComplex32(T): eigenScalarCSDivAssign(this.data, other.data)
     elif isComplex64(T): eigenScalarCDDivAssign(this.data, other.data)
 
-  method abs(): auto {.immutable.} =
+  method abs: auto {.immutable.} =
     when isReal32(T):
       return eigenScalarRSAbs(this.data)
     elif isReal64(T):
@@ -373,7 +407,7 @@ recordImpl EigenScalar:
     elif isComplex64(T):
       return eigenScalarCDAbs(this.data)
 
-  method conj(): EigenScalar[T] {.immutable.} =
+  method conj: EigenScalar[T] {.immutable.} =
     when isComplex32(T):
       var res: Complex32
       eigenScalarCSConj(this.data, addr res)
@@ -394,34 +428,6 @@ recordImpl EigenScalar:
   method `<=`(other: EigenScalar[T]): bool {.immutable.} = this[] <= other[]
   method `>`(other: EigenScalar[T]): bool {.immutable.} = this[] > other[]
   method `>=`(other: EigenScalar[T]): bool {.immutable.} = this[] >= other[]
-
-# =copy hook: when an EigenScalar is copied (e.g. passed by value to an
-# {.immutable.} method), share the raw data pointer with ownsData=false
-# so the copy's =destroy never frees the value, leaving the original intact.
-proc `=copy`*[T](dst: var EigenScalar[T]; src: EigenScalar[T]) =
-  if addr(dst) == unsafeAddr(src): return
-  dst.ownsData = false
-  dst.data = src.data
-
-proc `=sink`*[T](dst: var EigenScalar[T]; src: EigenScalar[T]) =
-  # Transfer ownership from src to dst without cloning.
-  # =destroy will NOT be called on src by the compiler after this.
-  `=destroy`(dst)
-  dst.ownsData = src.ownsData
-  dst.data = src.data
-
-proc `:=`*[T](dst: EigenScalar[T]; val: T) =
-  ## Write a raw value through the scalar's underlying pointer.
-  ## Enables `s := complex(3.0, 4.0)` and `field[n] := val`.
-  ## dst need not be `var` — writes go through the C++ handle, not the struct.
-  when isReal32(T):    eigenScalarRSSet(dst.data, val)
-  elif isReal64(T):    eigenScalarRDSet(dst.data, val)
-  elif isComplex32(T):
-    var v = val
-    eigenScalarCSSet(dst.data, addr v)
-  elif isComplex64(T):
-    var v = val
-    eigenScalarCDSet(dst.data, addr v)
 
 converter toValue*[T](s: EigenScalar[T]): T =
   ## Implicitly read an EigenScalar as its element type T.

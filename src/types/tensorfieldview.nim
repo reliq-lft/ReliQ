@@ -28,11 +28,11 @@
 ]#
 
 import reliq
-import globaltensor
-import localtensor
+import globaltensorfield
+import localtensorfield
 #import devicesitetensor
 
-import record/[record]
+import utils/[composite]
 import memory/[hostlayout]
 import memory/[simdlayout]
 import lattice/[indexing]
@@ -101,7 +101,7 @@ proc layoutTransformation*[D: static[int], R: static[int], S](
 
   return target
 
-recordImpl TensorFieldView:
+implement TensorFieldView with:
   method init(
     tensor: var TensorField[D, R, L, T];
     inputSIMDGrid: array[D, int] = defaultSIMDGrid[D]()

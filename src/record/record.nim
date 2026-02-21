@@ -179,7 +179,7 @@
 ##
 ## Architecture
 ## ------------
-## The implementation is a **hook-based compile-time plugin system** adapted
+## The recordImplation is a **hook-based compile-time plugin system** adapted
 ## from `jjv360/nim-classes <https://github.com/jjv360/nim-classes>`_ (MIT
 ## License), restructured for Chapel record semantics.
 ##

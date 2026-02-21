@@ -31,7 +31,7 @@ import std/[tables]
 import std/[locks]
 import std/[strutils]
 
-import class/[class]
+import utils/[composite]
 
 const
   MaxPoolEntries* = 128

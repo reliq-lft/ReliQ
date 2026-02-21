@@ -216,7 +216,7 @@ macro classImpl*(head: untyped, body: untyped): untyped =
     var methodBody = copyNimTree(node.body)
     if methodBody.kind == nnkEmpty:
       let mName = $node.name
-      let text = $classDef.name & "." & mName & "() is not implemented."
+      let text = $classDef.name & "." & mName & "() is not classImpled."
       methodBody = newStmtList(
         quote do: raiseAssert(`text`)
       )
@@ -296,6 +296,40 @@ macro classImpl*(head: untyped, body: untyped): untyped =
 
     if isInit:
       generateClassImplConstructors(code, classDef, procWithBody)
+
+    # Generate lifecycle hooks: =copy, =sink, =dup, =wasMoved, =trace
+    const lifecycleHooks = ["copy", "sink", "dup", "wasMoved", "trace"]
+    if methodName in lifecycleHooks and not isStatic:
+      let hookIdent = ident("`=" & methodName & "`")
+      let thisIdent = ident"this"
+      let call = newCall(newDotExpr(thisIdent, ident(methodName)))
+      for i in 2 ..< procWithBody.params.len:
+        let paramGroup = procWithBody.params[i]
+        for j in 0 ..< paramGroup.len - 2:
+          call.add(copyNimTree(paramGroup[j]))
+      let hookProc =
+        if methodName == "dup":
+          newProc(
+            name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+            params = @[
+              copyNimTree(classDef.fullType),
+              newIdentDefs(thisIdent, copyNimTree(classDef.fullType))
+            ],
+            body = newStmtList(call)
+          )
+        else:
+          newProc(
+            name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+            params = @[
+              newEmptyNode(),
+              newIdentDefs(thisIdent, newNimNode(nnkVarTy).add(classDef.fullType))
+            ],
+            body = newStmtList(call)
+          )
+      for i in 2 ..< procWithBody.params.len:
+        hookProc.params.add(copyNimTree(procWithBody.params[i]))
+      hookProc.addGenericParams(classDef)
+      code.add(hookProc)
 
   # Debug output
   const debugclasses {.strdefine.} = ""

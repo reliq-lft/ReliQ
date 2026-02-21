@@ -28,11 +28,11 @@
 ]#
 
 import lattice/[lattice]
-import record/[record]
 import eigen/[eigen]
 import utils/[complex]
+import utils/[composite]
 
-import globaltensor
+import globaltensorfield
 #import hostsitetensor
 
 type LocalStorage*[T] = distinct ptr UncheckedArray[T]
@@ -55,7 +55,7 @@ proc `[]`*[T](s: LocalStorage[T], i: int): var T =
 proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
   (ptr UncheckedArray[T])(s)[i] = val
 
-recordImpl LocalTensorField:
+implement LocalTensorField with:
   #[ constructor/destructor ]#
 
   method init(tensor: var TensorField[D, R, L, T]) =
@@ -179,7 +179,7 @@ when isMainModule:
           var s = ls[n]
           s := complex(3.0, 4.0)
         for n in ls.all:
-          let s = ls[n]
+          var s = ls[n]
           var b = newLocalTensor(ls.shape): Complex64
           b := complex(1.0, 2.0)
           let r = s - b

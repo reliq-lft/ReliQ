@@ -202,7 +202,7 @@ macro recordImpl*(head: untyped, body: untyped): untyped =
     var methodBody = copyNimTree(node.body)
     if methodBody.kind == nnkEmpty:
       let mName = $node.name
-      let text = $recDef.name & "." & mName & "() is not implemented."
+      let text = $recDef.name & "." & mName & "() is not recordImpled."
       methodBody = newStmtList(
         quote do: raiseAssert(`text`)
       )
@@ -277,6 +277,42 @@ macro recordImpl*(head: untyped, body: untyped): untyped =
     # Generate convenience constructors for init
     if isInit:
       generateImplConstructors(code, recDef, procWithBody)
+
+    # Generate lifecycle hooks: =copy, =sink, =dup, =wasMoved, =trace
+    const lifecycleHooks = ["copy", "sink", "dup", "wasMoved", "trace"]
+    if $node.name in lifecycleHooks and not isStatic:
+      let mName = $node.name
+      let hookIdent = ident("`=" & mName & "`")
+      let thisIdent = ident"this"
+      let call = newCall(newDotExpr(thisIdent, ident(mName)))
+      # procWithBody.params: [0]=return, [1]=this, [2+]=user params
+      for i in 2 ..< procWithBody.params.len:
+        let paramGroup = procWithBody.params[i]
+        for j in 0 ..< paramGroup.len - 2:
+          call.add(copyNimTree(paramGroup[j]))
+      let hookProc =
+        if mName == "dup":
+          newProc(
+            name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+            params = @[
+              copyNimTree(recDef.fullType),
+              newIdentDefs(thisIdent, copyNimTree(recDef.fullType))
+            ],
+            body = newStmtList(call)
+          )
+        else:
+          newProc(
+            name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+            params = @[
+              newEmptyNode(),
+              newIdentDefs(thisIdent, newNimNode(nnkVarTy).add(recDef.fullType))
+            ],
+            body = newStmtList(call)
+          )
+      for i in 2 ..< procWithBody.params.len:
+        hookProc.params.add(copyNimTree(procWithBody.params[i]))
+      hookProc.addGenericParams(recDef)
+      code.add(hookProc)
 
   # Debug output
   const debugrecords {.strdefine.} = ""

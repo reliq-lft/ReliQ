@@ -120,7 +120,59 @@ proc generateDestructor(classDef: ClassDescription) =
   destroyProc.addGenericParams(classDef)
   classDef.body.add(destroyProc)
 
+proc generateCopyHooks(classDef: ClassDescription) =
+  ## Generate lifecycle hooks for any correspondingly-named method declared
+  ## in the class body.  Only hooks whose methods are explicitly declared
+  ## are emitted; undeclared hooks fall back to Nim's default behaviour.
+  ##
+  ## Supported mappings:
+  ##   method copy(src: T)          → proc `=copy`*(this: var T; src: T)
+  ##   method sink(src: T)          → proc `=sink`*(this: var T; src: T)
+  ##   method dup(): T {.immutable.}→ proc `=dup`*(this: T): T
+  ##   method wasMoved()            → proc `=wasMoved`*(this: var T)
+  ##   method trace(env: pointer)   → proc `=trace`*(this: var T; env: pointer)
+  const lifecycleHooks = ["copy", "sink", "dup", "wasMoved", "trace"]
+  for m in classDef.methods.definitions:
+    let mName = $m.definition.name
+    if mName notin lifecycleHooks:
+      continue
+
+    let hookIdent = ident("`=" & mName & "`")
+    let className = classDef.fullType
+    let thisIdent = ident"this"
+
+    let call = newCall(newDotExpr(thisIdent, ident(mName)))
+    for i in 1 ..< m.definition.params.len:
+      let paramGroup = m.definition.params[i]
+      for j in 0 ..< paramGroup.len - 2:
+        call.add(copyNimTree(paramGroup[j]))
+
+    let hookProc =
+      if mName == "dup":
+        newProc(
+          name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+          params = @[
+            copyNimTree(className),
+            newIdentDefs(thisIdent, copyNimTree(className))
+          ],
+          body = newStmtList(call)
+        )
+      else:
+        newProc(
+          name = newNimNode(nnkPostfix).add(ident"*", hookIdent),
+          params = @[
+            newEmptyNode(),
+            newIdentDefs(thisIdent, newNimNode(nnkVarTy).add(className))
+          ],
+          body = newStmtList(call)
+        )
+    for i in 1 ..< m.definition.params.len:
+      hookProc.params.add(copyNimTree(m.definition.params[i]))
+    hookProc.addGenericParams(classDef)
+    classDef.body.add(hookProc)
+
 static:
   classCompilerHooks.add(proc(stage: ClassCompilerStage, classDef: ClassDescription) =
     if stage == ClassGenerateCode: generateDestructor(classDef)
+    if stage == ClassGenerateCode: generateCopyHooks(classDef)
   )

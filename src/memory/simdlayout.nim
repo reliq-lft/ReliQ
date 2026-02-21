@@ -39,7 +39,7 @@ else: # assume CPU build
 
 import hostlayout
 
-import class/[class]
+import utils/[composite]
 import lattice/[indexing]
 import utils/[private]
 
@@ -105,7 +105,7 @@ proc newSIMDGrid[D: static[int]](
       err &= "\n  result: " & $result
       raise newException(ValueError, err)
 
-classImpl SIMDLayout:
+implement SIMDLayout with:
   method init(hostGrid, inputSimdGrid: array[D, int]) =
     this.hostGrid = hostGrid
     this.simdGrid = newSIMDGrid(this.hostGrid, inputSimdGrid)

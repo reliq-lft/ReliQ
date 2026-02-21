@@ -250,7 +250,7 @@
 ##
 ## Architecture
 ## ------------
-## The implementation mirrors the record macro architecture — a hook-based
+## The classImplation mirrors the record macro architecture — a hook-based
 ## compile-time plugin system with the same stage pipeline:
 ##
 ## 1. ``ClassPreload`` — Early initialization.
