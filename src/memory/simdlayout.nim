@@ -40,10 +40,9 @@ else: # assume CPU build
 import hostlayout
 
 import utils/[composite]
-import lattice/[indexing]
 import utils/[private]
 
-class SIMDLayout[D: static[int]]:
+record SIMDLayout*[D: static[int]]:
   var hostGrid: array[D, int]
   var simdGrid: array[D, int]
   var deviceGrid: array[D, int]
@@ -118,7 +117,7 @@ implement SIMDLayout with:
     this.numHostSites = product(this.hostGrid)
     this.numDeviceSites = product(this.deviceGrid)
 
-  method deviceIdxAndLaneIdxToHostIdx(deviceIdx, laneIdx: int): int {.inline.} =
+  method deviceIdxAndLaneIdxToHostIdx(deviceIdx, laneIdx: int): int {.immutable, inline.} =
     var deviceRemainder = deviceIdx
     var laneRemainder = laneIdx
     result = 0
@@ -129,7 +128,7 @@ implement SIMDLayout with:
       deviceRemainder = deviceRemainder mod this.deviceStrides[d]
       result += (deviceCoord * this.simdGrid[d] + laneCoord) * this.hostStrides[d]
 
-  method hostIdxToDeviceIdxAndLaneIdx(hostIdx: int): (int, int) {.inline.} =
+  method hostIdxToDeviceIdxAndLaneIdx(hostIdx: int): (int, int) {.immutable, inline.} =
     var deviceIdx = 0
     var laneIdx = 0
     var hostRemainder = hostIdx

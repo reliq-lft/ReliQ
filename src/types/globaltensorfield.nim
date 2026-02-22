@@ -451,6 +451,10 @@ record TensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     ## Get total number of global lattice sites
     return this.lattice.numGlobalSites()
 
+  method zero* =
+    ## Set all elements of the tensor field to zero
+    this.data.zero()
+
 #[ convenience procedures/templates ]#
 
 proc newScalarField*[D: static[int], L: Lattice[D]](lattice: L, T: typedesc): TensorField[D, 0, L, T] =

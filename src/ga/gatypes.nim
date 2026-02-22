@@ -167,12 +167,10 @@ proc `=copy`*[D: static[int], T](
   ## - `src`: The source GlobalArray to copy from.
   if dest.handle == src.handle: return
   if dest.handle != 0 and src.handle != 0 and conformable(dest, src):
-    GA_Copy(src.handle, dest.handle) 
-    GA_Sync()
+    GA_Copy(src.handle, dest.handle)  # collective, no sync needed
   elif dest.handle == 0 and src.handle != 0:
     dest = newGlobalArray(src.globalGrid, src.mpiGrid, src.ghostGrid): T
-    GA_Copy(src.handle, dest.handle) 
-    GA_Sync()
+    GA_Copy(src.handle, dest.handle)  # collective, no sync needed
   elif src.handle == 0:
     let errMsg = "Error in GA copy from " & $src.handle & " to " & $dest.handle
     raise newException(ValueError): errMsg & "; source is uninitialized"
@@ -361,8 +359,7 @@ proc exchangeDirection*[D: static[int], T](
     cint(dir), 
     cint(side), 
     update_corners_c
-  )
-  GA_Sync()
+  )  # collective, no sync needed
 
 proc exchange*[D: static[int], T](
   ga: GlobalArray[D, T]; 
@@ -393,3 +390,12 @@ proc isInitialized*[D: static[int], T](ga: GlobalArray[D, T]): bool =
   ## Returns:
   ## `true` if the GlobalArray is initialized, `false` otherwise.
   return ga.handle != 0
+
+proc zero*[D: static[int], T](ga: GlobalArray[D, T]) =
+  ## Set all elements of the GlobalArray to zero
+  ##
+  ## This procedure sets all elements of the GlobalArray to zero using the GA_Zero function.
+  ##
+  ## Parameters:
+  ## - `ga`: The GlobalArray instance to be zeroed.
+  ga.handle.Zero()  # collective, no sync needed

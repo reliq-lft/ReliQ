@@ -149,7 +149,7 @@ proc generateExtraInits(recDef: RecordDescription) =
       # Forward user-defined init params
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
-        m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
+        m.definition.params.add(newIdentDefs(nameNode, typeNode, identDef[^1]))
         m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)
@@ -169,7 +169,7 @@ proc generateExtraInits(recDef: RecordDescription) =
 
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
-        m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
+        m.definition.params.add(newIdentDefs(nameNode, typeNode, identDef[^1]))
         m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)
@@ -189,7 +189,7 @@ proc generateExtraInits(recDef: RecordDescription) =
 
       traverseParams(methodDef.definition, proc(idx: int, nameNode: NimNode,
           typeNode: NimNode, identDef: NimNode, identDefIdx: int) =
-        m.definition.params.add(newIdentDefs(nameNode, typeNode, newEmptyNode()))
+        m.definition.params.add(newIdentDefs(nameNode, typeNode, identDef[^1]))
         m.body[1][0].add(nameNode)  # DiscardStmt[0] = the o.init() call
       )
       newItems.add(m)

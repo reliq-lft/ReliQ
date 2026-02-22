@@ -136,7 +136,7 @@ proc GA_Dgop*(x: ptr float64, n: cint, op: cstring)
 
 #[ misc ]#
 
-# ...
+proc Zero*(handle: cint) {.importc: "GA_Zero", ga.}
 
 #[ derived wrappers ]#
 
@@ -149,28 +149,23 @@ proc toGAType*(t: typedesc[float32]): cint = C_FLOAT
 proc toGAType*(t: typedesc[float64]): cint = C_DBL
 
 proc newHandle*(): cint =
-  result = GA_Create_handle()
-  GA_Sync()
+  result = GA_Create_handle()  # local only, no sync needed
 
 proc setName*(handle: cint; name: cstring) =
-  handle.GA_Set_name(cast[ptr cchar](name))
-  GA_Sync()
+  handle.GA_Set_name(cast[ptr cchar](name))  # local only, no sync needed
 
 proc setData*[D: static[int]](handle: cint; dims: array[D, cint]; T: typedesc) =
-  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T)) 
-  GA_Sync()
+  handle.GA_Set_data(cint(D), addr dims[0], toGAType(T))  # local only, no sync needed
 
 proc setChunk*[D: static[int]](handle: cint; chunks: array[D, cint]) =
-  handle.GA_Set_chunk(addr chunks[0]) 
-  GA_Sync()
+  handle.GA_Set_chunk(addr chunks[0])  # local only, no sync needed
 
 proc setGhosts*[D: static[int]](handle: cint; widths: array[D, cint]) =
-  handle.GA_Set_ghosts(addr widths[0]) 
-  GA_Sync()
+  handle.GA_Set_ghosts(addr widths[0])  # local only, no sync needed
 
 proc alloc*(handle: cint) =
+  # GA_Allocate is collective and internally synchronizes
   let status = handle.GA_Allocate()
-  GA_Sync()
   if status == 0:
     raise newException(ValueError, "Global Array allocation failed.")
 

@@ -31,11 +31,9 @@ import lattice/[lattice]
 import eigen/[eigen]
 import utils/[complex]
 import utils/[composite]
+import memory/[storage]
 
 import globaltensorfield
-#import hostsitetensor
-
-type LocalStorage*[T] = distinct ptr UncheckedArray[T]
 
 record LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
   var global*: TensorField[D, R, L, T]
@@ -48,14 +46,7 @@ record LocalTensorField*[D: static[int], R: static[int], L: Lattice[D], T]:
     var data*: LocalStorage[float64]
   else:
     var data*: LocalStorage[T]
-
-proc `[]`*[T](s: LocalStorage[T], i: int): var T =
-  (ptr UncheckedArray[T])(s)[i]
-
-proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
-  (ptr UncheckedArray[T])(s)[i] = val
-
-implement LocalTensorField with:
+  
   #[ constructor/destructor ]#
 
   method init(tensor: var TensorField[D, R, L, T]) =
@@ -72,8 +63,6 @@ implement LocalTensorField with:
   method deinit = this.global.releaseLocal()
 
   #[ accessors ]#
-
-  method numLocalSites: int = this.global.numLocalSites()
 
   method `[]`*(n: int): auto =
     let ghostWidth = 1
@@ -94,6 +83,10 @@ implement LocalTensorField with:
       return data.newEigenMatrix(this.shape, inner, outer)
     else: raise newException(ValueError, "Unsupported tensor rank")
   
+  #[ misc ]#
+
+  method numLocalSites: int = this.global.numLocalSites()
+  
 #[ convenience procedures/templates ]#
 
 template all*[D: static[int], R: static[int], L: Lattice[D], T](
@@ -112,8 +105,9 @@ when isMainModule:
   const eps = 1e-10
 
   gaParallel:
-    var lat = newSimpleCubicLattice([8, 8, 8, 16], ghostGrid = [1, 1, 1, 1])
-    let nc = 3
+    let gmtry = [8, 8, 8, 16]
+    let ghost = [1, 1, 1, 1]
+    var lat = gmtry.newSimpleCubicLattice(ghostGrid = ghost)
 
     var gf = lat.newTensorField([nc, nc]): Complex64
     var gv = lat.newTensorField([nc]): Complex64

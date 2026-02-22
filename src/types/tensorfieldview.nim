@@ -35,6 +35,7 @@ import localtensorfield
 import utils/[composite]
 import memory/[hostlayout]
 import memory/[simdlayout]
+import memory/[storage]
 import lattice/[indexing]
 import lattice/[lattice]
 import openmp/[ompbase]
@@ -57,51 +58,6 @@ record TensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T]:
     var localData*: LocalStorage[T]
     var hostData*: LocalStorage[T]
 
-proc layoutTransformation*[D: static[int], R: static[int], S](
-  src: LocalStorage[S];
-  tensorShape: array[R, int];
-  latticePadding: array[D, int];
-  simdLayout: SIMDLayout[D];
-  T: typedesc;
-): LocalStorage[S] =
-  let grid = simdLayout.hostGrid
-  let innerGhostWidth = 1
-  var shape: array[R+1, int]
-  var tensorPadding: array[R+1, int]
-
-  for r in 0..R: 
-    if r != R: shape[r] = tensorShape[r]
-    else: shape[r] = (if isComplex(T): 2 else: 1)
-    tensorPadding[r] = innerGhostWidth
-  
-  let paddedShape = shape + 2 * tensorPadding
-  let paddedGrid = grid + 2 * latticePadding
-
-  let numSIMDSites = simdLayout.numSIMDSites
-  let numDeviceSites = simdLayout.numDeviceSites
-  let elementsPerSite = product(shape)
-  let reshape = [numDeviceSites, elementsPerSite, numSIMDSites]
-  let numElements = product(reshape) * sizeof(S)
-
-  var target = cast[LocalStorage[S]](alloc(numElements))
-
-  # keep at it
-
-  threads: # just mapping local for now; TODO: take care of ghost boundaries
-    for deviceIdx in 0..<numDeviceSites:
-      for laneIdx in 0..<numSIMDSites:
-        let hostIdx = simdLayout.deviceIdxAndLaneIdxToHostIdx(deviceIdx, laneIdx)
-        let hostCoords = hostIdx.lexToCoords(grid) + latticePadding
-        let paddedHostIdx = hostCoords.coordsToLex(paddedGrid)
-        for elemIdx in 0..<elementsPerSite:
-          let elemCoords = elemIdx.lexToCoords(shape) + tensorPadding
-          let paddedElemIdx = elemCoords.coordsToLex(paddedShape)
-          let targetIdx = [deviceIdx, elemIdx, laneIdx].coordsToLex(reshape)
-          target[targetIdx] = src[paddedHostIdx + paddedElemIdx]
-
-  return target
-
-implement TensorFieldView with:
   method init(
     tensor: var TensorField[D, R, L, T];
     inputSIMDGrid: array[D, int] = defaultSIMDGrid[D]()
