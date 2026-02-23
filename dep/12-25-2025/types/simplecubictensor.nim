@@ -34,7 +34,7 @@ import std/[math]
 import reliq
 import simplecubicscalar
 
-import utils/[complex]
+import types/[complex]
 
 type Group = enum
   gkNone,

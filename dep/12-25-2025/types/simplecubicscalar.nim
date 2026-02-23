@@ -34,7 +34,7 @@ import std/[tables]
 import std/[strutils]
 import std/[math]
 
-import utils/[complex]
+import types/[complex]
 
 type SimpleCubicField*[D: static[int], T] = object
   ## Simple cubic field implementation

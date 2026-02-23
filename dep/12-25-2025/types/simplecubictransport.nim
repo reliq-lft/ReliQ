@@ -3,7 +3,7 @@ import reliq
 import simplecubicscalar
 import simplecubictensor
 
-import utils/[complex]
+import types/[complex]
 
 type TransporterKind* = enum tkShift, tkCovariantShift
 

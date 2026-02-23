@@ -31,7 +31,7 @@ import lattice
 import globalarrays
 import kokkos
 
-import utils/[complex]
+import types/[complex]
 
 type LocalView*[D: static[int], T] = object
   ## Wrapper around Kokkos View for local portion of GlobalArray

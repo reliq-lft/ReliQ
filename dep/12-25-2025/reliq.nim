@@ -33,7 +33,7 @@ import lattice
 import globalarrays
 import kokkos
 
-import utils/[complex]
+import types/[complex]
 
 import types/[localview]
 

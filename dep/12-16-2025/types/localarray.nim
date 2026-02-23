@@ -31,7 +31,7 @@ import globalarrays
 import kokkos
 
 import globalarrays/[gawrap]
-import utils/[complex]
+import types/[complex]
 
 type LocalArray*[D: static[int], T] = object
   ## Wrapper around Kokkos View for local portion of GlobalArray
