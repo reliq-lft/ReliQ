@@ -39,7 +39,7 @@ else: # assume CPU build
 
 import hostlayout
 
-import utils/[composite]
+import types/[composite]
 import utils/[private]
 
 record SIMDLayout*[D: static[int]]:

@@ -29,7 +29,7 @@
 
 import simdlayout
 import utils/[private]
-import utils/[complex]
+import types/[complex]
 import openmp/[ompbase]
 
 type LocalStorage*[T] = distinct ptr UncheckedArray[T]
@@ -227,12 +227,13 @@ proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
 ]#
 
 proc layoutTransformation*[D: static[int], R: static[int], S](
+  target: var LocalStorage[S];
   src: LocalStorage[S];
   tensorShape: array[R, int];
   latticePadding: array[D, int];
   simdLayout: SIMDLayout[D];
   T: typedesc;
-): LocalStorage[S] =
+) =
   let grid = simdLayout.hostGrid
   let innerGhostWidth = 1
   var shape: array[R+1, int]
@@ -263,7 +264,7 @@ proc layoutTransformation*[D: static[int], R: static[int], S](
   let reshape = [totalDeviceSlots, elementsPerSite, numSIMDSites]
   let numElements = product(reshape) * sizeof(S)
 
-  var target = cast[LocalStorage[S]](alloc(numElements))
+  #var target = cast[LocalStorage[S]](alloc(numElements))
 
   # Write one slot: map (deviceIdx, laneIdx, elemIdx) → target and src locations.
   template write(slot, deviceIdx: int; hostShift: array[D, int]) =

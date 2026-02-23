@@ -32,7 +32,7 @@
 ## ``record`` and ``class``, so a single import is sufficient:
 ##
 ## .. code-block:: nim
-##   import utils/[composite]   # brings in record, class, and implement
+##   import types/[composite]   # brings in record, class, and implement
 ##
 ## The macro inspects the compile-time caches of both the ``record`` and
 ## ``class`` systems and dispatches to ``recordImpl`` or ``classImpl``
@@ -41,7 +41,7 @@
 ## Usage
 ## -----
 ## .. code-block:: nim
-##   import utils/[composite]
+##   import types/[composite]
 ##
 ##   record Foo:
 ##     var x: int
@@ -57,7 +57,7 @@
 ## Works identically for classes:
 ##
 ## .. code-block:: nim
-##   import utils/[composite]
+##   import types/[composite]
 ##
 ##   class Bar:
 ##     var y: float

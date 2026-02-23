@@ -29,8 +29,8 @@
 
 import lattice/[lattice]
 import eigen/[eigen]
-import utils/[complex]
-import utils/[composite]
+import types/[complex]
+import types/[composite]
 import memory/[storage]
 
 import globaltensorfield

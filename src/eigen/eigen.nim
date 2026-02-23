@@ -30,7 +30,7 @@
 import eigenscalar
 import eigenvector
 import eigenmatrix
-import utils/[complex]
+import types/[complex]
 
 export eigenscalar
 export eigenvector

@@ -1,6 +1,6 @@
 #[ 
   ReliQ lattice field theory framework: https://github.com/reliq-lft/ReliQ
-  Source file: src/reliq.nim
+  Source file: src/memory/exchange.nim
   Contact: reliq-lft@proton.me
 
   Author: Curtis Taylor Peterson <curtistaylorpetersonwork@gmail.com>
@@ -26,25 +26,3 @@
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
-
-import ga/[ga]
-import memory/[bufferpool]
-import memory/[coherence]
-
-when defined(UseOpenMP):
-  import openmp/[openmp]
-elif defined(UseOpenCL):
-  import opencl/[opencl]
-else:
-  import opencl/[opencl]
-
-var globalBufferPool* {.inject.} = newBufferPool()
-var globalCoherenceManager* {.inject.} = newCoherenceManager()
-
-template reliq*(body: untyped): untyped =
-  gaParallel:
-    block: body
-  globalBufferPool.drain()
-
-template accelerator*(body: untyped): untyped =
-  block: body

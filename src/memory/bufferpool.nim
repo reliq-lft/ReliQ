@@ -31,7 +31,7 @@ import std/[tables]
 import std/[locks]
 import std/[strutils]
 
-import utils/[composite]
+import types/[composite]
 
 const
   MaxPoolEntries* = 128
@@ -72,7 +72,7 @@ class BufferPool:
     this.entries = 0
     this.bytes = 0
     this.tick = 0
-    initLock(this.lock)
+    initLock this.lock
   
   method lookup*(key: BufferKey): (bool, BufferEntry) =
     ## Try to retrieve a buffer from the pool.
@@ -82,8 +82,8 @@ class BufferPool:
     ##   Grid uses exact-size matching and pops from a std::multimap.
     ##   We use BufferKey (which includes numSites, elemsPerSite, elementSize)
     ##   and pop from a seq (LIFO for cache warmth).
-    acquire(this.lock)
-    defer: release(this.lock)
+    acquire this.lock
+    defer: release this.lock
 
     if key in this.buckets:
       var bucket = addr this.buckets[key]
@@ -130,8 +130,8 @@ class BufferPool:
     ##
     ## If the pool is over budget, evict the oldest entry (LRU).
     ## This is Grid's Insert(ptr, size) + Victim() combined.
-    acquire(this.lock)
-    defer: release(this.lock)
+    acquire this.lock
+    defer: release this.lock
 
     # Over budget: evict LRU entry
     while (this.entries >= MaxPoolEntries or this.bytes + entry.bytes > MaxPoolBytes):
@@ -149,8 +149,8 @@ class BufferPool:
   
   method drain* =
     ## Release all pooled buffers.  Call at program shutdown.
-    acquire(this.lock)
-    defer: release(this.lock)
+    acquire this.lock
+    defer: release this.lock
 
     this.buckets.clear()
     this.entries = 0

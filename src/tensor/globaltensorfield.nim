@@ -112,11 +112,11 @@
 ##     src.releaseLocal()
 
 import lattice/[lattice]
-import utils/[composite]
-import utils/[composite]
+import types/[composite]
+import types/[composite]
 import ga/[ga]
 import ga/[gawrap]
-import utils/[complex]
+import types/[complex]
 import lattice/[indexing]
 import memory/[hostlayout]
 

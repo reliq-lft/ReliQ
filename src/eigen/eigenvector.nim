@@ -27,8 +27,8 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import utils/[composite]
-import utils/[complex]
+import types/[composite]
+import types/[complex]
 
 template eigenVectorHeader*: untyped =
   {.pragma: vector, header: "eigenvector.h".}
