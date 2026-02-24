@@ -37,10 +37,13 @@ import memory/[coherence]
 # <***> will be where view is exported <***>
 when defined(UseOpenMP):
   import openmp/[openmp]
+  export openmp
 elif defined(UseOpenCL):
   import opencl/[opencl]
+  export opencl
 else:
   import opencl/[opencl]
+  export opencl
 
 when defined(UseOpenMP):
   type
@@ -55,8 +58,8 @@ else:
     DeviceBuffer* = PMem
     DeviceQueue* = PCommandQueue
     
-var globalBufferPool* {.inject.} = newBufferPool()
-var globalCoherenceManager* {.inject.} = newCoherenceManager()
+var globalBufferPool* {.global.} = newBufferPool()
+var globalCoherenceManager* {.global.} = newCoherenceManager()
 
 template reliq*(body: untyped): untyped =
   gaParallel:

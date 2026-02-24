@@ -33,6 +33,10 @@ import std/[strutils]
 
 import types/[composite]
 
+import opencl/[oclbufferpool]
+
+export oclbufferpool
+
 const
   MaxPoolEntries* = 128
   MaxPoolBytes* = 2 * 1024 * 1024 * 1024 # 2 GB

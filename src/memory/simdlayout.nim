@@ -146,3 +146,4 @@ implement SIMDLayout with:
     for d in 0..<D:
       let numFaceSites = this.numDeviceSites() div this.deviceGrid[d]
       result += 2 * numFaceSites * ghostGrid[d]
+

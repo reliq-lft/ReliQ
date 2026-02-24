@@ -95,12 +95,16 @@ template newTensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T](
   let ghostGrid = tensor.ghostGrid()
   var view = tensor.newTensorFieldView(true)
 
-  #[ host/device coherence check ]#
+  #[ host coherence check ]#
 
   globalCoherenceManager.ensureEntry(view.aos)
   view.state = globalCoherenceManager.open(view.aos, io)
 
-  #[ buffer acquisition ]#
+  #[ get SIMD layout ]#
+
+  view.simdLayout = newSIMDLayout(localGrid, inputSIMDGrid)
+
+  #[ host buffer acquisition ]#
 
   when isComplex32(T):
     type StorageType = float32
@@ -109,22 +113,23 @@ template newTensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T](
   else:
     type StorageType = T
 
-  view.simdLayout = newSIMDLayout(localGrid, inputSIMDGrid)
+  var numLocalSites = view.simdLayout.numLocalDeviceSites()
+  var numGhostSites = view.simdLayout.numGhostDeviceSites(ghostGrid)
+  let key = BufferKey(
+    numSites: numLocalSites + numGhostSites,
+    elementsPerSite: product(view.shape) * (if isComplex(T): 2 else: 1),
+    elementSize: sizeof(StorageType)
+  )
+  let bytes = key.numSites * key.elementsPerSite * key.elementSize
+
   if view.state.canReuseBuffer and view.state.buffer != nil:
     (view.buffer, view.reference) = (view.state.buffer, view.state.reference)
   else: # try buffer pool
-    var numLocalSites = view.simdLayout.numLocalDeviceSites()
-    var numGhostSites = view.simdLayout.numGhostDeviceSites(ghostGrid)
-    let key = BufferKey(
-      numSites: numLocalSites + numGhostSites,
-      elementsPerSite: product(view.shape) * (if isComplex(T): 2 else: 1),
-      elementSize: sizeof(StorageType)
-    )
     let (found, entry) = globalBufferPool.lookup(key)
     if found: (view.buffer, view.reference) = (entry.buffer, entry.reference)
-    else: view.buffer = alloc entry.bytes
+    else: view.buffer = alloc bytes
   
-  #[ AoS -> AoSoA transformation ]#
+  #[ host AoS -> AoSoA transformation ]#
 
   view.aosoa = cast[LocalStorage[StorageType]](view.buffer)
   if view.state.needsTransform:
@@ -139,12 +144,34 @@ template newTensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T](
       ): T
     of iokWrite: discard
 
-  #[ host to device transfer ]#
+  #[ device buffer acquisition ]#
 
-  case globalCoherenceManager[view.buffer].state
-  of cskDeviceDirty:
-  of cskEmpty:
-  of cskHostDirty, cskConsistent: discard
+  # !!!! NEED TO IMPLEMENT OpenCL BUFFER POOL !!!!
+
+  #[
+  when defined(UseOpenMP):
+    view.deviceQueue = nil.DeviceQueue
+    view.deviceBuffer = cast[DeviceBuffer](view.buffer)
+  elif defined(UseOpenCL):
+    view.deviceQueue = clQueues[0] # one device per MPI rank
+
+    # cl_mem allocation: no coherence-level caching exists for device
+    # buffers yet, so every view gets a fresh cl_mem.  The host AoSoA
+    # buffer *is* reused via the coherence manager above, but the cl_mem
+    # is not (a CLBufferPool would be needed for that — see §3.4 of
+    # memory_management_strategy.txt).
+    view.deviceBuffer = buffer[StorageType](clContext, key.numSites * key.elementsPerSite)
+
+    # Upload decision: for iokRead/iokReadWrite we always need to
+    # upload because the cl_mem is freshly allocated (no cl_mem reuse).
+    # Once a CLBufferPool is added, this can be conditioned on whether
+    # the cl_mem was reused and the data is already current.
+    case io
+    of iokRead, iokReadWrite:
+      view.deviceQueue.write(addr view.aosoa[0], view.deviceBuffer, bytes)
+      check finish(view.deviceQueue)
+    of iokWrite: discard
+  ]#
   
   # return view
   move view
