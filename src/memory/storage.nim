@@ -27,23 +27,6 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
-import simdlayout
-import utils/[private]
-import types/[complex]
-import openmp/[ompbase]
-
-type LocalStorage*[T] = distinct ptr UncheckedArray[T]
-
-#[ host storage facilities ]#
-
-proc `[]`*[T](s: LocalStorage[T], i: int): var T =
-  (ptr UncheckedArray[T])(s)[i]
-
-proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
-  (ptr UncheckedArray[T])(s)[i] = val
-
-#[ layout transformation facilities ]#
-
 #[
   layoutTransformation: AoS (GlobalArrays) → AoSoA (SIMD-vectorized)
   ====================================================================
@@ -225,6 +208,23 @@ proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
 
   ─────────────────────────────────────────────────────────────────────
 ]#
+
+import simdlayout
+import utils/[private]
+import types/[complex]
+import openmp/[ompbase]
+
+type LocalStorage*[T] = distinct ptr UncheckedArray[T]
+
+#[ host storage facilities ]#
+
+proc `[]`*[T](s: LocalStorage[T], i: int): var T =
+  (ptr UncheckedArray[T])(s)[i]
+
+proc `[]=`*[T](s: LocalStorage[T], i: int, val: T) =
+  (ptr UncheckedArray[T])(s)[i] = val
+
+#[ layout transformation facilities ]#
 
 proc layoutTransformation*[D: static[int], R: static[int], S](
   target: var LocalStorage[S];

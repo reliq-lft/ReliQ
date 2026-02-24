@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/reliq-lft/ReliQ/blob/main/LICENSE)
 [![Nim](https://img.shields.io/badge/Nim-2.2.4-orange.svg)](https://nim-lang.org/)
 [![GA](https://img.shields.io/badge/GlobalArrays-5.8-green.svg)](https://globalarrays.github.io/)
+[![Eigen](https://img.shields.io/badge/Eigen-3.4-blue.svg)](https://eigen.tuxfamily.org/)
 
 > *"We all make choices. But in the end our choices make us."* — Andrew Ryan (BioShock)
 

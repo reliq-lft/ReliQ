@@ -27,10 +27,14 @@
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
 
+const UseSycl* {.booldefine.} = false
+const UseOpenMP* {.booldefine.} = false
+
 import ga/[ga]
 import memory/[bufferpool]
 import memory/[coherence]
 
+# <***> will be where view is exported <***>
 when defined(UseOpenMP):
   import openmp/[openmp]
 elif defined(UseOpenCL):
@@ -38,6 +42,19 @@ elif defined(UseOpenCL):
 else:
   import opencl/[opencl]
 
+when defined(UseOpenMP):
+  type
+    DeviceBuffer* = pointer
+    DeviceQueue* = pointer
+elif defined(UseOpenCL):
+  type
+    DeviceBuffer* = PMem
+    DeviceQueue* = PCommandQueue
+else:
+  type
+    DeviceBuffer* = PMem
+    DeviceQueue* = PCommandQueue
+    
 var globalBufferPool* {.inject.} = newBufferPool()
 var globalCoherenceManager* {.inject.} = newCoherenceManager()
 
@@ -47,4 +64,21 @@ template reliq*(body: untyped): untyped =
   globalBufferPool.drain()
 
 template accelerator*(body: untyped): untyped =
+  ## Scoping block for GPU/accelerator operations.
+  ## TensorFieldViews are created and ``each`` loops run within this block.
+  ## On exit, views are synced/destroyed in order.
+  bind UseOpenMP, UseOpenCL
+  when defined(UseOpenMP):
+    ompParallel:
+      block: body
+  elif defined(UseOpenCL):
+    oclParallel:
+      block: body
+  else:
+    oclParallel:
+      block: body
+
+template local*(body: untyped): untyped =
+  ## Scoping block for CPU-local operations.
+  ## LocalTensorFields are created and accessed within this block.
   block: body

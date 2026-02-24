@@ -38,9 +38,9 @@ import memory/[storage]
 import memory/[coherence]
 import lattice/[indexing]
 import lattice/[lattice]
-import utils/[private]
 import types/[composite]
 import types/[complex]
+import utils/[private]
 
 record TensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T]:
   var global*: TensorField[D, R, L, T] # holds handle to global array
@@ -51,15 +51,21 @@ record TensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T]:
   var state: ViewState
   var simdLayout: SIMDLayout[D]
 
+  var buffer: pointer
+  var reference: RootRef = nil
+
   when isComplex32(T): 
-    var aos*: LocalStorage[float32]
-    var aosoa*: LocalStorage[float32]
+    var aos: LocalStorage[float32]
+    var aosoa: LocalStorage[float32]
   elif isComplex64(T):
-    var aos*: LocalStorage[float64]
-    var aosoa*: LocalStorage[float64]
+    var aos: LocalStorage[float64]
+    var aosoa: LocalStorage[float64]
   else:
-    var aos*: LocalStorage[T]
-    var aosoa*: LocalStorage[T]
+    var aos: LocalStorage[T]
+    var aosoa: LocalStorage[T]
+  
+  var deviceBuffer: DeviceBuffer
+  var deviceQueue: DeviceQueue
 
 implement TensorFieldView with:
   method init(tensor: var TensorField[D, R, L, T]; permission: bool = false) =
@@ -85,35 +91,63 @@ template newTensorFieldView*[D: static[int], R: static[int], L: Lattice[D], T](
   io: IOKind;
   inputSIMDGrid: array[D, int] = defaultSIMDGrid[D]()
 ): TensorFieldView[D, R, L, T] =
+  let localGrid = tensor.localGrid()
+  let ghostGrid = tensor.ghostGrid()
   var view = tensor.newTensorFieldView(true)
 
-  # host/device coherence check
+  #[ host/device coherence check ]#
+
   globalCoherenceManager.ensureEntry(view.aos)
   view.state = globalCoherenceManager.open(view.aos, io)
 
   #[ buffer acquisition ]#
-  
-  var buffer: pointer
-  var reference: RootRef = nil
 
+  when isComplex32(T):
+    type StorageType = float32
+  elif isComplex64(T):
+    type StorageType = float64
+  else:
+    type StorageType = T
+
+  view.simdLayout = newSIMDLayout(localGrid, inputSIMDGrid)
   if view.state.canReuseBuffer and view.state.buffer != nil:
-    buffer = view.state.buffer
-    reference = view.state.reference
+    (view.buffer, view.reference) = (view.state.buffer, view.state.reference)
   else: # try buffer pool
-    discard # TODO
+    var numLocalSites = view.simdLayout.numLocalDeviceSites()
+    var numGhostSites = view.simdLayout.numGhostDeviceSites(ghostGrid)
+    let key = BufferKey(
+      numSites: numLocalSites + numGhostSites,
+      elementsPerSite: product(view.shape) * (if isComplex(T): 2 else: 1),
+      elementSize: sizeof(StorageType)
+    )
+    let (found, entry) = globalBufferPool.lookup(key)
+    if found: (view.buffer, view.reference) = (entry.buffer, entry.reference)
+    else: view.buffer = alloc entry.bytes
+  
+  #[ AoS -> AoSoA transformation ]#
 
-  #[
-  view.simdLayout = newSIMDLayout(tensor.localGrid(), inputSIMDGrid)
-  layoutTransformation(
-    view.aosoa,
-    view.aos,
-    view.shape, 
-    tensor.ghostGrid(),
-    view.simdLayout
-  ): T
-  ]#
+  view.aosoa = cast[LocalStorage[StorageType]](view.buffer)
+  if view.state.needsTransform:
+    case io
+    of iokRead, iokReadWrite:
+      layoutTransformation(
+        view.aosoa,
+        view.aos,
+        view.shape, 
+        ghostGrid,
+        view.simdLayout
+      ): T
+    of iokWrite: discard
 
-  view # return view
+  #[ host to device transfer ]#
+
+  case globalCoherenceManager[view.buffer].state
+  of cskDeviceDirty:
+  of cskEmpty:
+  of cskHostDirty, cskConsistent: discard
+  
+  # return view
+  move view
 
 #[ convenience procedures/templates ]#
 
@@ -131,24 +165,23 @@ when isMainModule:
     var tlat = newSimpleCubicLattice([8, 8, 8, 16])
     var plat = tlat.newPaddedLattice([1, 1, 1, 1])
 
-    accelerator:
-      suite "TensorFieldView construction":
-        test "int32":
-          var gf = plat.newTensorField([nc, nc]): int32
-          var lf = gf.newLocalTensorField()
+    suite "TensorFieldView construction":
+      test "int32":
+        var gf = plat.newTensorField([nc, nc]): int32
+        accelerator:
           var df = gf.newTensorFieldView()
-        
-        test "int64":
-          var gf = plat.newTensorField([nc, nc]): int64
-          var lf = gf.newLocalTensorField()
+      
+      test "int64":
+        var gf = plat.newTensorField([nc, nc]): int64
+        accelerator:
           var df = gf.newTensorFieldView()
 
-        test "float32":
-          var gf = plat.newTensorField([nc, nc]): float32
-          var lf = gf.newLocalTensorField()
+      test "float32":
+        var gf = plat.newTensorField([nc, nc]): float32
+        accelerator:
           var df = gf.newTensorFieldView()
-        
-        test "float64":
-          var gf = plat.newTensorField([nc, nc]): float64
-          var lf = gf.newLocalTensorField()
+      
+      test "float64":
+        var gf = plat.newTensorField([nc, nc]): float64
+        accelerator:
           var df = gf.newTensorFieldView()

@@ -138,3 +138,11 @@ implement SIMDLayout with:
       deviceIdx += (hostCoord div this.simdGrid[d]) * this.deviceStrides[d]
       laneIdx += (hostCoord mod this.simdGrid[d]) * this.simdStrides[d]
     return (deviceIdx, laneIdx)
+
+  method numLocalDeviceSites: int = product(this.deviceGrid())
+
+  method numGhostDeviceSites(ghostGrid: array[D, int]): int =
+    result = 0
+    for d in 0..<D:
+      let numFaceSites = this.numDeviceSites() div this.deviceGrid[d]
+      result += 2 * numFaceSites * ghostGrid[d]

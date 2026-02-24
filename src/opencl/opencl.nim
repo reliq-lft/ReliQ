@@ -26,3 +26,18 @@
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]#
+
+import oclwrap
+import oclbase
+
+export oclbase
+
+template oclParallel*(body: untyped): untyped =
+  ensureCL()
+  block:
+    body
+    # Drain all pending kernels before views are destroyed and
+    # results are read on the host.  Individual `each` dispatches
+    # use clFlush (non-blocking) for pipelining, so we synchronise
+    # once here at the end of the accelerator block.
+    for q in clQueues: check finish(q)

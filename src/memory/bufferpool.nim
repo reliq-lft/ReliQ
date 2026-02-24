@@ -49,6 +49,10 @@ type
     bytes*: int         # allocation size in bytes
     lastUseTick*: int   # for LRU eviction
   
+proc bytes*(key: BufferKey): int =
+  ## Compute total byte size for a given BufferKey
+  return key.numSites * key.elementsPerSite * key.elementSize
+
 class BufferPool:
   ## Global pool of reusable buffers.
   ##

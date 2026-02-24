@@ -90,7 +90,16 @@ var inited = false
 var ts: pointer = nil
 var nts = 0
 
+var ompInitialized* {.global.}: bool = false
+
 alwaysInlinePragma()
+
+template ensureMP*: untyped =
+  ## Initialize OpenMP runtime
+  ## Respects OMP_NUM_THREADS environment variable if set
+  if not ompInitialized:
+    let maxThreads = omp_get_max_threads()
+    ompInitialized = true
 
 proc omp_get_max_threads(): cint {.importc, header: "<omp.h>".}
 proc omp_get_thread_num(): cint {.importc, header: "<omp.h>".}
